@@ -1,0 +1,288 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>OpenSRE Config Service — Admin</title>
+    <style>
+      :root {
+        --bg:#0b1020; --panel:#121a33; --muted:#94a3b8; --text:#e5e7eb;
+        --accent:#60a5fa; --danger:#fb7185; --ok:#34d399;
+        --org-color:#34d399; --team-color:#60a5fa;
+      }
+      * { box-sizing: border-box; }
+      body { margin:0; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; background:var(--bg); color:var(--text); }
+      header { padding:16px 20px; border-bottom:1px solid #1f2a4a; display:flex; justify-content:space-between; align-items:center; }
+      header h1 { margin:0; font-size:16px; font-weight:600; display:flex; align-items:center; gap:10px; }
+      header h1 svg { width:24px; height:24px; }
+      header .meta { font-size:12px; color:var(--muted); }
+      a { color: var(--accent); text-decoration:none; }
+      .wrap { padding:20px; display:grid; gap:16px; }
+      .card { background:var(--panel); border:1px solid #1f2a4a; border-radius:10px; padding:14px; }
+      label { display:block; font-size:12px; color:var(--muted); margin-bottom:6px; }
+      input, textarea, select { width:100%; box-sizing:border-box; background:#0f1630; color:var(--text); border:1px solid #243155; border-radius:8px; padding:10px; font-size:13px; }
+      textarea { min-height: 120px; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
+      button { background:#1d4ed8; border:0; color:white; padding:10px 14px; border-radius:8px; cursor:pointer; font-weight:600; font-size:13px; transition: all 0.15s; }
+      button:hover { background:#2563eb; transform: translateY(-1px); }
+      button.secondary { background:#334155; }
+      button.secondary:hover { background:#475569; }
+      button.danger { background:#be123c; }
+      button.danger:hover { background:#e11d48; }
+      .row { display:flex; gap:10px; align-items:center; flex-wrap: wrap; }
+      .status { font-size:12px; color:var(--muted); padding: 4px 0; }
+      .status.ok { color: var(--ok); }
+      .status.err { color: var(--danger); }
+      pre { margin:0; padding:10px; background:#0f1630; border:1px solid #243155; border-radius:8px; overflow:auto; max-height: 300px; font-size: 11px; }
+      .small { font-size:12px; color:var(--muted); }
+
+      /* Tree Visualization */
+      .tree-container { 
+        background: linear-gradient(135deg, #0f1630 0%, #0b1020 100%);
+        border: 1px solid #243155; 
+        border-radius: 12px; 
+        padding: 24px; 
+        min-height: 300px;
+        overflow: auto;
+      }
+      .tree-svg { display: block; margin: 0 auto; }
+      .tree-node { cursor: pointer; transition: all 0.2s; }
+      .tree-node:hover .node-bg { filter: brightness(1.2); }
+      .tree-node .node-bg { rx: 8; transition: all 0.2s; }
+      .tree-node.org .node-bg { fill: #059669; }
+      .tree-node.team .node-bg { fill: #1d4ed8; }
+      .tree-node text { fill: white; font-size: 11px; font-weight: 500; pointer-events: none; }
+      .tree-edge { stroke: #3b5998; stroke-width: 2; fill: none; }
+      .tree-legend { display: flex; gap: 16px; justify-content: center; margin-top: 16px; }
+      .legend-item { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--muted); }
+      .legend-dot { width: 12px; height: 12px; border-radius: 4px; }
+      .legend-dot.org { background: #059669; }
+      .legend-dot.team { background: #1d4ed8; }
+
+      /* Node Info Panel */
+      .node-panel { 
+        position: fixed; 
+        top: 50%; left: 50%; 
+        transform: translate(-50%, -50%);
+        background: var(--panel); 
+        border: 1px solid #3b5998; 
+        border-radius: 12px; 
+        padding: 20px; 
+        min-width: 320px;
+        max-width: 500px;
+        z-index: 1000;
+        box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+        display: none;
+      }
+      .node-panel.show { display: block; }
+      .node-panel h3 { margin: 0 0 12px; display: flex; align-items: center; gap: 8px; }
+      .node-panel .pill { font-size: 10px; padding: 3px 8px; border-radius: 999px; }
+      .node-panel .pill.org { background: #059669; color: white; }
+      .node-panel .pill.team { background: #1d4ed8; color: white; }
+      .node-panel .close-btn { position: absolute; top: 12px; right: 12px; background: none; border: none; color: var(--muted); cursor: pointer; font-size: 18px; padding: 4px; }
+      .node-panel .close-btn:hover { color: white; }
+      .node-panel .info-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #243155; font-size: 13px; }
+      .node-panel .info-row:last-child { border-bottom: none; }
+      .node-panel .info-label { color: var(--muted); }
+      .node-panel .actions { margin-top: 16px; display: flex; gap: 8px; }
+
+      /* Modal */
+      .modal-overlay { 
+        position: fixed; inset: 0; 
+        background: rgba(0,0,0,0.7); 
+        z-index: 999; 
+        display: none; 
+        justify-content: center; 
+        align-items: center;
+      }
+      .modal-overlay.show { display: flex; }
+      .modal { 
+        background: var(--panel); 
+        border: 1px solid #3b5998; 
+        border-radius: 12px; 
+        padding: 24px; 
+        min-width: 400px;
+        max-width: 500px;
+      }
+      .modal h2 { margin: 0 0 20px; font-size: 18px; }
+      .modal .form-group { margin-bottom: 16px; }
+      .modal .form-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; }
+
+      /* Grid layout */
+      .main-grid { display: grid; grid-template-columns: 300px 1fr; gap: 16px; }
+      @media (max-width: 900px) { .main-grid { grid-template-columns: 1fr; } }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+        </svg>
+        OpenSRE Admin
+      </h1>
+      <div class="meta">
+        <a href="/">Team UI</a> · <a href="/docs" target="_blank">API Docs</a>
+      </div>
+    </header>
+
+    <div class="wrap">
+      <div class="main-grid">
+        <!-- Left sidebar -->
+        <div>
+          <div class="card">
+            <label>Admin Token</label>
+            <input id="adminToken" type="password" placeholder="Paste admin token" />
+            <label style="margin-top:12px;">Organization ID</label>
+            <input id="orgId" value="org1" />
+            <button id="connectBtn" style="margin-top:12px; width:100%;">Connect</button>
+            <div id="status" class="status" style="margin-top:8px;">Not connected</div>
+          </div>
+
+          <div class="card" style="margin-top:16px;">
+            <label>Quick Actions</label>
+            <button id="addNodeBtn" style="width:100%; margin-bottom:8px;">
+              + Add Node
+            </button>
+            <button id="refreshTreeBtn" class="secondary" style="width:100%;">
+              ↻ Refresh Tree
+            </button>
+          </div>
+        </div>
+
+        <!-- Main content -->
+        <div>
+          <div class="card">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+              <h2 style="margin:0; font-size:16px;">Organization Tree</h2>
+              <div class="tree-legend">
+                <div class="legend-item"><div class="legend-dot org"></div> Org</div>
+                <div class="legend-item"><div class="legend-dot team"></div> Team</div>
+              </div>
+            </div>
+            <div class="tree-container" id="treeContainer">
+              <div style="text-align:center; color:var(--muted); padding:40px;">
+                Click "Connect" to load the organization tree
+              </div>
+            </div>
+          </div>
+
+          <!-- Tokens section -->
+          <div class="card" style="margin-top:16px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+              <h2 style="margin:0; font-size:16px;">Team Tokens</h2>
+              <div class="row">
+                <select id="teamForTokens" style="width:150px;">
+                  <option value="">Select team...</option>
+                </select>
+                <button id="issueTokenBtn" class="secondary">Issue Token</button>
+              </div>
+            </div>
+            <div id="tokensList"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Node Info Panel -->
+    <div class="node-panel" id="nodePanel">
+      <button class="close-btn" id="closePanelBtn">×</button>
+      <h3>
+        <span id="panelNodeName">Node Name</span>
+        <span class="pill" id="panelNodeType">team</span>
+      </h3>
+      <div class="info-row">
+        <span class="info-label">Node ID</span>
+        <span id="panelNodeId">-</span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">Parent</span>
+        <span id="panelParentId">-</span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">Created</span>
+        <span id="panelCreatedAt">-</span>
+      </div>
+      <div class="actions">
+        <button id="panelAddChildBtn">+ Add Child</button>
+        <button id="panelEditBtn" class="secondary">Edit</button>
+        <button id="panelConfigBtn" class="secondary">Config</button>
+        <button id="panelTokensBtn" class="secondary">Tokens</button>
+      </div>
+    </div>
+
+    <!-- Add Node Modal -->
+    <div class="modal-overlay" id="addNodeModal">
+      <div class="modal">
+        <h2>Add New Node</h2>
+        <div class="form-group">
+          <label>Node ID</label>
+          <input id="newNodeId" placeholder="e.g. platform-team-west" />
+        </div>
+        <div class="form-group">
+          <label>Display Name</label>
+          <input id="newNodeName" placeholder="e.g. Platform Team West" />
+        </div>
+        <div class="form-group">
+          <label>Parent Node</label>
+          <select id="newNodeParent">
+            <option value="">Loading...</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Node Type</label>
+          <select id="newNodeType">
+            <option value="team">Team (leaf node, can have tokens)</option>
+          </select>
+        </div>
+        <div class="form-actions">
+          <button class="secondary" id="cancelAddNodeBtn">Cancel</button>
+          <button id="confirmAddNodeBtn">Create Node</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Edit Node Modal -->
+    <div class="modal-overlay" id="editNodeModal">
+      <div class="modal">
+        <h2>Edit Node</h2>
+        <div class="form-group">
+          <label>Node ID (read-only)</label>
+          <input id="editNodeId" readonly style="opacity:0.6;" />
+        </div>
+        <div class="form-group">
+          <label>Display Name</label>
+          <input id="editNodeName" />
+        </div>
+        <div class="form-group">
+          <label>Parent Node</label>
+          <select id="editNodeParent"></select>
+        </div>
+        <div class="form-actions">
+          <button class="secondary" id="cancelEditNodeBtn">Cancel</button>
+          <button id="confirmEditNodeBtn">Save Changes</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Config Modal -->
+    <div class="modal-overlay" id="configModal">
+      <div class="modal" style="min-width:600px;">
+        <h2>Node Configuration: <span id="configNodeId"></span></h2>
+        <div class="form-group">
+          <label>Effective Config (inherited + local)</label>
+          <pre id="effectiveConfigPre" style="max-height:200px;">{}</pre>
+        </div>
+        <div class="form-group">
+          <label>Config Patch (JSON) - Only local overrides</label>
+          <textarea id="configPatchTa" style="min-height:150px;">{}</textarea>
+        </div>
+        <div class="form-actions">
+          <button class="secondary" id="cancelConfigBtn">Cancel</button>
+          <button id="saveConfigBtn">Save Config</button>
+        </div>
+      </div>
+    </div>
+
+    <script src="/ui/admin.js?v=7"></script>
+  </body>
+</html>

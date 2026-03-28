@@ -1,0 +1,29 @@
+aws_region         = "us-west-2"
+aws_profile        = "playground"
+project            = "opensre-config-service"
+vpc_id             = "vpc-0949ea4cf60f4aa72"
+private_subnet_ids = ["subnet-0b361bbf3330457b8", "subnet-0ea37c7ded57bf10c"]
+vpc_cidr           = "10.0.0.0/16"
+
+# Uses the RDS stack secret that stores {username,password,host,port,dbname}
+db_secret_name = "opensre-config-service/rds"
+
+# Create this secret once (plaintext secret string) and Terraform will reference it
+token_pepper_secret_name = "opensre-config-service/token_pepper"
+
+# Create this secret once (plaintext secret string) and Terraform will reference it
+admin_token_secret_name = "opensre-config-service/admin_token"
+
+# Service sizing
+desired_count = 1
+cpu           = 256
+memory        = 512
+
+# Image tag that ECS will run (updated by scripts/deploy_app_ecs.sh)
+image_tag = "latest"
+
+tags = {
+  Environment = "playground"
+}
+
+

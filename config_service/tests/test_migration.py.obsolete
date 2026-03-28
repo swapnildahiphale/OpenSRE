@@ -1,0 +1,413 @@
+"""
+Tests for config migration script.
+
+Tests:
+- Agent tools migration from {enabled: [...], disabled: [...]} to {tool_id: bool}
+- Agent sub_agents migration from list to dict
+- MCP servers migration from list to dict
+- team_added_mcp_servers merging
+- team_enabled_tool_ids and team_disabled_tool_ids application
+"""
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+import pytest
+from scripts.migrate_to_dict_schema import (
+    migrate_agent_tools,
+    migrate_agent_sub_agents,
+    migrate_mcp_servers,
+    merge_team_added_mcps,
+    apply_team_enabled_tool_ids,
+    apply_team_disabled_tool_ids,
+    add_mcps_field_to_agents,
+    migrate_config,
+)
+
+
+class TestAgentToolsMigration:
+    """Test agent tools migration."""
+
+    def test_migrate_enabled_tools(self):
+        """Test migrating enabled tools list to dict."""
+        agent_config = {
+            "enabled": True,
+            "tools": {
+                "enabled": ["think", "llm_call", "web_search"],
+                "disabled": []
+            }
+        }
+
+        migrate_agent_tools(agent_config)
+
+        assert agent_config["tools"] == {
+            "think": True,
+            "llm_call": True,
+            "web_search": True
+        }
+
+    def test_migrate_disabled_tools(self):
+        """Test migrating disabled tools."""
+        agent_config = {
+            "tools": {
+                "enabled": ["think"],
+                "disabled": ["web_search"]
+            }
+        }
+
+        migrate_agent_tools(agent_config)
+
+        assert agent_config["tools"] == {
+            "think": True,
+            "web_search": False
+        }
+
+    def test_migrate_wildcard_tools(self):
+        """Test migrating wildcard (*) tools."""
+        agent_config = {
+            "tools": {
+                "enabled": ["*"],
+                "disabled": []
+            }
+        }
+
+        migrate_agent_tools(agent_config)
+
+        assert agent_config["tools"] == {
+            "*": True
+        }
+
+    def test_already_migrated_tools(self):
+        """Test that already-migrated tools are not changed."""
+        agent_config = {
+            "tools": {
+                "think": True,
+                "llm_call": True
+            }
+        }
+
+        original = agent_config["tools"].copy()
+        migrate_agent_tools(agent_config)
+
+        # Should remain unchanged
+        assert agent_config["tools"] == original
+
+
+class TestSubAgentsMigration:
+    """Test sub_agents migration."""
+
+    def test_migrate_sub_agents_list(self):
+        """Test migrating sub_agents from list to dict."""
+        agent_config = {
+            "sub_agents": ["investigation", "k8s", "aws"]
+        }
+
+        migrate_agent_sub_agents(agent_config)
+
+        assert agent_config["sub_agents"] == {
+            "investigation": True,
+            "k8s": True,
+            "aws": True
+        }
+
+    def test_empty_sub_agents_list(self):
+        """Test migrating empty sub_agents list."""
+        agent_config = {
+            "sub_agents": []
+        }
+
+        migrate_agent_sub_agents(agent_config)
+
+        assert agent_config["sub_agents"] == {}
+
+    def test_already_migrated_sub_agents(self):
+        """Test that already-migrated sub_agents are not changed."""
+        agent_config = {
+            "sub_agents": {
+                "investigation": True,
+                "k8s": True
+            }
+        }
+
+        original = agent_config["sub_agents"].copy()
+        migrate_agent_sub_agents(agent_config)
+
+        # Should remain unchanged
+        assert agent_config["sub_agents"] == original
+
+
+class TestMCPServersMigration:
+    """Test MCP servers migration."""
+
+    def test_migrate_mcp_servers_list(self):
+        """Test migrating mcp_servers from list to dict."""
+        config = {
+            "mcp_servers": [
+                {
+                    "id": "github-mcp",
+                    "name": "GitHub MCP",
+                    "enabled": True,
+                    "command": "npx"
+                },
+                {
+                    "id": "custom-mcp",
+                    "name": "Custom MCP",
+                    "enabled": False
+                }
+            ]
+        }
+
+        migrate_mcp_servers(config)
+
+        assert config["mcp_servers"] == {
+            "github-mcp": {
+                "name": "GitHub MCP",
+                "enabled": True,
+                "command": "npx"
+            },
+            "custom-mcp": {
+                "name": "Custom MCP",
+                "enabled": False
+            }
+        }
+
+    def test_migrate_mcp_without_id(self):
+        """Test migrating MCP without id field (generates from name)."""
+        config = {
+            "mcp_servers": [
+                {
+                    "name": "My Custom MCP",
+                    "enabled": True
+                }
+            ]
+        }
+
+        migrate_mcp_servers(config)
+
+        # Should generate ID from name
+        assert "my-custom-mcp" in config["mcp_servers"]
+        assert config["mcp_servers"]["my-custom-mcp"]["name"] == "My Custom MCP"
+
+
+class TestTeamFieldsMigration:
+    """Test team-specific field migrations."""
+
+    def test_merge_team_added_mcps(self):
+        """Test merging team_added_mcp_servers into mcp_servers."""
+        config = {
+            "mcp_servers": {
+                "github-mcp": {
+                    "enabled": True
+                }
+            },
+            "team_added_mcp_servers": [
+                {
+                    "id": "team-mcp",
+                    "name": "Team MCP",
+                    "enabled": True
+                }
+            ]
+        }
+
+        merge_team_added_mcps(config)
+
+        # Should merge into mcp_servers
+        assert "team-mcp" in config["mcp_servers"]
+        assert config["mcp_servers"]["team-mcp"]["name"] == "Team MCP"
+
+        # Should remove team_added_mcp_servers field
+        assert "team_added_mcp_servers" not in config
+
+    def test_apply_team_enabled_tool_ids(self):
+        """Test applying team_enabled_tool_ids."""
+        config = {
+            "tools": {
+                "custom_tool": {
+                    "enabled": False
+                }
+            },
+            "integrations": {
+                "custom_integration": {
+                    "enabled": False
+                }
+            },
+            "team_enabled_tool_ids": ["custom_tool", "custom_integration"]
+        }
+
+        apply_team_enabled_tool_ids(config)
+
+        # Should enable the tools/integrations
+        assert config["tools"]["custom_tool"]["enabled"] is True
+        assert config["integrations"]["custom_integration"]["enabled"] is True
+
+        # Should remove the field
+        assert "team_enabled_tool_ids" not in config
+
+    def test_apply_team_disabled_tool_ids(self):
+        """Test applying team_disabled_tool_ids."""
+        config = {
+            "tools": {
+                "unwanted_tool": {
+                    "enabled": True
+                }
+            },
+            "mcp_servers": {
+                "unwanted_mcp": {
+                    "enabled": True
+                }
+            },
+            "team_disabled_tool_ids": ["unwanted_tool", "unwanted_mcp"]
+        }
+
+        apply_team_disabled_tool_ids(config)
+
+        # Should disable the tools/MCPs
+        assert config["tools"]["unwanted_tool"]["enabled"] is False
+        assert config["mcp_servers"]["unwanted_mcp"]["enabled"] is False
+
+        # Should remove the field
+        assert "team_disabled_tool_ids" not in config
+
+
+class TestAddMCPsField:
+    """Test adding mcps field to agents."""
+
+    def test_add_mcps_to_agents(self):
+        """Test that mcps field is added to all agents."""
+        config = {
+            "agents": {
+                "planner": {
+                    "enabled": True,
+                    "tools": {
+                        "think": True
+                    }
+                },
+                "investigation": {
+                    "enabled": True
+                }
+            }
+        }
+
+        add_mcps_field_to_agents(config)
+
+        # All agents should have mcps field
+        assert "mcps" in config["agents"]["planner"]
+        assert config["agents"]["planner"]["mcps"] == {}
+        assert "mcps" in config["agents"]["investigation"]
+        assert config["agents"]["investigation"]["mcps"] == {}
+
+    def test_dont_overwrite_existing_mcps(self):
+        """Test that existing mcps field is not overwritten."""
+        config = {
+            "agents": {
+                "planner": {
+                    "mcps": {
+                        "github-mcp": True
+                    }
+                }
+            }
+        }
+
+        add_mcps_field_to_agents(config)
+
+        # Should not overwrite
+        assert config["agents"]["planner"]["mcps"] == {"github-mcp": True}
+
+
+class TestFullMigration:
+    """Test complete end-to-end migration."""
+
+    def test_full_migration(self):
+        """Test migrating a complete config."""
+        old_config = {
+            "agents": {
+                "planner": {
+                    "enabled": True,
+                    "tools": {
+                        "enabled": ["think", "llm_call"],
+                        "disabled": []
+                    },
+                    "sub_agents": ["investigation", "k8s"]
+                },
+                "investigation": {
+                    "enabled": True,
+                    "tools": {
+                        "enabled": ["*"],
+                        "disabled": []
+                    },
+                    "sub_agents": []
+                }
+            },
+            "tools": {
+                "think": {
+                    "enabled": True
+                },
+                "custom_tool": {
+                    "enabled": False
+                }
+            },
+            "mcp_servers": [
+                {
+                    "id": "github-mcp",
+                    "enabled": True,
+                    "command": "npx"
+                }
+            ],
+            "team_added_mcp_servers": [
+                {
+                    "id": "team-mcp",
+                    "enabled": True
+                }
+            ],
+            "team_enabled_tool_ids": ["custom_tool"],
+            "team_disabled_tool_ids": []
+        }
+
+        new_config = migrate_config(old_config)
+
+        # Check agents
+        assert new_config["agents"]["planner"]["tools"] == {
+            "think": True,
+            "llm_call": True
+        }
+        assert new_config["agents"]["planner"]["sub_agents"] == {
+            "investigation": True,
+            "k8s": True
+        }
+        assert "mcps" in new_config["agents"]["planner"]
+
+        assert new_config["agents"]["investigation"]["tools"] == {
+            "*": True
+        }
+
+        # Check MCP servers
+        assert isinstance(new_config["mcp_servers"], dict)
+        assert "github-mcp" in new_config["mcp_servers"]
+        assert "team-mcp" in new_config["mcp_servers"]
+
+        # Check tools
+        assert new_config["tools"]["custom_tool"]["enabled"] is True  # Applied team_enabled_tool_ids
+
+        # Check deprecated fields removed
+        assert "team_added_mcp_servers" not in new_config
+        assert "team_enabled_tool_ids" not in new_config
+        assert "team_disabled_tool_ids" not in new_config
+
+    def test_idempotent_migration(self):
+        """Test that migrating twice produces same result."""
+        old_config = {
+            "agents": {
+                "planner": {
+                    "tools": {
+                        "enabled": ["think"],
+                        "disabled": []
+                    }
+                }
+            }
+        }
+
+        first_migration = migrate_config(old_config)
+        second_migration = migrate_config(first_migration)
+
+        # Should be identical
+        assert first_migration == second_migration

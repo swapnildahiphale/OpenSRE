@@ -1,0 +1,17 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 💬 GitHub Discussions
+    url: https://github.com/swapnildahiphale/OpenSRE/discussions
+    about: Ask questions, share ideas, and discuss with the community
+
+  - name: 💬 Slack Community
+    url: https://join.slack.com/t/opensre/shared_invite/zt-3ojlxvs46-xuEJEplqBHPlymxtzQi8KQ
+    about: Join our Slack workspace for real-time discussions and support
+
+  - name: 📚 Documentation
+    url: https://opensre.in/docs
+    about: Read the docs for setup guides, integrations, and architecture details
+
+  - name: 🔒 Security Issues
+    url: https://github.com/swapnildahiphale/OpenSRE/security/advisories/new
+    about: Report security vulnerabilities privately

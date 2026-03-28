@@ -1,0 +1,9 @@
+# Artifact Hub repository metadata
+# https://artifacthub.io/docs/topics/repositories/
+#
+# After registering the repository on Artifact Hub, replace the
+# repositoryID below with the value assigned by Artifact Hub.
+repositoryID: 318a2c36-5d56-4883-a33b-942c9a289050
+owners:
+  - name: opensre
+    email: support@opensre.ai

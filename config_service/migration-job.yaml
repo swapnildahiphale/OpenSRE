@@ -1,0 +1,34 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: alembic-migration
+  namespace: claude-runtime
+spec:
+  ttlSecondsAfterFinished: 600
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+      - name: migration
+        image: python:3.11-slim
+        command:
+        - /bin/sh
+        - -c
+        - |
+          apt-get update && apt-get install -y postgresql-client git
+          pip install alembic psycopg2-binary sqlalchemy
+          cd /workspace
+          alembic upgrade head
+        workingDir: /workspace
+        env:
+        - name: DATABASE_URL
+          value: "postgresql+psycopg2://opensre:oO?G?cU[_Q7Xk:yy<H_Pckvq66CoccPf@opensre-pilot.c21cia4scjk8.us-east-1.rds.amazonaws.com:5432/opensre"
+        - name: PYTHONPATH
+          value: "/workspace"
+        volumeMounts:
+        - name: config-service
+          mountPath: /workspace
+      volumes:
+      - name: config-service
+        configMap:
+          name: config-service-files

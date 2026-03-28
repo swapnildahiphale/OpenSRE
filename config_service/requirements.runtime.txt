@@ -1,0 +1,40 @@
+# Runtime dependencies for production images (exclude dev/test tools).
+
+# Core
+pydantic>=2.0.0
+pydantic-settings>=2.0.0
+email-validator>=2.0.0  # Required for pydantic EmailStr
+pyyaml>=6.0
+ruamel.yaml>=0.18.0  # For YAML config with comment preservation (local mode)
+watchdog>=3.0.0  # For file watching (local mode)
+structlog>=23.0.0
+
+# Database
+sqlalchemy>=2.0.0
+psycopg2-binary>=2.9.0
+alembic>=1.12.0
+
+# API
+fastapi>=0.115.0
+uvicorn>=0.30.0
+python-multipart>=0.0.22
+
+# HTTP / Metrics
+httpx>=0.27.0
+prometheus-client>=0.19.0
+# Security patches (urllib3, pyasn1, jaraco.context, starlette) applied in Dockerfile
+
+# Auth (OIDC/JWT)
+PyJWT>=2.8.0
+cryptography>=41.0.0
+
+# Cron expression parsing for scheduled jobs
+croniter>=2.0.0
+
+# Optional cache (enabled via CONFIG_CACHE_BACKEND=redis)
+redis>=5.0.0
+
+# MCP (for MCP preview functionality)
+mcp==1.24.0
+
+

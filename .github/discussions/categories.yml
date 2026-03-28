@@ -1,0 +1,28 @@
+# GitHub Discussions Categories Configuration
+# This file is used by GitHub to configure discussion categories
+
+categories:
+  - name: 💡 Ideas
+    description: Suggest new features, integrations, or improvements
+    emoji: "💡"
+    format: discussion
+
+  - name: 🙋 Q&A
+    description: Ask technical questions about setup, integrations, and troubleshooting
+    emoji: "🙋"
+    format: question
+
+  - name: 📣 Show and Tell
+    description: Share your custom tools, runbooks, and deployment setups
+    emoji: "📣"
+    format: discussion
+
+  - name: 🗣️ General
+    description: Introduce yourself, share incident stories, and discuss SRE practices
+    emoji: "🗣️"
+    format: discussion
+
+  - name: 📢 Announcements
+    description: Official announcements from the OpenSRE team
+    emoji: "📢"
+    format: announcement

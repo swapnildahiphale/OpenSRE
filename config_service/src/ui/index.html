@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>OpenSRE Config Service</title>
+    <style>
+      :root { --bg:#0b1020; --panel:#121a33; --muted:#94a3b8; --text:#e5e7eb; --accent:#60a5fa; --danger:#fb7185; --ok:#34d399; }
+      body { margin:0; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; background:var(--bg); color:var(--text); }
+      header { padding:16px 20px; border-bottom:1px solid #1f2a4a; display:flex; justify-content:space-between; align-items:center; }
+      header h1 { margin:0; font-size:16px; font-weight:600; letter-spacing:0.2px; }
+      header .meta { font-size:12px; color:var(--muted); }
+      .wrap { padding:20px; display:grid; gap:16px; grid-template-columns: 1fr; }
+      .grid { display:grid; gap:16px; grid-template-columns: 360px 1fr; align-items:start; }
+      .card { background:var(--panel); border:1px solid #1f2a4a; border-radius:10px; padding:14px; }
+      label { display:block; font-size:12px; color:var(--muted); margin-bottom:6px; }
+      input, textarea { width:100%; box-sizing:border-box; background:#0f1630; color:var(--text); border:1px solid #243155; border-radius:8px; padding:10px; font-size:13px; }
+      textarea { min-height: 240px; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
+      button { background:#1d4ed8; border:0; color:white; padding:10px 12px; border-radius:8px; cursor:pointer; font-weight:600; font-size:13px; }
+      button.secondary { background:#334155; }
+      button.danger { background:#be123c; }
+      button:disabled { opacity:0.5; cursor:not-allowed; }
+      .row { display:flex; gap:10px; align-items:center; }
+      .row > * { flex: 1; }
+      .row .shrink { flex: 0 0 auto; }
+      .pill { display:inline-block; padding:3px 8px; border-radius:999px; background:#0f1630; border:1px solid #243155; color:var(--muted); font-size:12px; }
+      pre { margin:0; padding:10px; background:#0f1630; border:1px solid #243155; border-radius:8px; overflow:auto; max-height: 520px; }
+      .status { font-size:12px; color:var(--muted); }
+      .status.ok { color: var(--ok); }
+      .status.err { color: var(--danger); }
+      a { color: var(--accent); text-decoration: none; }
+      .small { font-size:12px; color:var(--muted); }
+      @media (max-width: 980px) { .grid { grid-template-columns: 1fr; } }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>OpenSRE Config Service</h1>
+      <div class="meta">
+        <span class="pill">UI</span>
+        <span class="pill"><a href="/admin">admin</a></span>
+        <span class="pill"><a href="/metrics" target="_blank" rel="noreferrer">metrics</a></span>
+        <span class="pill"><a href="/docs" target="_blank" rel="noreferrer">docs</a></span>
+      </div>
+    </header>
+
+    <div class="wrap">
+      <div class="grid">
+        <div class="card">
+          <label>Team token</label>
+          <input id="token" placeholder="paste Bearer token (opaque)" />
+          <div class="row" style="margin-top:10px;">
+            <button id="loadBtn">Load config</button>
+            <button id="logoutBtn" class="secondary">Clear</button>
+          </div>
+          <div id="status" class="status" style="margin-top:10px;">Not connected.</div>
+
+          <hr style="border:0;border-top:1px solid #1f2a4a;margin:14px 0;" />
+
+          <div class="small">
+            Workflow:
+            <ol>
+              <li>Paste token</li>
+              <li>Load config (shows inherited effective config)</li>
+              <li>Edit team overrides JSON and Save</li>
+            </ol>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="row" style="margin-bottom:10px;">
+            <div class="shrink"><span class="pill" id="teamLabel">team: —</span></div>
+            <div class="shrink"><span class="pill" id="lineageLabel">lineage: —</span></div>
+            <div class="shrink"><span class="pill" id="reqLabel">request: —</span></div>
+          </div>
+
+          <div class="grid" style="grid-template-columns: 1fr 1fr;">
+            <div>
+              <label>Effective config (read-only)</label>
+              <pre id="effectivePre">{}</pre>
+            </div>
+            <div>
+              <label>Team overrides (edit JSON)</label>
+              <textarea id="overridesTa" spellcheck="false">{}</textarea>
+              <div class="row" style="margin-top:10px;">
+                <button id="saveBtn">Save overrides</button>
+                <button id="resetBtn" class="secondary">Reset</button>
+              </div>
+              <div class="small" style="margin-top:8px;">
+                Notes:
+                <ul>
+                  <li>Do not include <code>team_name</code> (immutable; server rejects).</li>
+                  <li>PATCH semantics: payload deep-merges into existing overrides.</li>
+                </ul>
+              </div>
+              <div id="saveStatus" class="status" style="margin-top:8px;"></div>
+            </div>
+          </div>
+
+          <hr style="border:0;border-top:1px solid #1f2a4a;margin:14px 0;" />
+
+          <label>Lineage + raw configs (read-only)</label>
+          <pre id="rawPre">{}</pre>
+        </div>
+      </div>
+    </div>
+
+    <script src="/ui/app.js"></script>
+  </body>
+</html>
+
+

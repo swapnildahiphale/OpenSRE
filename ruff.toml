@@ -1,0 +1,33 @@
+# Ruff configuration for the entire monorepo
+line-length = 100
+target-version = "py311"
+
+[lint]
+select = ["E", "F", "I"]
+ignore = [
+    "E501",  # Line too long (handled by Black)
+    "E402",  # Module level import not at top of file (common in tests with pytest.importorskip)
+    "E711",  # Comparison to None (SQLAlchemy uses == None)
+    "E712",  # Comparison to True/False (SQLAlchemy uses == True/False)
+    "E741",  # Ambiguous variable name
+    "F402",  # Import shadowed by loop variable
+    "F403",  # Star imports
+    "F405",  # May be undefined from star import
+    "F811",  # Redefinition of unused name
+]
+
+# Per-file ignores for rules that are globally enabled but have
+# legitimate exceptions in specific locations.
+[lint.per-file-ignores]
+# slack-bot: large legacy codebase — bare excepts and unused vars
+# will be cleaned up in a dedicated refactor PR.
+"slack-bot/*.py" = ["E722", "F841"]
+# config_service repository.py: deferred imports used only in type
+# annotations (from __future__ import annotations makes these safe).
+"config_service/src/db/repository.py" = ["F821"]
+# Test files: unused variables from function calls checked for side effects
+"sre-agent/tests/*.py" = ["F841"]
+# Scripts: variables captured for debugging/observability baselines
+"scripts/fault_analysis.py" = ["F841"]
+# Neo4j semantic layer: property access used to test connection
+"sre-agent/tools/neo4j_semantic_layer.py" = ["F841"]

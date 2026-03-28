@@ -1,0 +1,15 @@
+{
+    "dependencies": ["."],
+    "graphs": {
+        "investigation": {
+            "entrypoint": "graph:create_app"
+        }
+    },
+    "env": {
+        "LITELLM_BASE_URL": "http://localhost:4001/v1",
+        "CONFIG_SERVICE_URL": "http://localhost:8081",
+        "NEO4J_URI": "bolt://localhost:7688",
+        "OPENSRE_TENANT_ID": "local",
+        "OPENSRE_TEAM_ID": "default"
+    }
+}

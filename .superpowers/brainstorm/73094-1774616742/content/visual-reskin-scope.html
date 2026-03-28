@@ -1,0 +1,98 @@
+<h2>Visual Reskin: What Changes?</h2>
+<p class="subtitle">Current site elements mapped to the reference design's visual language. Click any items you want to <strong>skip</strong> (keep as-is).</p>
+
+<div class="options" data-multiselect>
+
+  <div class="option" data-choice="navbar" onclick="toggleSelect(this)">
+    <div class="letter">1</div>
+    <div class="content">
+      <h3>Glassmorphism Navbar</h3>
+      <p><strong>Current:</strong> Solid bg with opacity<br>
+      <strong>New:</strong> Frosted glass effect (<code>backdrop-filter: blur(12px)</code>), semi-transparent white bg, subtle border. Scrollbar thumb turns green on hover.</p>
+    </div>
+  </div>
+
+  <div class="option" data-choice="blobs" onclick="toggleSelect(this)">
+    <div class="letter">2</div>
+    <div class="content">
+      <h3>Animated Background Blobs</h3>
+      <p><strong>Current:</strong> Static blurred gradient shapes in hero<br>
+      <strong>New:</strong> Fixed full-page animated blobs (green + coral) that slowly float/morph behind all content. Visible through glass elements.</p>
+    </div>
+  </div>
+
+  <div class="option" data-choice="dot-grid" onclick="toggleSelect(this)">
+    <div class="letter">3</div>
+    <div class="content">
+      <h3>Dot Grid Background Pattern</h3>
+      <p><strong>Current:</strong> Noise texture overlay (SVG pattern)<br>
+      <strong>New:</strong> Subtle dot grid in hero area (radial gradient dots, 40px spacing) that fades out downward. Replaces or supplements the noise texture.</p>
+    </div>
+  </div>
+
+  <div class="option" data-choice="buttons" onclick="toggleSelect(this)">
+    <div class="letter">4</div>
+    <div class="content">
+      <h3>Button Sweep Hover Effect</h3>
+      <p><strong>Current:</strong> MagneticButton with mouse-tracking spring physics<br>
+      <strong>New:</strong> Color sweep animation on hover (dark color fills from left to right via <code>::before</code> pseudo-element). Rounded pill shape. Keep magnetic effect too, or replace?</p>
+    </div>
+  </div>
+
+  <div class="option" data-choice="feature-cards" onclick="toggleSelect(this)">
+    <div class="letter">5</div>
+    <div class="content">
+      <h3>Feature Card Hover Effects</h3>
+      <p><strong>Current:</strong> Hover lift (-4px) + glowing mouse-tracking border<br>
+      <strong>New:</strong> Dramatic per-card hover effects — color fill slides (green bg slides up, dark bg slides from left), icon transforms (scale, rotate, translate), hidden content reveals on hover. Each card gets a unique effect.</p>
+    </div>
+  </div>
+
+  <div class="option" data-choice="link-underline" onclick="toggleSelect(this)">
+    <div class="letter">6</div>
+    <div class="content">
+      <h3>Link Underline Animation</h3>
+      <p><strong>Current:</strong> Standard hover color change<br>
+      <strong>New:</strong> Animated underline that scales from right-to-left on hover via <code>scaleX</code> transform. Applied to nav links and footer links.</p>
+    </div>
+  </div>
+
+  <div class="option" data-choice="stats-bar" onclick="toggleSelect(this)">
+    <div class="letter">7</div>
+    <div class="content">
+      <h3>Stats Bar Redesign</h3>
+      <p><strong>Current:</strong> 3-column stats below hero fold (46 skills, &lt;5m MTTD, 100% open source)<br>
+      <strong>New:</strong> Full-width bordered bar with serif numbers, 4 columns with dividers, scale-in animations. Prominent visual break between hero and content.</p>
+    </div>
+  </div>
+
+  <div class="option" data-choice="marquee" onclick="toggleSelect(this)">
+    <div class="letter">8</div>
+    <div class="content">
+      <h3>Dual-Row Marquee</h3>
+      <p><strong>Current:</strong> Single-row logo marquee with SVG logos<br>
+      <strong>New:</strong> Two rows scrolling in opposite directions, icon+text format (Remix Icons instead of SVGs), pause on hover. Edge fade gradients.</p>
+    </div>
+  </div>
+
+  <div class="option" data-choice="hero-terminal" onclick="toggleSelect(this)">
+    <div class="letter">9</div>
+    <div class="content">
+      <h3>Hero Right Panel: Terminal Mockup</h3>
+      <p><strong>Current:</strong> Video player with thumbnail on right side<br>
+      <strong>New:</strong> Dark terminal window with macOS chrome (red/yellow/green dots), typing animation, animated network diagram with SVG lines + flowing dots, floating MTTR stat card. <em>This is a significant content change — skip if you want to keep the video.</em></p>
+    </div>
+  </div>
+
+  <div class="option" data-choice="accent-color" onclick="toggleSelect(this)">
+    <div class="letter">10</div>
+    <div class="content">
+      <h3>Accent Color Shift</h3>
+      <p><strong>Current:</strong> Clay/warm orange <code>#D4856A</code><br>
+      <strong>New:</strong> Stronger coral/rust <code>#c25e4c</code> from reference. More contrast, bolder accent. Affects badges, problem highlights, secondary buttons.</p>
+    </div>
+  </div>
+
+</div>
+
+<p class="subtitle" style="margin-top: 2rem;">Click items to <strong>exclude</strong> them from the reskin. Unclicked items will be included. Then respond in the terminal.</p>

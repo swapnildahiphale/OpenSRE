@@ -1,0 +1,59 @@
+@import "tailwindcss";
+
+/* Configure class-based dark mode for Tailwind v4 */
+@variant dark (&:where(.dark, .dark *));
+
+:root {
+  --background: #FAFAF7;
+  --foreground: #1A1A18;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+
+  /* Stone palette */
+  --color-stone-50:  #FAFAF7;
+  --color-stone-100: #F5F3EF;
+  --color-stone-200: #E8E5DE;
+  --color-stone-300: #D4D0C8;
+  --color-stone-400: #A09E97;
+  --color-stone-500: #7A7870;
+  --color-stone-600: #5A5850;
+  --color-stone-700: #3D3B35;
+  --color-stone-800: #2D2D2D;
+  --color-stone-900: #1A1A18;
+
+  /* Forest palette */
+  --color-forest: #3D7B5F;
+  --color-forest-light: #4E9B77;
+  --color-forest-dark: #2D5B47;
+
+  /* Clay palette */
+  --color-clay: #c25e4c;
+  --color-clay-light: #d67665;
+  --color-clay-dark: #a34a3a;
+}
+
+/* Apply dark mode styles when .dark class is present */
+:root.dark {
+  --background: #2D2D2D;
+  --foreground: #E8E5DE;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+/* Brand card shadow utility */
+.card-opensre {
+  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.05);
+  transition: box-shadow 0.2s ease;
+}
+.card-opensre:hover {
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+}

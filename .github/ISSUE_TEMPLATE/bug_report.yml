@@ -1,0 +1,46 @@
+name: 🐛 Bug Report
+description: Report a bug or unexpected behavior
+title: "[Bug]: "
+labels: ["bug", "needs-triage"]
+
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: Please fill out the template below
+      value: |
+        ## Describe the bug
+        A clear and concise description of what the bug is.
+
+        ## Steps to reproduce
+        1. 
+        2. 
+        3. 
+
+        ## Expected behavior
+        What you expected to happen.
+
+        ## Actual behavior
+        What actually happened (include error messages, stack traces, logs).
+
+        ## Deployment type
+        (Docker Compose / Kubernetes / Managed / Slack / Other)
+
+        ## Environment
+        - OpenSRE version:
+        - Python version:
+        - OS:
+        - Integrations:
+
+        ## Relevant logs
+        (Paste logs here, sanitize sensitive info)
+
+        ## Additional context
+        Any other context about the problem.
+
+        ## Checklist
+        - [ ] I have searched existing issues
+        - [ ] I have provided all requested information
+    validations:
+      required: true

@@ -1,0 +1,4 @@
+{"type":"server-started","port":55932,"host":"127.0.0.1","url_host":"localhost","url":"http://localhost:55932","screen_dir":"/Users/Swapnil/workspace/swapnil/OpenSRE/.superpowers/brainstorm/99524-1774689342/content","state_dir":"/Users/Swapnil/workspace/swapnil/OpenSRE/.superpowers/brainstorm/99524-1774689342/state"}
+{"type":"screen-added","file":"/Users/Swapnil/workspace/swapnil/OpenSRE/.superpowers/brainstorm/99524-1774689342/content/sidebar-comparison.html"}
+{"type":"screen-added","file":"/Users/Swapnil/workspace/swapnil/OpenSRE/.superpowers/brainstorm/99524-1774689342/content/waiting.html"}
+{"type":"server-stopped","reason":"idle timeout"}

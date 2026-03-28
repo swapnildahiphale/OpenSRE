@@ -1,0 +1,31 @@
+aws_region          = "us-west-2"
+aws_profile         = "playground"
+project             = "opensre-config-service"
+
+# Existing VPC (opensre-demo-vpc)
+vpc_id              = "vpc-0949ea4cf60f4aa72"
+private_subnet_ids  = ["subnet-0b361bbf3330457b8", "subnet-0ea37c7ded57bf10c"]
+
+# RDS
+db_name                     = "opensre_config"
+db_username                 = "opensre"
+db_instance_class           = "db.t4g.micro"
+db_engine_version           = "16.11"
+db_allocated_storage_gb     = 20
+db_max_allocated_storage_gb = 100
+db_backup_retention_days    = 7
+db_deletion_protection      = true
+db_multi_az                 = false
+
+# Allow DB access from within the VPC CIDR (prefer restricting to app SG later)
+allowed_cidrs = ["10.0.0.0/16"]
+
+tags = {
+  Environment = "playground"
+}
+
+# Local-friendly DB access (via SSM, no public DB)
+jumpbox_enabled   = true
+jumpbox_subnet_id = "subnet-0b361bbf3330457b8"
+
+

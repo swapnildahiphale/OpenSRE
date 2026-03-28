@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Demo Sidebar Visual Comparison</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #1a1a2e; color: #e0e0e0; padding: 24px; }
+
+  h1 { text-align: center; font-size: 22px; color: #fff; margin-bottom: 6px; }
+  .subtitle { text-align: center; font-size: 14px; color: #888; margin-bottom: 28px; }
+
+  .comparison { display: flex; gap: 32px; justify-content: center; flex-wrap: wrap; }
+
+  .option-card {
+    flex: 1; min-width: 440px; max-width: 560px;
+    border: 2px solid #333; border-radius: 16px; overflow: hidden;
+    cursor: pointer; transition: border-color 0.2s, box-shadow 0.2s;
+    background: #222;
+  }
+  .option-card:hover { border-color: #555; }
+  .option-card.selected { border-color: #3D7B5F; box-shadow: 0 0 20px rgba(61,123,95,0.3); }
+
+  .option-label {
+    padding: 14px 20px;
+    font-size: 15px; font-weight: 700;
+    display: flex; align-items: center; gap: 10px;
+    background: #2a2a2a; border-bottom: 1px solid #333;
+  }
+  .option-label .badge {
+    display: inline-block; width: 28px; height: 28px; border-radius: 50%;
+    background: #3D7B5F; color: #fff; font-size: 14px; font-weight: 700;
+    text-align: center; line-height: 28px;
+  }
+  .option-label .desc { font-size: 12px; color: #888; font-weight: 400; margin-left: auto; }
+
+  /* ---- Mockup frame ---- */
+  .mockup-frame {
+    display: flex; height: 420px; position: relative;
+  }
+
+  /* -- DEMO BANNER -- */
+  .demo-banner {
+    position: absolute; top: 0; left: 0; right: 0;
+    height: 32px; display: flex; align-items: center; justify-content: space-between;
+    padding: 0 12px; font-size: 11px; z-index: 10;
+  }
+
+  /* -- SIDEBAR -- */
+  .sidebar {
+    width: 200px; flex-shrink: 0;
+    display: flex; flex-direction: column;
+    padding-top: 32px; /* below banner */
+    border-right: 1px solid;
+  }
+  .sidebar .logo-area {
+    height: 80px; display: flex; align-items: center; padding: 0 16px;
+    font-size: 16px; font-weight: 700; letter-spacing: -0.5px;
+  }
+  .sidebar .logo-area .logo-icon {
+    width: 36px; height: 36px; border-radius: 8px; margin-right: 10px;
+    display: flex; align-items: center; justify-content: center; font-size: 18px;
+  }
+  .sidebar nav { flex: 1; padding: 12px 10px; display: flex; flex-direction: column; gap: 2px; }
+  .sidebar nav a {
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 12px; border-radius: 8px; font-size: 13px; font-weight: 500;
+    text-decoration: none; transition: background 0.15s;
+  }
+  .sidebar nav a .icon {
+    width: 18px; height: 18px; border-radius: 4px;
+    display: flex; align-items: center; justify-content: center; font-size: 10px;
+  }
+  .sidebar .footer {
+    padding: 12px 16px; font-size: 10px;
+  }
+
+  /* -- WORKSPACE -- */
+  .workspace {
+    flex: 1; padding-top: 32px; overflow: hidden;
+  }
+  .workspace-inner { padding: 20px; }
+  .workspace h2 { font-size: 18px; font-weight: 700; margin-bottom: 4px; }
+  .workspace .sub { font-size: 12px; margin-bottom: 16px; }
+
+  .stat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 16px; }
+  .stat-card {
+    padding: 14px; border-radius: 10px; border: 1px solid;
+  }
+  .stat-card .val { font-size: 22px; font-weight: 700; }
+  .stat-card .label { font-size: 11px; margin-top: 2px; }
+
+  .activity-card {
+    border-radius: 10px; border: 1px solid; overflow: hidden;
+  }
+  .activity-card .header {
+    padding: 12px 14px; font-size: 13px; font-weight: 600;
+    border-bottom: 1px solid;
+  }
+  .activity-card .row {
+    padding: 10px 14px; font-size: 12px;
+    border-bottom: 1px solid;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .activity-card .row:last-child { border-bottom: none; }
+  .activity-card .dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+
+  /* ========== OPTION A: All Warm-Light ========== */
+  .optA .demo-banner { background: #FAFAF7; color: #5A5850; border-bottom: 1px solid #E8E5DE; }
+  .optA .demo-banner .highlight { color: #3D7B5F; font-weight: 600; }
+  .optA .demo-banner .cta { background: #3D7B5F; color: #fff; padding: 2px 10px; border-radius: 4px; font-weight: 600; }
+
+  .optA .sidebar { background: #FAFAF7; border-right-color: #E8E5DE; }
+  .optA .sidebar .logo-area { color: #1A1A18; border-bottom: 1px solid #E8E5DE; }
+  .optA .sidebar .logo-area .logo-icon { background: #3D7B5F; color: #fff; }
+  .optA .sidebar nav a { color: #5A5850; }
+  .optA .sidebar nav a:hover { background: #F5F3EF; }
+  .optA .sidebar nav a.active { background: rgba(61,123,95,0.1); color: #3D7B5F; }
+  .optA .sidebar nav a.active .icon { color: #3D7B5F; }
+  .optA .sidebar nav a .icon { color: #A09E97; }
+  .optA .sidebar .footer { color: #A09E97; border-top: 1px solid #E8E5DE; }
+
+  .optA .workspace { background: #FAFAF7; }
+  .optA .workspace h2 { color: #1A1A18; }
+  .optA .workspace .sub { color: #7A7870; }
+
+  .optA .stat-card { background: #fff; border-color: #E8E5DE; }
+  .optA .stat-card .val { color: #1A1A18; }
+  .optA .stat-card .label { color: #7A7870; }
+
+  .optA .activity-card { background: #fff; border-color: #E8E5DE; }
+  .optA .activity-card .header { color: #1A1A18; border-bottom-color: #E8E5DE; }
+  .optA .activity-card .row { color: #5A5850; border-bottom-color: #F5F3EF; }
+
+  /* ========== OPTION C: Dark Sidebar + Warm-Light Workspace ========== */
+  .optC .demo-banner { background: #1A1A18; color: #D4D0C8; }
+  .optC .demo-banner .highlight { color: #4E9B77; font-weight: 600; }
+  .optC .demo-banner .cta { background: #3D7B5F; color: #fff; padding: 2px 10px; border-radius: 4px; font-weight: 600; }
+
+  .optC .sidebar { background: #1A1A18; border-right-color: #2D2D2D; }
+  .optC .sidebar .logo-area { color: #fff; border-bottom: 1px solid #2D2D2D; }
+  .optC .sidebar .logo-area .logo-icon { background: #3D7B5F; color: #fff; }
+  .optC .sidebar nav a { color: #A09E97; }
+  .optC .sidebar nav a:hover { background: rgba(255,255,255,0.05); }
+  .optC .sidebar nav a.active { background: #3D7B5F; color: #fff; }
+  .optC .sidebar nav a.active .icon { color: #fff; }
+  .optC .sidebar nav a .icon { color: #7A7870; }
+  .optC .sidebar .footer { color: #7A7870; border-top: 1px solid #2D2D2D; }
+
+  .optC .workspace { background: #FAFAF7; }
+  .optC .workspace h2 { color: #1A1A18; }
+  .optC .workspace .sub { color: #7A7870; }
+
+  .optC .stat-card { background: #fff; border-color: #E8E5DE; }
+  .optC .stat-card .val { color: #1A1A18; }
+  .optC .stat-card .label { color: #7A7870; }
+
+  .optC .activity-card { background: #fff; border-color: #E8E5DE; }
+  .optC .activity-card .header { color: #1A1A18; border-bottom-color: #E8E5DE; }
+  .optC .activity-card .row { color: #5A5850; border-bottom-color: #F5F3EF; }
+
+  /* Selection indicator */
+  .option-card .check { display: none; position: absolute; top: 12px; right: 12px; width: 24px; height: 24px; background: #3D7B5F; border-radius: 50%; color: #fff; text-align: center; line-height: 24px; font-size: 14px; }
+  .option-card.selected .check { display: block; }
+  .option-card { position: relative; }
+
+  .note { text-align: center; font-size: 12px; color: #666; margin-top: 20px; }
+</style>
+</head>
+<body>
+
+<h1>Demo Website Sidebar Style</h1>
+<p class="subtitle">Click to select your preferred approach. Both use the warm stone/forest/clay palette.</p>
+
+<div class="comparison">
+
+  <!-- OPTION A -->
+  <div class="option-card" onclick="selectOption(this, 'A')">
+    <div class="check">&#10003;</div>
+    <div class="option-label">
+      <span class="badge">A</span>
+      All Warm-Light — unified light sidebar
+      <span class="desc">Same feel as opensre.in</span>
+    </div>
+    <div class="mockup-frame optA">
+      <div class="demo-banner">
+        <span class="highlight">Interactive Demo</span>
+        <span>Experience OpenSRE</span>
+        <span class="cta">Get Started</span>
+      </div>
+      <div class="sidebar">
+        <div class="logo-area">
+          <div class="logo-icon">O</div>
+          OpenSRE
+        </div>
+        <nav>
+          <a class="active"><span class="icon">&#9632;</span> Dashboard</a>
+          <a><span class="icon">&#9632;</span> Agent Runs</a>
+          <a><span class="icon">&#9632;</span> Memory</a>
+          <a><span class="icon">&#9632;</span> Agent Topology</a>
+          <a><span class="icon">&#9632;</span> Tools & MCPs</a>
+        </nav>
+        <div class="footer">demo.opensre.in</div>
+      </div>
+      <div class="workspace">
+        <div class="workspace-inner">
+          <h2>Team Dashboard</h2>
+          <p class="sub">production-sre</p>
+          <div class="stat-grid">
+            <div class="stat-card">
+              <div class="val">247</div>
+              <div class="label">Total Agent Runs</div>
+            </div>
+            <div class="stat-card">
+              <div class="val">94%</div>
+              <div class="label">Success Rate</div>
+            </div>
+            <div class="stat-card">
+              <div class="val">3m 42s</div>
+              <div class="label">Avg MTTD</div>
+            </div>
+          </div>
+          <div class="activity-card">
+            <div class="header">Recent Activity</div>
+            <div class="row"><span class="dot" style="background:#22c55e"></span> Agent run completed — payment-service</div>
+            <div class="row"><span class="dot" style="background:#22c55e"></span> Investigation resolved — auth-latency</div>
+            <div class="row"><span class="dot" style="background:#7A7870"></span> Config updated — team settings</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- OPTION C -->
+  <div class="option-card" onclick="selectOption(this, 'C')">
+    <div class="check">&#10003;</div>
+    <div class="option-label">
+      <span class="badge">C</span>
+      Dark Sidebar + Warm-Light Workspace
+      <span class="desc">Matches web UI identity</span>
+    </div>
+    <div class="mockup-frame optC">
+      <div class="demo-banner">
+        <span class="highlight">Interactive Demo</span>
+        <span>Experience OpenSRE</span>
+        <span class="cta">Get Started</span>
+      </div>
+      <div class="sidebar">
+        <div class="logo-area">
+          <div class="logo-icon">O</div>
+          OpenSRE
+        </div>
+        <nav>
+          <a class="active"><span class="icon">&#9632;</span> Dashboard</a>
+          <a><span class="icon">&#9632;</span> Agent Runs</a>
+          <a><span class="icon">&#9632;</span> Memory</a>
+          <a><span class="icon">&#9632;</span> Agent Topology</a>
+          <a><span class="icon">&#9632;</span> Tools & MCPs</a>
+        </nav>
+        <div class="footer">demo.opensre.in</div>
+      </div>
+      <div class="workspace">
+        <div class="workspace-inner">
+          <h2>Team Dashboard</h2>
+          <p class="sub">production-sre</p>
+          <div class="stat-grid">
+            <div class="stat-card">
+              <div class="val">247</div>
+              <div class="label">Total Agent Runs</div>
+            </div>
+            <div class="stat-card">
+              <div class="val">94%</div>
+              <div class="label">Success Rate</div>
+            </div>
+            <div class="stat-card">
+              <div class="val">3m 42s</div>
+              <div class="label">Avg MTTD</div>
+            </div>
+          </div>
+          <div class="activity-card">
+            <div class="header">Recent Activity</div>
+            <div class="row"><span class="dot" style="background:#22c55e"></span> Agent run completed — payment-service</div>
+            <div class="row"><span class="dot" style="background:#22c55e"></span> Investigation resolved — auth-latency</div>
+            <div class="row"><span class="dot" style="background:#7A7870"></span> Config updated — team settings</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<p class="note">Both options use the same warm stone/forest/clay palette for the workspace. The difference is the sidebar and banner.</p>
+
+<script>
+  let selected = null;
+  function selectOption(el, choice) {
+    document.querySelectorAll('.option-card').forEach(c => c.classList.remove('selected'));
+    el.classList.add('selected');
+    selected = choice;
+    // Try to communicate selection
+    try {
+      if (window.__superpowers_select) window.__superpowers_select(choice);
+    } catch(e) {}
+  }
+</script>
+
+</body>
+</html>

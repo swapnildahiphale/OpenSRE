@@ -1,0 +1,2790 @@
+from __future__ import annotations
+
+from dataclasses import dataclass
+from datetime import datetime, timedelta
+from typing import Any, Dict, List, Optional
+from uuid import uuid4
+
+from sqlalchemy import func, select
+from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy.orm import Session
+from sqlalchemy.orm.attributes import flag_modified
+
+from src.core.security import generate_token, hash_token
+from src.db.models import (
+    AgentRun,
+    ConversationMapping,
+    ImpersonationJTI,
+    K8sCluster,
+    K8sClusterStatus,
+    OrgAdminToken,
+    OrgNode,
+    PendingConfigChange,
+    SecurityPolicy,
+    SlackSessionCache,
+    TeamToken,
+    TokenAudit,
+    TokenPermission,
+)
+
+
+@dataclass(frozen=True)
+class Principal:
+    org_id: str
+    team_node_id: str
+
+
+def record_impersonation_jti(
+    session: Session,
+    *,
+    jti: str,
+    org_id: str,
+    team_node_id: str,
+    subject: Optional[str],
+    email: Optional[str],
+    issued_at: datetime,
+    expires_at: datetime,
+) -> None:
+    """
+    Best-effort insert of an impersonation JWT's `jti` for auditing / allowlist verification.
+    """
+    row = ImpersonationJTI(
+        jti=jti,
+        org_id=org_id,
+        team_node_id=team_node_id,
+        subject=subject,
+        email=email,
+        issued_at=issued_at,
+        expires_at=expires_at,
+    )
+    session.add(row)
+    # If this is a duplicate, let the caller decide whether to ignore/raise by catching.
+    session.flush()
+
+
+def impersonation_jti_exists(session: Session, *, jti: str) -> bool:
+    row = session.execute(
+        select(ImpersonationJTI.jti).where(ImpersonationJTI.jti == jti)
+    ).first()
+    return row is not None
+
+
+def issue_team_token(
+    session: Session,
+    *,
+    org_id: str,
+    team_node_id: str,
+    issued_by: Optional[str],
+    pepper: str,
+    expires_at: Optional[datetime] = None,
+    permissions: Optional[List[str]] = None,
+    label: Optional[str] = None,
+) -> str:
+    """Create and store a new opaque bearer token.
+
+    Token format: <token_id>.<token_secret>
+    - token_id is stored in DB and used for lookup
+    - token_secret is only returned once; only its hash is stored
+    """
+    token_id = uuid4().hex
+    token_secret = generate_token(32)
+    token_hash = hash_token(token_secret, pepper=pepper)
+
+    # Apply security policy expiration if not explicitly set
+    if expires_at is None:
+        policy = get_security_policy(session, org_id=org_id)
+        if policy and policy.token_expiry_days:
+            from datetime import timedelta
+
+            expires_at = datetime.utcnow() + timedelta(days=policy.token_expiry_days)
+
+    row = TeamToken(
+        org_id=org_id,
+        team_node_id=team_node_id,
+        token_id=token_id,
+        token_hash=token_hash,
+        issued_at=datetime.utcnow(),
+        issued_by=issued_by,
+        revoked_at=None,
+        expires_at=expires_at,
+        permissions=permissions or TokenPermission.DEFAULT_TEAM,
+        label=label,
+    )
+    session.add(row)
+    session.flush()
+
+    # Audit log
+    record_token_audit(
+        session,
+        org_id=org_id,
+        team_node_id=team_node_id,
+        token_id=token_id,
+        event_type="issued",
+        actor=issued_by,
+        details={
+            "label": label,
+            "permissions": permissions or TokenPermission.DEFAULT_TEAM,
+        },
+    )
+
+    return f"{token_id}.{token_secret}"
+
+
+def revoke_team_token(
+    session: Session, *, token_id: str, revoked_by: Optional[str] = None
+) -> None:
+    row = session.execute(
+        select(TeamToken).where(TeamToken.token_id == token_id)
+    ).scalar_one_or_none()
+    if row is None:
+        return
+    row.revoked_at = datetime.utcnow()
+    session.flush()
+
+    # Audit log
+    record_token_audit(
+        session,
+        org_id=row.org_id,
+        team_node_id=row.team_node_id,
+        token_id=token_id,
+        event_type="revoked",
+        actor=revoked_by,
+        details={},
+    )
+
+
+def revoke_team_token_scoped(
+    session: Session,
+    *,
+    org_id: str,
+    team_node_id: str,
+    token_id: str,
+    revoked_by: Optional[str] = None,
+) -> None:
+    row = session.execute(
+        select(TeamToken).where(
+            TeamToken.org_id == org_id,
+            TeamToken.team_node_id == team_node_id,
+            TeamToken.token_id == token_id,
+        )
+    ).scalar_one_or_none()
+    if row is None:
+        return
+    row.revoked_at = datetime.utcnow()
+    session.flush()
+
+    # Audit log
+    record_token_audit(
+        session,
+        org_id=org_id,
+        team_node_id=team_node_id,
+        token_id=token_id,
+        event_type="revoked",
+        actor=revoked_by,
+        details={},
+    )
+
+
+def list_team_tokens(
+    session: Session, *, org_id: str, team_node_id: str
+) -> List[TeamToken]:
+    return (
+        session.execute(
+            select(TeamToken)
+            .where(TeamToken.org_id == org_id, TeamToken.team_node_id == team_node_id)
+            .order_by(TeamToken.issued_at.desc())
+        )
+        .scalars()
+        .all()
+    )
+
+
+def list_org_tokens(session: Session, *, org_id: str) -> List[TeamToken]:
+    """List all tokens across all teams in an organization."""
+    return (
+        session.execute(
+            select(TeamToken)
+            .where(TeamToken.org_id == org_id)
+            .order_by(TeamToken.issued_at.desc())
+        )
+        .scalars()
+        .all()
+    )
+
+
+def get_token_by_id(session: Session, *, token_id: str) -> Optional[TeamToken]:
+    """Get token details by token ID."""
+    return session.execute(
+        select(TeamToken).where(TeamToken.token_id == token_id)
+    ).scalar_one_or_none()
+
+
+def extend_token_expiration(
+    session: Session,
+    *,
+    token_id: str,
+    days: int,
+    extended_by: Optional[str] = None,
+) -> Optional[TeamToken]:
+    """Extend token expiration by specified number of days."""
+    token = session.execute(
+        select(TeamToken).where(TeamToken.token_id == token_id)
+    ).scalar_one_or_none()
+
+    if token is None or token.revoked_at is not None:
+        return None
+
+    # Calculate new expiration
+    if token.expires_at is None:
+        # If token never expires, set expiration from now
+        token.expires_at = datetime.utcnow() + timedelta(days=days)
+    else:
+        # Extend from current expiration
+        token.expires_at = token.expires_at + timedelta(days=days)
+
+    session.flush()
+
+    # Audit log
+    record_token_audit(
+        session,
+        org_id=token.org_id,
+        team_node_id=token.team_node_id,
+        token_id=token_id,
+        event_type="extended",
+        actor=extended_by,
+        details={"extended_days": days, "new_expires_at": token.expires_at.isoformat()},
+    )
+
+    return token
+
+
+def bulk_revoke_tokens(
+    session: Session,
+    *,
+    token_ids: List[str],
+    revoked_by: Optional[str] = None,
+) -> int:
+    """Bulk revoke multiple tokens. Returns count of revoked tokens."""
+    count = 0
+    for token_id in token_ids:
+        token = session.execute(
+            select(TeamToken).where(TeamToken.token_id == token_id)
+        ).scalar_one_or_none()
+
+        if token and token.revoked_at is None:
+            token.revoked_at = datetime.utcnow()
+            session.flush()
+
+            # Audit log
+            record_token_audit(
+                session,
+                org_id=token.org_id,
+                team_node_id=token.team_node_id,
+                token_id=token_id,
+                event_type="revoked",
+                actor=revoked_by,
+                details={"bulk_revoke": True},
+            )
+            count += 1
+
+    return count
+
+
+# =============================================================================
+# Org Admin Tokens (Per-Org Admin Authentication)
+# =============================================================================
+
+
+@dataclass(frozen=True)
+class OrgAdminPrincipal:
+    """Principal for org-scoped admin authentication."""
+
+    org_id: str
+
+
+def issue_org_admin_token(
+    session: Session,
+    *,
+    org_id: str,
+    issued_by: Optional[str],
+    pepper: str,
+    expires_at: Optional[datetime] = None,
+    label: Optional[str] = None,
+) -> str:
+    """Create and store a new org admin token.
+
+    Token format: <token_id>.<token_secret>
+    - token_id is stored in DB and used for lookup
+    - token_secret is only returned once; only its hash is stored
+    """
+    token_id = uuid4().hex
+    token_secret = generate_token(32)
+    token_hash = hash_token(token_secret, pepper=pepper)
+
+    row = OrgAdminToken(
+        org_id=org_id,
+        token_id=token_id,
+        token_hash=token_hash,
+        issued_at=datetime.utcnow(),
+        issued_by=issued_by,
+        revoked_at=None,
+        expires_at=expires_at,
+        label=label,
+    )
+    session.add(row)
+    session.flush()
+
+    return f"{token_id}.{token_secret}"
+
+
+def revoke_org_admin_token(
+    session: Session,
+    *,
+    org_id: str,
+    token_id: str,
+    revoked_by: Optional[str] = None,
+) -> None:
+    """Revoke an org admin token."""
+    row = session.execute(
+        select(OrgAdminToken).where(
+            OrgAdminToken.org_id == org_id,
+            OrgAdminToken.token_id == token_id,
+        )
+    ).scalar_one_or_none()
+    if row is None:
+        return
+    row.revoked_at = datetime.utcnow()
+    session.flush()
+
+
+def list_org_admin_tokens(session: Session, *, org_id: str) -> List[OrgAdminToken]:
+    """List all admin tokens for an organization."""
+    return (
+        session.execute(
+            select(OrgAdminToken)
+            .where(OrgAdminToken.org_id == org_id)
+            .order_by(OrgAdminToken.issued_at.desc())
+        )
+        .scalars()
+        .all()
+    )
+
+
+def authenticate_org_admin_token(
+    session: Session,
+    *,
+    bearer: str,
+    pepper: str,
+    update_last_used: bool = False,
+) -> OrgAdminPrincipal:
+    """Authenticate an org admin bearer token.
+
+    Args:
+        bearer: The full token string (token_id.secret)
+        pepper: The token pepper for hashing
+        update_last_used: Whether to update last_used_at timestamp
+
+    Returns:
+        OrgAdminPrincipal with org_id
+
+    Raises:
+        ValueError: If token is invalid, expired, or revoked
+    """
+    parts = bearer.split(".", 1)
+    if len(parts) != 2:
+        raise ValueError("Invalid token format")
+
+    token_id, token_secret = parts
+    expected_hash = hash_token(token_secret, pepper=pepper)
+
+    row = session.execute(
+        select(OrgAdminToken).where(OrgAdminToken.token_id == token_id)
+    ).scalar_one_or_none()
+
+    if row is None:
+        raise ValueError("Token not found")
+
+    if row.token_hash != expected_hash:
+        raise ValueError("Invalid token")
+
+    if row.revoked_at is not None:
+        raise ValueError("Token has been revoked")
+
+    if row.is_expired():
+        raise ValueError("Token has expired")
+
+    # Throttle last_used_at updates to reduce write contention (only update if older than 5 minutes)
+    if update_last_used:
+        now = datetime.utcnow()
+        should_update = (
+            row.last_used_at is None
+            or (now - row.last_used_at.replace(tzinfo=None)).total_seconds() > 300
+        )
+        if should_update:
+            row.last_used_at = now
+            session.flush()
+
+    return OrgAdminPrincipal(org_id=row.org_id)
+
+
+def list_org_nodes(session: Session, *, org_id: str) -> List[OrgNode]:
+    return (
+        session.execute(
+            select(OrgNode)
+            .where(OrgNode.org_id == org_id)
+            .order_by(OrgNode.node_id.asc())
+        )
+        .scalars()
+        .all()
+    )
+
+
+def get_org_node(session: Session, *, org_id: str, node_id: str) -> OrgNode:
+    node = session.execute(
+        select(OrgNode).where(OrgNode.org_id == org_id, OrgNode.node_id == node_id)
+    ).scalar_one_or_none()
+    if node is None:
+        raise ValueError(f"Node not found: {node_id}")
+    return node
+
+
+def list_node_config_audit(
+    session: Session, *, org_id: str, node_id: str, limit: int = 50
+) -> List["ConfigChangeHistory"]:
+    """List configuration change history for a node. Now uses config_change_history table."""
+    from .config_models import ConfigChangeHistory
+
+    lim = max(1, min(int(limit), 200))
+    return (
+        session.execute(
+            select(ConfigChangeHistory)
+            .where(
+                ConfigChangeHistory.org_id == org_id,
+                ConfigChangeHistory.node_id == node_id,
+            )
+            .order_by(ConfigChangeHistory.changed_at.desc())
+            .limit(lim)
+        )
+        .scalars()
+        .all()
+    )
+
+
+def list_org_config_audit(
+    session: Session,
+    *,
+    org_id: str,
+    node_id: Optional[str] = None,
+    changed_by: Optional[str] = None,
+    since: Optional[datetime] = None,
+    until: Optional[datetime] = None,
+    limit: int = 200,
+) -> List["ConfigChangeHistory"]:
+    """List configuration change history for an org. Now uses config_change_history table."""
+    from .config_models import ConfigChangeHistory
+
+    lim = max(1, min(int(limit), 500))
+    stmt = select(ConfigChangeHistory).where(ConfigChangeHistory.org_id == org_id)
+    if node_id:
+        stmt = stmt.where(ConfigChangeHistory.node_id == node_id)
+    if changed_by:
+        stmt = stmt.where(ConfigChangeHistory.changed_by == changed_by)
+    if since is not None:
+        stmt = stmt.where(ConfigChangeHistory.changed_at >= since)
+    if until is not None:
+        stmt = stmt.where(ConfigChangeHistory.changed_at <= until)
+    stmt = stmt.order_by(ConfigChangeHistory.changed_at.desc()).limit(lim)
+    return session.execute(stmt).scalars().all()
+
+
+def create_org_node(
+    session: Session,
+    *,
+    org_id: str,
+    node_id: str,
+    parent_id: Optional[str],
+    node_type: Any,
+    name: Optional[str],
+) -> OrgNode:
+    existing = session.execute(
+        select(OrgNode).where(OrgNode.org_id == org_id, OrgNode.node_id == node_id)
+    ).scalar_one_or_none()
+    if existing is not None:
+        raise ValueError(f"Node already exists: {node_id}")
+    if parent_id is not None:
+        parent = session.execute(
+            select(OrgNode).where(
+                OrgNode.org_id == org_id, OrgNode.node_id == parent_id
+            )
+        ).scalar_one_or_none()
+        if parent is None:
+            raise ValueError(f"Parent not found: {parent_id}")
+    node = OrgNode(
+        org_id=org_id,
+        node_id=node_id,
+        parent_id=parent_id,
+        node_type=node_type,
+        name=name,
+    )
+    session.add(node)
+    session.flush()
+
+    # Create corresponding node configuration entry
+    from .config_repository import get_or_create_node_configuration
+
+    get_or_create_node_configuration(
+        session,
+        org_id,
+        node_id,
+        node_type.value if hasattr(node_type, "value") else node_type,
+    )
+
+    return node
+
+
+def update_org_node(
+    session: Session,
+    *,
+    org_id: str,
+    node_id: str,
+    parent_id: Optional[str] = None,
+    name: Optional[str] = None,
+) -> OrgNode:
+    node = session.execute(
+        select(OrgNode).where(OrgNode.org_id == org_id, OrgNode.node_id == node_id)
+    ).scalar_one_or_none()
+    if node is None:
+        raise ValueError(f"Node not found: {node_id}")
+
+    if parent_id is not None:
+        if parent_id == node_id:
+            raise ValueError("parent_id cannot equal node_id")
+        parent = session.execute(
+            select(OrgNode).where(
+                OrgNode.org_id == org_id, OrgNode.node_id == parent_id
+            )
+        ).scalar_one_or_none()
+        if parent is None:
+            raise ValueError(f"Parent not found: {parent_id}")
+        # Prevent cycles: new parent cannot be a descendant of this node.
+        lineage = get_lineage_nodes(session, org_id=org_id, node_id=parent_id)
+        if any(n.node_id == node_id for n in lineage):
+            raise ValueError("Reparent would create a cycle")
+        node.parent_id = parent_id
+
+    if name is not None:
+        node.name = name
+
+    session.flush()
+    return node
+
+
+def validate_against_locked_settings(
+    session: Session,
+    *,
+    org_id: str,
+    node_id: str,
+    patch: Dict[str, Any],
+) -> None:
+    """Check if patch attempts to modify locked settings.
+
+    Raises ValueError if trying to change a locked setting.
+    """
+    # Get security policy
+    policy = get_security_policy(session, org_id=org_id)
+    if not policy or not policy.locked_settings:
+        return  # No locked settings
+
+    # Get node to check if it's not root (root can change anything)
+    node = session.execute(
+        select(OrgNode).where(OrgNode.org_id == org_id, OrgNode.node_id == node_id)
+    ).scalar_one_or_none()
+    if node and node.parent_id is None:
+        return  # Root node can change anything
+
+    locked = set(policy.locked_settings)
+
+    def check_path(obj: Any, path: str = "") -> None:
+        if isinstance(obj, dict):
+            for k, v in obj.items():
+                full_path = f"{path}.{k}" if path else k
+                if full_path in locked:
+                    raise ValueError(f"Cannot modify locked setting: {full_path}")
+                check_path(v, full_path)
+
+    check_path(patch)
+
+
+def validate_against_max_values(
+    session: Session,
+    *,
+    org_id: str,
+    merged_config: Dict[str, Any],
+) -> None:
+    """Check if merged config violates max value constraints.
+
+    Raises ValueError if any value exceeds max.
+    """
+    policy = get_security_policy(session, org_id=org_id)
+    if not policy or not policy.max_values:
+        return
+
+    def get_nested(d: Dict[str, Any], path: str) -> Any:
+        keys = path.split(".")
+        for k in keys:
+            if not isinstance(d, dict):
+                return None
+            d = d.get(k)
+        return d
+
+    for path, max_val in policy.max_values.items():
+        current = get_nested(merged_config, path)
+        if (
+            current is not None
+            and isinstance(current, (int, float))
+            and isinstance(max_val, (int, float))
+        ):
+            if current > max_val:
+                raise ValueError(
+                    f"Value for {path} ({current}) exceeds maximum ({max_val})"
+                )
+
+
+@dataclass(frozen=True)
+class AuthenticatedToken:
+    """Extended principal with token metadata."""
+
+    org_id: str
+    team_node_id: str
+    token_id: str
+    permissions: List[str]
+    expires_at: Optional[datetime]
+    label: Optional[str]
+
+
+def authenticate_bearer_token(
+    session: Session,
+    *,
+    bearer: str,
+    pepper: str,
+    update_last_used: bool = True,
+) -> Principal:
+    """Authenticate an opaque bearer token against team_tokens.
+
+    Raises ValueError if invalid or expired.
+    """
+    token_id, token_secret = _parse_bearer(bearer)
+    row = session.execute(
+        select(TeamToken).where(TeamToken.token_id == token_id)
+    ).scalar_one_or_none()
+    if row is None:
+        raise ValueError("Invalid token")
+    if row.revoked_at is not None:
+        raise ValueError("Token revoked")
+    if row.token_hash != hash_token(token_secret, pepper=pepper):
+        raise ValueError("Invalid token")
+
+    # Check expiration
+    if row.expires_at is not None and datetime.utcnow() > row.expires_at.replace(
+        tzinfo=None
+    ):
+        # Log expiration event
+        record_token_audit(
+            session,
+            org_id=row.org_id,
+            team_node_id=row.team_node_id,
+            token_id=token_id,
+            event_type="expired",
+            actor="system",
+            details={},
+        )
+        raise ValueError("Token expired")
+
+    # Update last_used_at (throttled to reduce write contention - only update if older than 5 minutes)
+    if update_last_used:
+        now = datetime.utcnow()
+        should_update = (
+            row.last_used_at is None
+            or (now - row.last_used_at.replace(tzinfo=None)).total_seconds() > 300
+        )
+        if should_update:
+            row.last_used_at = now
+            session.flush()
+
+    return Principal(org_id=row.org_id, team_node_id=row.team_node_id)
+
+
+def authenticate_bearer_token_extended(
+    session: Session,
+    *,
+    bearer: str,
+    pepper: str,
+    required_permission: Optional[str] = None,
+) -> AuthenticatedToken:
+    """Authenticate and return extended token info with permission check.
+
+    Raises ValueError if invalid, expired, or missing required permission.
+    """
+    token_id, token_secret = _parse_bearer(bearer)
+    row = session.execute(
+        select(TeamToken).where(TeamToken.token_id == token_id)
+    ).scalar_one_or_none()
+    if row is None:
+        raise ValueError("Invalid token")
+    if row.revoked_at is not None:
+        raise ValueError("Token revoked")
+    if row.token_hash != hash_token(token_secret, pepper=pepper):
+        raise ValueError("Invalid token")
+
+    # Check expiration
+    if row.expires_at is not None and datetime.utcnow() > row.expires_at.replace(
+        tzinfo=None
+    ):
+        record_token_audit(
+            session,
+            org_id=row.org_id,
+            team_node_id=row.team_node_id,
+            token_id=token_id,
+            event_type="expired",
+            actor="system",
+            details={},
+        )
+        raise ValueError("Token expired")
+
+    # Check permission
+    permissions = row.permissions or []
+    if required_permission and required_permission not in permissions:
+        record_token_audit(
+            session,
+            org_id=row.org_id,
+            team_node_id=row.team_node_id,
+            token_id=token_id,
+            event_type="permission_denied",
+            actor="system",
+            details={"required": required_permission, "has": permissions},
+        )
+        raise ValueError(f"Permission denied: {required_permission}")
+
+    # Update last_used_at
+    row.last_used_at = datetime.utcnow()
+    session.flush()
+
+    return AuthenticatedToken(
+        org_id=row.org_id,
+        team_node_id=row.team_node_id,
+        token_id=token_id,
+        permissions=permissions,
+        expires_at=row.expires_at,
+        label=row.label,
+    )
+
+
+def _parse_bearer(bearer: str) -> tuple[str, str]:
+    if "." not in bearer:
+        raise ValueError("Invalid token format")
+    token_id, token_secret = bearer.split(".", 1)
+    if not token_id or not token_secret:
+        raise ValueError("Invalid token format")
+    return token_id, token_secret
+
+
+def get_lineage_nodes(
+    session: Session, *, org_id: str, node_id: str, max_depth: int = 64
+) -> List[OrgNode]:
+    """Return lineage from root -> node_id inclusive by following parent_id pointers."""
+    lineage: List[OrgNode] = []
+    seen: set[str] = set()
+    cur = node_id
+
+    while True:
+        if cur in seen:
+            raise ValueError("Cycle detected in org graph")
+        seen.add(cur)
+        node = session.execute(
+            select(OrgNode).where(OrgNode.org_id == org_id, OrgNode.node_id == cur)
+        ).scalar_one_or_none()
+        if node is None:
+            raise ValueError(f"Node not found: {cur}")
+        lineage.append(node)
+        if node.parent_id is None:
+            break
+        if len(lineage) > max_depth:
+            raise ValueError("Lineage depth exceeds safety limit")
+        cur = node.parent_id
+
+    lineage.reverse()
+    return lineage
+
+
+def get_node_configs(
+    session: Session, *, org_id: str, node_ids: List[str]
+) -> Dict[str, Dict[str, Any]]:
+    """Get configuration for multiple nodes. Now uses node_configurations table."""
+    if not node_ids:
+        return {}
+    from .config_models import NodeConfiguration
+
+    rows = (
+        session.execute(
+            select(NodeConfiguration).where(
+                NodeConfiguration.org_id == org_id,
+                NodeConfiguration.node_id.in_(node_ids),
+            )
+        )
+        .scalars()
+        .all()
+    )
+    out: Dict[str, Dict[str, Any]] = {r.node_id: (r.config_json or {}) for r in rows}
+    for nid in node_ids:
+        out.setdefault(nid, {})
+    return out
+
+
+def upsert_team_overrides(
+    session: Session,
+    *,
+    org_id: str,
+    team_node_id: str,
+    overrides: Dict[str, Any],
+    updated_by: Optional[str],
+) -> Dict[str, Any]:
+    """Replace team config with provided overrides dict. Now uses node_configurations table."""
+    from .config_models import ConfigChangeHistory, NodeConfiguration
+
+    existing = session.execute(
+        select(NodeConfiguration).where(
+            NodeConfiguration.org_id == org_id,
+            NodeConfiguration.node_id == team_node_id,
+        )
+    ).scalar_one_or_none()
+
+    before = (
+        existing.config_json
+        if existing is not None and existing.config_json is not None
+        else {}
+    )
+
+    if existing is None:
+        # Create new config
+        new = NodeConfiguration(
+            id=f"cfg-{uuid4().hex[:12]}",
+            org_id=org_id,
+            node_id=team_node_id,
+            node_type="team",  # This function is only called for teams
+            config_json=overrides,
+            version=1,
+        )
+        session.add(new)
+        version = 1
+    else:
+        existing.config_json = overrides
+        flag_modified(existing, "config_json")
+        existing.version = int(existing.version) + 1
+        version = existing.version
+
+    diff = compute_diff(before, overrides)
+
+    # Store in new audit table
+    change = ConfigChangeHistory(
+        id=f"chg-{uuid4().hex[:12]}",
+        org_id=org_id,
+        node_id=team_node_id,
+        previous_config=before,
+        new_config=overrides,
+        change_diff=diff,
+        changed_by=updated_by or "system",
+        changed_at=datetime.utcnow(),
+        change_reason="team_config_update",
+        version=version,
+    )
+    session.add(change)
+    session.flush()
+    return overrides
+
+
+def compute_diff(before: Dict[str, Any], after: Dict[str, Any]) -> Dict[str, Any]:
+    """Compute a minimal JSON diff (best-effort) for audit.
+
+    Output format:
+      { "changed": { "path.to.key": { "before": X, "after": Y }, ... } }
+    """
+    changed: Dict[str, Any] = {}
+
+    def walk(b: Any, a: Any, path: str) -> None:
+        if isinstance(b, dict) and isinstance(a, dict):
+            keys = set(b.keys()) | set(a.keys())
+            for k in keys:
+                walk(b.get(k, None), a.get(k, None), f"{path}.{k}" if path else str(k))
+            return
+        if b != a:
+            changed[path] = {"before": b, "after": a}
+
+    walk(before or {}, after or {}, "")
+    return {"changed": changed}
+
+
+# =============================================================================
+# Security Policy Functions
+# =============================================================================
+
+
+def get_security_policy(session: Session, *, org_id: str) -> Optional[SecurityPolicy]:
+    """Get security policy for an org (or None if not set)."""
+    return session.execute(
+        select(SecurityPolicy).where(SecurityPolicy.org_id == org_id)
+    ).scalar_one_or_none()
+
+
+def upsert_security_policy(
+    session: Session,
+    *,
+    org_id: str,
+    updates: Dict[str, Any],
+    updated_by: Optional[str],
+) -> SecurityPolicy:
+    """Create or update security policy for an org."""
+    policy = get_security_policy(session, org_id=org_id)
+
+    if policy is None:
+        policy = SecurityPolicy(
+            org_id=org_id,
+            updated_at=datetime.utcnow(),
+            updated_by=updated_by,
+        )
+        session.add(policy)
+
+    for key, value in updates.items():
+        if hasattr(policy, key):
+            setattr(policy, key, value)
+
+    policy.updated_at = datetime.utcnow()
+    policy.updated_by = updated_by
+    session.flush()
+
+    return policy
+
+
+# =============================================================================
+# Token Audit Functions
+# =============================================================================
+
+
+def record_token_audit(
+    session: Session,
+    *,
+    org_id: str,
+    team_node_id: str,
+    token_id: str,
+    event_type: str,
+    actor: Optional[str] = None,
+    details: Optional[Dict[str, Any]] = None,
+    ip_address: Optional[str] = None,
+    user_agent: Optional[str] = None,
+) -> TokenAudit:
+    """Record a token audit event."""
+    audit = TokenAudit(
+        org_id=org_id,
+        team_node_id=team_node_id,
+        token_id=token_id,
+        event_type=event_type,
+        event_at=datetime.utcnow(),
+        actor=actor,
+        details=details or {},
+        ip_address=ip_address,
+        user_agent=user_agent,
+    )
+    session.add(audit)
+    session.flush()
+    return audit
+
+
+def list_token_audit(
+    session: Session,
+    *,
+    org_id: str,
+    team_node_id: Optional[str] = None,
+    token_id: Optional[str] = None,
+    event_type: Optional[str] = None,
+    limit: int = 100,
+    offset: int = 0,
+) -> List[TokenAudit]:
+    """List token audit events with optional filtering."""
+    stmt = select(TokenAudit).where(TokenAudit.org_id == org_id)
+
+    if team_node_id:
+        stmt = stmt.where(TokenAudit.team_node_id == team_node_id)
+    if token_id:
+        stmt = stmt.where(TokenAudit.token_id == token_id)
+    if event_type:
+        stmt = stmt.where(TokenAudit.event_type == event_type)
+
+    stmt = stmt.order_by(TokenAudit.event_at.desc())
+    stmt = stmt.offset(offset).limit(min(limit, 1000))
+
+    return list(session.execute(stmt).scalars().all())
+
+
+# =============================================================================
+# Agent Run Functions
+# =============================================================================
+
+
+def create_agent_run(
+    session: Session,
+    *,
+    run_id: str,
+    org_id: str,
+    team_node_id: Optional[str] = None,
+    correlation_id: Optional[str] = None,
+    trigger_source: str,
+    trigger_actor: Optional[str] = None,
+    trigger_message: Optional[str] = None,
+    trigger_channel_id: Optional[str] = None,
+    agent_name: str,
+    metadata: Optional[Dict[str, Any]] = None,
+) -> AgentRun:
+    """Create a new agent run record (status=running)."""
+    run = AgentRun(
+        id=run_id,
+        org_id=org_id,
+        team_node_id=team_node_id,
+        correlation_id=correlation_id,
+        trigger_source=trigger_source,
+        trigger_actor=trigger_actor,
+        trigger_message=trigger_message,
+        trigger_channel_id=trigger_channel_id,
+        agent_name=agent_name,
+        started_at=datetime.utcnow(),
+        status="running",
+        extra_metadata=metadata or {},
+    )
+    session.add(run)
+    session.flush()
+    return run
+
+
+def complete_agent_run(
+    session: Session,
+    *,
+    run_id: str,
+    status: str,
+    tool_calls_count: Optional[int] = None,
+    output_summary: Optional[str] = None,
+    output_json: Optional[Dict[str, Any]] = None,
+    error_message: Optional[str] = None,
+    confidence: Optional[int] = None,
+    thoughts: Optional[list] = None,
+) -> Optional[AgentRun]:
+    """Mark an agent run as completed/failed/timeout."""
+    run = session.execute(
+        select(AgentRun).where(AgentRun.id == run_id)
+    ).scalar_one_or_none()
+
+    if run is None:
+        return None
+
+    run.status = status
+    run.thoughts = thoughts
+    from datetime import timezone
+
+    run.completed_at = datetime.now(timezone.utc)
+    run.tool_calls_count = tool_calls_count
+    run.output_summary = output_summary
+    run.output_json = output_json
+    run.error_message = error_message
+    run.confidence = confidence
+
+    if run.started_at:
+        # Handle timezone-aware vs naive datetime comparison
+        completed = run.completed_at
+        started = run.started_at
+        if completed.tzinfo is not None and started.tzinfo is None:
+            started = started.replace(tzinfo=timezone.utc)
+        elif completed.tzinfo is None and started.tzinfo is not None:
+            completed = completed.replace(tzinfo=timezone.utc)
+        run.duration_seconds = (completed - started).total_seconds()
+
+    session.flush()
+    return run
+
+
+def append_agent_run_thoughts(
+    session: Session,
+    *,
+    run_id: str,
+    thoughts: list,
+) -> Optional[AgentRun]:
+    """Append thoughts to a running agent run (incremental updates)."""
+    run = session.execute(
+        select(AgentRun).where(AgentRun.id == run_id)
+    ).scalar_one_or_none()
+
+    if run is None:
+        return None
+
+    existing = run.thoughts or []
+    run.thoughts = existing + thoughts
+    session.flush()
+    return run
+
+
+def get_agent_run(session: Session, *, run_id: str) -> Optional[AgentRun]:
+    """Get a single agent run by ID."""
+    return session.execute(
+        select(AgentRun).where(AgentRun.id == run_id)
+    ).scalar_one_or_none()
+
+
+def list_agent_runs(
+    session: Session,
+    *,
+    org_id: str,
+    team_node_id: Optional[str] = None,
+    status: Optional[str] = None,
+    trigger_source: Optional[str] = None,
+    agent_name: Optional[str] = None,
+    since: Optional[datetime] = None,
+    until: Optional[datetime] = None,
+    limit: int = 100,
+    offset: int = 0,
+) -> List[AgentRun]:
+    """List agent runs with optional filtering."""
+    stmt = select(AgentRun).where(AgentRun.org_id == org_id)
+
+    if team_node_id:
+        stmt = stmt.where(AgentRun.team_node_id == team_node_id)
+    if status:
+        stmt = stmt.where(AgentRun.status == status)
+    if trigger_source:
+        stmt = stmt.where(AgentRun.trigger_source == trigger_source)
+    if agent_name:
+        stmt = stmt.where(AgentRun.agent_name == agent_name)
+    if since:
+        stmt = stmt.where(AgentRun.started_at >= since)
+    if until:
+        stmt = stmt.where(AgentRun.started_at <= until)
+
+    stmt = stmt.order_by(AgentRun.started_at.desc())
+    stmt = stmt.offset(offset).limit(min(limit, 1000))
+
+    return list(session.execute(stmt).scalars().all())
+
+
+def mark_stale_runs_as_timeout(
+    session: Session,
+    *,
+    max_age_seconds: int = 600,  # 10 minutes default (2x typical 5min timeout)
+) -> int:
+    """
+    Mark agent runs stuck in 'running' status as 'timeout'.
+
+    This is a cleanup function to handle runs that were orphaned due to:
+    - Process crash/OOM kill
+    - Network partition during completion recording
+    - Any other failure that prevented proper status recording
+
+    Args:
+        session: Database session
+        max_age_seconds: Mark runs as timeout if they've been running longer than this
+
+    Returns:
+        Number of runs marked as timeout
+    """
+    from datetime import timezone
+
+    cutoff_time = datetime.now(timezone.utc) - timedelta(seconds=max_age_seconds)
+
+    # Find stale running runs
+    stmt = (
+        select(AgentRun)
+        .where(AgentRun.status == "running")
+        .where(AgentRun.started_at < cutoff_time)
+    )
+
+    stale_runs = list(session.execute(stmt).scalars().all())
+
+    if not stale_runs:
+        return 0
+
+    # Mark each as timeout
+    now = datetime.now(timezone.utc)
+    for run in stale_runs:
+        run.status = "timeout"
+        run.completed_at = now
+        run.error_message = f"Run exceeded {max_age_seconds}s without completion (marked by cleanup job)"
+
+        # Calculate duration
+        if run.started_at:
+            started = run.started_at
+            if started.tzinfo is None:
+                started = started.replace(tzinfo=timezone.utc)
+            run.duration_seconds = (now - started).total_seconds()
+
+    session.flush()
+    return len(stale_runs)
+
+
+def get_stale_runs_count(
+    session: Session,
+    *,
+    max_age_seconds: int = 600,
+) -> int:
+    """
+    Count agent runs stuck in 'running' status for longer than max_age_seconds.
+
+    Useful for monitoring/alerting without modifying data.
+    """
+    from datetime import timezone
+
+    cutoff_time = datetime.now(timezone.utc) - timedelta(seconds=max_age_seconds)
+
+    stmt = (
+        select(func.count())
+        .select_from(AgentRun)
+        .where(AgentRun.status == "running")
+        .where(AgentRun.started_at < cutoff_time)
+    )
+
+    result = session.execute(stmt).scalar()
+    return result or 0
+
+
+# =============================================================================
+# Agent Tool Call Functions
+# =============================================================================
+
+
+def create_tool_call(
+    session: Session,
+    *,
+    tool_call_id: str,
+    run_id: str,
+    tool_name: str,
+    tool_input: Optional[Dict[str, Any]] = None,
+    tool_output: Optional[str] = None,
+    started_at: Optional[datetime] = None,
+    duration_ms: Optional[int] = None,
+    status: str = "success",
+    error_message: Optional[str] = None,
+    sequence_number: int = 0,
+) -> "AgentToolCall":
+    """Create a single tool call record."""
+    from .models import AgentToolCall
+
+    tool_call = AgentToolCall(
+        id=tool_call_id,
+        run_id=run_id,
+        tool_name=tool_name,
+        tool_input=tool_input,
+        tool_output=tool_output[:5000] if tool_output else None,  # Truncate output
+        started_at=started_at or datetime.utcnow(),
+        duration_ms=duration_ms,
+        status=status,
+        error_message=error_message[:1000] if error_message else None,
+        sequence_number=sequence_number,
+    )
+    session.add(tool_call)
+    session.flush()
+    return tool_call
+
+
+def bulk_create_tool_calls(
+    session: Session,
+    *,
+    run_id: str,
+    tool_calls: List[Dict[str, Any]],
+) -> int:
+    """
+    Upsert tool calls for a run.
+
+    On tool_start, a record is inserted with status="running" and no output.
+    On tool_end, the same ID is sent again — ON CONFLICT updates with final
+    status, output, and duration. This ensures in-progress tool calls are
+    visible in the DB immediately (so the UI can show them while running).
+
+    Args:
+        run_id: The agent run ID
+        tool_calls: List of dicts with keys:
+            - id: Unique ID for the tool call
+            - tool_name: Name of the tool
+            - tool_input: Arguments passed to tool (dict)
+            - tool_output: Result from tool (string, truncated)
+            - started_at: When the call started (datetime)
+            - duration_ms: How long it took (int)
+            - status: success, error, or running
+            - error_message: Error details if failed
+            - sequence_number: Order in the run
+
+    Returns:
+        Number of tool calls upserted
+    """
+    from .models import AgentToolCall
+
+    if not tool_calls:
+        return 0
+
+    for i, tc in enumerate(tool_calls):
+        output = tc.get("tool_output")
+        error = tc.get("error_message")
+        values = {
+            "run_id": run_id,
+            "agent_name": tc.get("agent_name"),
+            "parent_agent": tc.get("parent_agent"),
+            "tool_name": tc.get("tool_name", "unknown"),
+            "tool_input": tc.get("tool_input"),
+            "tool_output": output[:5000] if output else None,
+            "started_at": tc.get("started_at", datetime.utcnow()),
+            "duration_ms": tc.get("duration_ms"),
+            "status": tc.get("status", "success"),
+            "error_message": error[:1000] if error else None,
+            "sequence_number": tc.get("sequence_number", i),
+        }
+        stmt = (
+            pg_insert(AgentToolCall)
+            .values(id=tc.get("id", f"{run_id}_{i}"), **values)
+            .on_conflict_do_update(index_elements=["id"], set_=values)
+        )
+        session.execute(stmt)
+
+    session.flush()
+    return len(tool_calls)
+
+
+def get_tool_calls_for_run(
+    session: Session,
+    *,
+    run_id: str,
+) -> List["AgentToolCall"]:
+    """Get all tool calls for a specific agent run, ordered by sequence."""
+    from .models import AgentToolCall
+
+    stmt = (
+        select(AgentToolCall)
+        .where(AgentToolCall.run_id == run_id)
+        .order_by(AgentToolCall.sequence_number)
+    )
+    return list(session.execute(stmt).scalars().all())
+
+
+def list_tool_calls(
+    session: Session,
+    *,
+    run_ids: Optional[List[str]] = None,
+    tool_name: Optional[str] = None,
+    status: Optional[str] = None,
+    since: Optional[datetime] = None,
+    until: Optional[datetime] = None,
+    limit: int = 1000,
+    offset: int = 0,
+) -> List["AgentToolCall"]:
+    """List tool calls with optional filtering."""
+    from .models import AgentToolCall
+
+    stmt = select(AgentToolCall)
+
+    if run_ids:
+        stmt = stmt.where(AgentToolCall.run_id.in_(run_ids))
+    if tool_name:
+        stmt = stmt.where(AgentToolCall.tool_name == tool_name)
+    if status:
+        stmt = stmt.where(AgentToolCall.status == status)
+    if since:
+        stmt = stmt.where(AgentToolCall.started_at >= since)
+    if until:
+        stmt = stmt.where(AgentToolCall.started_at <= until)
+
+    stmt = stmt.order_by(AgentToolCall.started_at.desc())
+    stmt = stmt.offset(offset).limit(min(limit, 5000))
+
+    return list(session.execute(stmt).scalars().all())
+
+
+# =============================================================================
+# Agent Feedback Functions
+# =============================================================================
+
+
+def create_agent_feedback(
+    session: Session,
+    *,
+    feedback_id: str,
+    run_id: str,
+    feedback_type: str,
+    source: str,
+    user_id: Optional[str] = None,
+    correlation_id: Optional[str] = None,
+) -> "AgentFeedback":
+    """Create a feedback record for an agent run."""
+    from .models import AgentFeedback
+
+    feedback = AgentFeedback(
+        id=feedback_id,
+        run_id=run_id,
+        feedback_type=feedback_type,
+        source=source,
+        user_id=user_id,
+        correlation_id=correlation_id,
+    )
+    session.add(feedback)
+    session.flush()
+    return feedback
+
+
+def get_feedback_for_run(
+    session: Session,
+    *,
+    run_id: str,
+) -> List["AgentFeedback"]:
+    """Get all feedback for a specific run."""
+    from .models import AgentFeedback
+
+    stmt = select(AgentFeedback).where(AgentFeedback.run_id == run_id)
+    return list(session.execute(stmt).scalars().all())
+
+
+def get_feedback_stats(
+    session: Session,
+    *,
+    org_id: Optional[str] = None,
+    team_node_id: Optional[str] = None,
+    since: Optional[datetime] = None,
+    until: Optional[datetime] = None,
+) -> Dict[str, Any]:
+    """Get aggregated feedback statistics."""
+    from .models import AgentFeedback
+
+    # Build base query joining feedback to runs for org/team filtering
+    stmt = select(
+        AgentFeedback.feedback_type,
+        AgentFeedback.source,
+        func.count().label("count"),
+    ).select_from(AgentFeedback)
+
+    if org_id or team_node_id:
+        stmt = stmt.join(AgentRun, AgentRun.id == AgentFeedback.run_id)
+        if org_id:
+            stmt = stmt.where(AgentRun.org_id == org_id)
+        if team_node_id:
+            stmt = stmt.where(AgentRun.team_node_id == team_node_id)
+
+    if since:
+        stmt = stmt.where(AgentFeedback.created_at >= since)
+    if until:
+        stmt = stmt.where(AgentFeedback.created_at <= until)
+
+    stmt = stmt.group_by(AgentFeedback.feedback_type, AgentFeedback.source)
+
+    results = session.execute(stmt).all()
+
+    # Aggregate results
+    stats: Dict[str, Any] = {
+        "total": 0,
+        "positive": 0,
+        "negative": 0,
+        "by_source": {},
+    }
+
+    for row in results:
+        stats["total"] += row.count
+        if row.feedback_type == "positive":
+            stats["positive"] += row.count
+        else:
+            stats["negative"] += row.count
+
+        if row.source not in stats["by_source"]:
+            stats["by_source"][row.source] = {"positive": 0, "negative": 0}
+        stats["by_source"][row.source][row.feedback_type] = row.count
+
+    return stats
+
+
+# =============================================================================
+# Slack Session Cache Functions
+# =============================================================================
+
+
+def save_session_state(
+    session: Session,
+    *,
+    message_ts: str,
+    state_json: dict,
+    thread_ts: Optional[str] = None,
+    org_id: Optional[str] = None,
+    team_node_id: Optional[str] = None,
+) -> SlackSessionCache:
+    """Save or update a session state for the View Session modal."""
+    from sqlalchemy.dialects.postgresql import insert as pg_insert
+
+    stmt = (
+        pg_insert(SlackSessionCache)
+        .values(
+            message_ts=message_ts,
+            thread_ts=thread_ts,
+            org_id=org_id,
+            team_node_id=team_node_id,
+            state_json=state_json,
+            created_at=datetime.utcnow(),
+        )
+        .on_conflict_do_update(
+            index_elements=["message_ts"],
+            set_={
+                "state_json": state_json,
+                "created_at": datetime.utcnow(),
+            },
+        )
+    )
+    session.execute(stmt)
+    session.flush()
+
+    return session.get(SlackSessionCache, message_ts)
+
+
+def get_session_state(
+    session: Session,
+    *,
+    message_ts: str,
+) -> Optional[SlackSessionCache]:
+    """Fetch a cached session state by message_ts."""
+    return session.get(SlackSessionCache, message_ts)
+
+
+def cleanup_expired_sessions(
+    session: Session,
+    *,
+    max_age_hours: int = 72,  # 3 days
+) -> int:
+    """Delete session cache entries older than max_age_hours. Returns count deleted."""
+    from datetime import timezone
+
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=max_age_hours)
+    stmt = select(SlackSessionCache).where(SlackSessionCache.created_at < cutoff)
+    expired = list(session.execute(stmt).scalars().all())
+
+    for entry in expired:
+        session.delete(entry)
+
+    session.flush()
+    return len(expired)
+
+
+# =============================================================================
+# Unified Audit Functions
+# =============================================================================
+
+
+@dataclass
+class UnifiedAuditEvent:
+    """Normalized audit event for unified view."""
+
+    id: str
+    source: str  # token, config, agent
+    event_type: str
+    timestamp: datetime
+    actor: Optional[str]
+    team_node_id: Optional[str]
+    summary: str
+    details: Dict[str, Any]
+    correlation_id: Optional[str] = None
+
+
+def list_unified_audit(
+    session: Session,
+    *,
+    org_id: str,
+    sources: Optional[List[str]] = None,  # token, config, agent
+    team_node_id: Optional[str] = None,
+    event_types: Optional[List[str]] = None,
+    actor: Optional[str] = None,
+    search: Optional[str] = None,
+    since: Optional[datetime] = None,
+    until: Optional[datetime] = None,
+    limit: int = 100,
+    offset: int = 0,
+) -> tuple[List[UnifiedAuditEvent], int]:
+    """
+    Aggregate audit events from all sources into a unified timeline.
+
+    Returns (events, total_count) for pagination.
+    """
+    all_sources = sources or ["token", "config", "agent"]
+    events: List[UnifiedAuditEvent] = []
+
+    # --- Token Audit ---
+    if "token" in all_sources:
+        stmt = select(TokenAudit).where(TokenAudit.org_id == org_id)
+        if team_node_id:
+            stmt = stmt.where(TokenAudit.team_node_id == team_node_id)
+        if event_types:
+            token_types = [
+                et
+                for et in event_types
+                if et in ("issued", "revoked", "expired", "permission_denied", "used")
+            ]
+            if token_types:
+                stmt = stmt.where(TokenAudit.event_type.in_(token_types))
+        if actor:
+            stmt = stmt.where(TokenAudit.actor.ilike(f"%{actor}%"))
+        if since:
+            stmt = stmt.where(TokenAudit.event_at >= since)
+        if until:
+            stmt = stmt.where(TokenAudit.event_at <= until)
+
+        token_rows = session.execute(stmt).scalars().all()
+        for row in token_rows:
+            summary = f"Token {row.event_type}"
+            if row.event_type == "issued":
+                label = (row.details or {}).get("label", "")
+                summary = f"Token issued{': ' + label if label else ''}"
+            elif row.event_type == "revoked":
+                summary = "Token revoked"
+            elif row.event_type == "expired":
+                summary = "Token expired"
+            elif row.event_type == "permission_denied":
+                summary = f"Permission denied: {(row.details or {}).get('required', 'unknown')}"
+
+            events.append(
+                UnifiedAuditEvent(
+                    id=f"token_{row.id}",
+                    source="token",
+                    event_type=row.event_type,
+                    timestamp=row.event_at,
+                    actor=row.actor,
+                    team_node_id=row.team_node_id,
+                    summary=summary,
+                    details={"token_id": row.token_id, **(row.details or {})},
+                )
+            )
+
+    # --- Config Audit ---
+    if "config" in all_sources:
+        from .config_models import ConfigChangeHistory
+
+        stmt = select(ConfigChangeHistory).where(ConfigChangeHistory.org_id == org_id)
+        if team_node_id:
+            stmt = stmt.where(ConfigChangeHistory.node_id == team_node_id)
+        if actor:
+            stmt = stmt.where(ConfigChangeHistory.changed_by.ilike(f"%{actor}%"))
+        if since:
+            stmt = stmt.where(ConfigChangeHistory.changed_at >= since)
+        if until:
+            stmt = stmt.where(ConfigChangeHistory.changed_at <= until)
+
+        config_rows = session.execute(stmt).scalars().all()
+        for row in config_rows:
+            changed_keys = list((row.change_diff or {}).get("changed", {}).keys())
+            summary = (
+                f"Config updated: {', '.join(changed_keys[:3])}"
+                if changed_keys
+                else "Config updated"
+            )
+            if len(changed_keys) > 3:
+                summary += f" (+{len(changed_keys) - 3} more)"
+
+            events.append(
+                UnifiedAuditEvent(
+                    id=f"config_{row.org_id}_{row.node_id}_{row.version}",
+                    source="config",
+                    event_type="config_updated",
+                    timestamp=row.changed_at,
+                    actor=row.changed_by,
+                    team_node_id=row.node_id,
+                    summary=summary,
+                    details={
+                        "node_id": row.node_id,
+                        "version": row.version,
+                        "diff": row.diff_json,
+                    },
+                )
+            )
+
+    # --- Agent Runs ---
+    if "agent" in all_sources:
+        stmt = select(AgentRun).where(AgentRun.org_id == org_id)
+        if team_node_id:
+            stmt = stmt.where(AgentRun.team_node_id == team_node_id)
+        if event_types:
+            agent_types = [
+                et
+                for et in event_types
+                if et in ("completed", "failed", "timeout", "running")
+            ]
+            if agent_types:
+                stmt = stmt.where(AgentRun.status.in_(agent_types))
+        if actor:
+            stmt = stmt.where(AgentRun.trigger_actor.ilike(f"%{actor}%"))
+        if since:
+            stmt = stmt.where(AgentRun.started_at >= since)
+        if until:
+            stmt = stmt.where(AgentRun.started_at <= until)
+
+        agent_rows = session.execute(stmt).scalars().all()
+        for row in agent_rows:
+            summary = f"Agent run {row.status}: {row.agent_name}"
+            if row.output_summary:
+                summary += f" - {row.output_summary[:100]}"
+            if row.confidence:
+                summary += f" ({row.confidence}% confidence)"
+
+            events.append(
+                UnifiedAuditEvent(
+                    id=f"agent_{row.id}",
+                    source="agent",
+                    event_type=f"agent_{row.status}",
+                    timestamp=row.started_at,
+                    actor=row.trigger_actor,
+                    team_node_id=row.team_node_id,
+                    summary=summary,
+                    details={
+                        "agent_name": row.agent_name,
+                        "trigger_source": row.trigger_source,
+                        "trigger_message": row.trigger_message,
+                        "status": row.status,
+                        "tool_calls": row.tool_calls_count,
+                        "duration_seconds": row.duration_seconds,
+                        "confidence": row.confidence,
+                        "error": row.error_message,
+                    },
+                    correlation_id=row.correlation_id,
+                )
+            )
+
+    # --- Search filter ---
+    if search:
+        search_lower = search.lower()
+        events = [
+            e
+            for e in events
+            if search_lower in e.summary.lower()
+            or search_lower in str(e.details).lower()
+        ]
+
+    # --- Sort by timestamp descending ---
+    events.sort(key=lambda e: e.timestamp, reverse=True)
+
+    total = len(events)
+
+    # --- Paginate ---
+    events = events[offset : offset + limit]
+
+    return events, total
+
+
+# =============================================================================
+# Token Lifecycle Management
+# =============================================================================
+
+
+@dataclass
+class TokenLifecycleResult:
+    """Result of running token lifecycle checks."""
+
+    tokens_expiring_soon: List[Dict[str, Any]]
+    tokens_revoked: List[str]
+    warnings_sent: int
+
+
+def get_tokens_expiring_soon(
+    session: Session,
+    *,
+    org_id: str,
+    warn_before_days: int,
+) -> List[TeamToken]:
+    """Get tokens that will expire within warn_before_days."""
+    from datetime import timedelta
+
+    now = datetime.utcnow()
+    warn_threshold = now + timedelta(days=warn_before_days)
+
+    stmt = select(TeamToken).where(
+        TeamToken.org_id == org_id,
+        TeamToken.revoked_at.is_(None),
+        TeamToken.expires_at.isnot(None),
+        TeamToken.expires_at <= warn_threshold,
+        TeamToken.expires_at > now,  # Not yet expired
+    )
+    return list(session.execute(stmt).scalars().all())
+
+
+def get_inactive_tokens(
+    session: Session,
+    *,
+    org_id: str,
+    inactive_days: int,
+) -> List[TeamToken]:
+    """Get tokens not used in inactive_days."""
+    from datetime import timedelta
+
+    cutoff = datetime.utcnow() - timedelta(days=inactive_days)
+
+    stmt = select(TeamToken).where(
+        TeamToken.org_id == org_id,
+        TeamToken.revoked_at.is_(None),
+        # Consider both last_used_at and issued_at for tokens never used
+        (
+            (TeamToken.last_used_at.isnot(None) & (TeamToken.last_used_at < cutoff))
+            | (TeamToken.last_used_at.is_(None) & (TeamToken.issued_at < cutoff))
+        ),
+    )
+    return list(session.execute(stmt).scalars().all())
+
+
+def process_token_lifecycle(
+    session: Session,
+    *,
+    org_id: str,
+) -> TokenLifecycleResult:
+    """Run all token lifecycle checks for an org based on security policy.
+
+    Returns summary of actions taken.
+    """
+    policy = get_security_policy(session, org_id=org_id)
+
+    result = TokenLifecycleResult(
+        tokens_expiring_soon=[],
+        tokens_revoked=[],
+        warnings_sent=0,
+    )
+
+    if not policy:
+        return result
+
+    # 1. Find tokens expiring soon
+    if policy.token_warn_before_days:
+        expiring = get_tokens_expiring_soon(
+            session,
+            org_id=org_id,
+            warn_before_days=policy.token_warn_before_days,
+        )
+        for token in expiring:
+            result.tokens_expiring_soon.append(
+                {
+                    "token_id": token.token_id,
+                    "team_node_id": token.team_node_id,
+                    "expires_at": (
+                        token.expires_at.isoformat() if token.expires_at else None
+                    ),
+                    "label": token.label,
+                    "issued_by": token.issued_by,
+                }
+            )
+            # Record warning event (only once per day ideally)
+            # Check if we already warned today
+            existing_warning = session.execute(
+                select(TokenAudit).where(
+                    TokenAudit.token_id == token.token_id,
+                    TokenAudit.event_type == "expiry_warning",
+                    TokenAudit.event_at
+                    >= datetime.utcnow().replace(hour=0, minute=0, second=0),
+                )
+            ).first()
+            if not existing_warning:
+                record_token_audit(
+                    session,
+                    org_id=org_id,
+                    team_node_id=token.team_node_id,
+                    token_id=token.token_id,
+                    event_type="expiry_warning",
+                    actor="system",
+                    details={
+                        "expires_at": (
+                            token.expires_at.isoformat() if token.expires_at else None
+                        ),
+                        "days_remaining": (
+                            (token.expires_at - datetime.utcnow()).days
+                            if token.expires_at
+                            else None
+                        ),
+                    },
+                )
+                result.warnings_sent += 1
+
+    # 2. Auto-revoke inactive tokens
+    if policy.token_revoke_inactive_days:
+        inactive = get_inactive_tokens(
+            session,
+            org_id=org_id,
+            inactive_days=policy.token_revoke_inactive_days,
+        )
+        for token in inactive:
+            # Revoke it
+            token.revoked_at = datetime.utcnow()
+            record_token_audit(
+                session,
+                org_id=org_id,
+                team_node_id=token.team_node_id,
+                token_id=token.token_id,
+                event_type="auto_revoked_inactive",
+                actor="system",
+                details={
+                    "last_used_at": (
+                        token.last_used_at.isoformat() if token.last_used_at else None
+                    ),
+                    "inactive_days": policy.token_revoke_inactive_days,
+                },
+            )
+            result.tokens_revoked.append(token.token_id)
+
+    session.flush()
+    return result
+
+
+# =============================================================================
+# Approval Workflow Functions
+# =============================================================================
+
+
+def create_pending_change(
+    session: Session,
+    *,
+    org_id: str,
+    node_id: str,
+    change_type: str,  # "prompt", "tools", "config"
+    change_path: Optional[str] = None,
+    proposed_value: Any,
+    previous_value: Any,
+    requested_by: str,
+    reason: Optional[str] = None,
+) -> PendingConfigChange:
+    """Create a pending config change request."""
+    from uuid import uuid4
+
+    change = PendingConfigChange(
+        id=uuid4().hex,
+        org_id=org_id,
+        node_id=node_id,
+        change_type=change_type,
+        change_path=change_path,
+        proposed_value=proposed_value,
+        previous_value=previous_value,
+        requested_by=requested_by,
+        requested_at=datetime.utcnow(),
+        reason=reason,
+        status="pending",
+    )
+    session.add(change)
+    session.flush()
+    return change
+
+
+def list_pending_changes(
+    session: Session,
+    *,
+    org_id: str,
+    node_id: Optional[str] = None,
+    status: Optional[str] = None,
+    change_type: Optional[str] = None,
+    limit: int = 100,
+    offset: int = 0,
+) -> List[PendingConfigChange]:
+    """List pending config changes."""
+    stmt = select(PendingConfigChange).where(PendingConfigChange.org_id == org_id)
+
+    if node_id:
+        stmt = stmt.where(PendingConfigChange.node_id == node_id)
+    if status:
+        stmt = stmt.where(PendingConfigChange.status == status)
+    if change_type:
+        stmt = stmt.where(PendingConfigChange.change_type == change_type)
+
+    stmt = stmt.order_by(PendingConfigChange.requested_at.desc())
+    stmt = stmt.offset(offset).limit(min(limit, 1000))
+
+    return list(session.execute(stmt).scalars().all())
+
+
+def get_pending_change(
+    session: Session, *, change_id: str
+) -> Optional[PendingConfigChange]:
+    """Get a pending change by ID."""
+    return session.execute(
+        select(PendingConfigChange).where(PendingConfigChange.id == change_id)
+    ).scalar_one_or_none()
+
+
+def approve_pending_change(
+    session: Session,
+    *,
+    change_id: str,
+    reviewed_by: str,
+    review_comment: Optional[str] = None,
+    apply_change: bool = True,
+) -> Optional[PendingConfigChange]:
+    """Approve a pending change and optionally apply it.
+
+    If apply_change is True, the change will be applied to the node config.
+    """
+    change = get_pending_change(session, change_id=change_id)
+    if not change:
+        return None
+
+    if change.status != "pending":
+        raise ValueError(f"Change already {change.status}")
+
+    change.status = "approved"
+    change.reviewed_by = reviewed_by
+    change.reviewed_at = datetime.utcnow()
+    change.review_comment = review_comment
+
+    if apply_change:
+        # Apply the change to the node config
+        # Build a patch from the change
+        if change.change_path:
+            # Nested path - build nested dict
+            keys = change.change_path.split(".")
+            patch = {}
+            current = patch
+            for i, key in enumerate(keys[:-1]):
+                current[key] = {}
+                current = current[key]
+            current[keys[-1]] = change.proposed_value
+        else:
+            # Direct value
+            patch = (
+                change.proposed_value if isinstance(change.proposed_value, dict) else {}
+            )
+
+        if patch:
+            # Lazy import to avoid circular dependency
+            from src.db.config_repository import update_node_configuration
+
+            update_node_configuration(
+                session,
+                org_id=change.org_id,
+                node_id=change.node_id,
+                config_patch=patch,
+                updated_by=reviewed_by,
+                skip_validation=True,  # Already approved
+            )
+
+    session.flush()
+    return change
+
+
+def reject_pending_change(
+    session: Session,
+    *,
+    change_id: str,
+    reviewed_by: str,
+    review_comment: Optional[str] = None,
+) -> Optional[PendingConfigChange]:
+    """Reject a pending change."""
+    change = get_pending_change(session, change_id=change_id)
+    if not change:
+        return None
+
+    if change.status != "pending":
+        raise ValueError(f"Change already {change.status}")
+
+    change.status = "rejected"
+    change.reviewed_by = reviewed_by
+    change.reviewed_at = datetime.utcnow()
+    change.review_comment = review_comment
+
+    session.flush()
+    return change
+
+
+def requires_approval(
+    session: Session,
+    *,
+    org_id: str,
+    change_type: str,  # "prompt" or "tools"
+) -> bool:
+    """Check if a change type requires approval based on security policy."""
+    policy = get_security_policy(session, org_id=org_id)
+    if not policy:
+        return False
+
+    if change_type == "prompt":
+        return policy.require_approval_for_prompts
+    elif change_type == "tools":
+        return policy.require_approval_for_tools
+
+    return False
+
+
+# =============================================================================
+# Conversation Mapping Functions
+# =============================================================================
+
+
+def get_conversation_mapping(
+    session: Session,
+    *,
+    session_id: str,
+) -> Optional[ConversationMapping]:
+    """Get conversation mapping by session_id."""
+    stmt = select(ConversationMapping).where(
+        ConversationMapping.session_id == session_id
+    )
+    return session.execute(stmt).scalar_one_or_none()
+
+
+def create_conversation_mapping(
+    session: Session,
+    *,
+    session_id: str,
+    openai_conversation_id: str,
+    session_type: str,
+    org_id: Optional[str] = None,
+    team_node_id: Optional[str] = None,
+) -> ConversationMapping:
+    """Create a new conversation mapping."""
+    mapping = ConversationMapping(
+        session_id=session_id,
+        openai_conversation_id=openai_conversation_id,
+        session_type=session_type,
+        org_id=org_id,
+        team_node_id=team_node_id,
+    )
+    session.add(mapping)
+    session.flush()
+    return mapping
+
+
+def update_conversation_mapping_last_used(
+    session: Session,
+    *,
+    session_id: str,
+) -> Optional[ConversationMapping]:
+    """Update the last_used_at timestamp for a conversation mapping."""
+    mapping = get_conversation_mapping(session, session_id=session_id)
+    if mapping:
+        mapping.last_used_at = datetime.utcnow()
+        session.flush()
+    return mapping
+
+
+def upsert_conversation_mapping(
+    session: Session,
+    *,
+    session_id: str,
+    openai_conversation_id: str,
+    session_type: str,
+    org_id: Optional[str] = None,
+    team_node_id: Optional[str] = None,
+) -> tuple[ConversationMapping, bool]:
+    """
+    Upsert a conversation mapping (create if not exists, update if exists).
+
+    Returns:
+        Tuple of (ConversationMapping, created) where created is True if new record was created.
+    """
+    existing = get_conversation_mapping(session, session_id=session_id)
+    if existing:
+        # Update existing mapping
+        existing.openai_conversation_id = openai_conversation_id
+        existing.last_used_at = datetime.utcnow()
+        session.flush()
+        return existing, False
+    else:
+        # Create new mapping
+        mapping = create_conversation_mapping(
+            session,
+            session_id=session_id,
+            openai_conversation_id=openai_conversation_id,
+            session_type=session_type,
+            org_id=org_id,
+            team_node_id=team_node_id,
+        )
+        return mapping, True
+
+
+def delete_conversation_mapping(
+    session: Session,
+    *,
+    session_id: str,
+) -> bool:
+    """Delete a conversation mapping. Returns True if deleted, False if not found."""
+    mapping = get_conversation_mapping(session, session_id=session_id)
+    if mapping:
+        session.delete(mapping)
+        session.flush()
+        return True
+    return False
+
+
+# =============================================================================
+# K8s Cluster Management (SaaS Model)
+# =============================================================================
+
+
+@dataclass(frozen=True)
+class K8sClusterInfo:
+    """Information returned after creating a K8s cluster registration."""
+
+    cluster_id: str
+    cluster_name: str
+    token: str  # Only returned once at creation time
+
+
+def issue_k8s_agent_token(
+    session: Session,
+    *,
+    org_id: str,
+    team_node_id: str,
+    cluster_name: str,
+    display_name: Optional[str] = None,
+    issued_by: Optional[str] = None,
+    pepper: str,
+) -> K8sClusterInfo:
+    """
+    Issue a K8s agent token and create cluster record.
+
+    This creates both:
+    1. A TeamToken with K8S_AGENT_CONNECT permission
+    2. A K8sCluster record linking to that token
+
+    Returns K8sClusterInfo with the token (shown once to user).
+    """
+    # Generate cluster ID
+    cluster_id = f"k8s-{uuid4().hex[:12]}"
+
+    # Issue a team token with K8s agent permissions
+    token = issue_team_token(
+        session,
+        org_id=org_id,
+        team_node_id=team_node_id,
+        issued_by=issued_by,
+        pepper=pepper,
+        permissions=TokenPermission.DEFAULT_K8S_AGENT,
+        label=f"K8s Agent: {cluster_name}",
+    )
+
+    # Extract token_id from the issued token (format: token_id.secret)
+    token_id = token.split(".", 1)[0]
+
+    # Create the cluster record
+    cluster = K8sCluster(
+        id=cluster_id,
+        org_id=org_id,
+        team_node_id=team_node_id,
+        cluster_name=cluster_name,
+        display_name=display_name,
+        token_id=token_id,
+        status=K8sClusterStatus.disconnected,
+    )
+    session.add(cluster)
+    session.flush()
+
+    # Audit log
+    record_token_audit(
+        session,
+        org_id=org_id,
+        team_node_id=team_node_id,
+        token_id=token_id,
+        event_type="k8s_cluster_registered",
+        actor=issued_by,
+        details={
+            "cluster_id": cluster_id,
+            "cluster_name": cluster_name,
+        },
+    )
+
+    return K8sClusterInfo(
+        cluster_id=cluster_id,
+        cluster_name=cluster_name,
+        token=token,
+    )
+
+
+def list_k8s_clusters(
+    session: Session,
+    *,
+    org_id: str,
+    team_node_id: Optional[str] = None,
+    include_revoked: bool = False,
+) -> List[K8sCluster]:
+    """
+    List K8s clusters for an org (optionally filtered by team).
+
+    When team_node_id is None, returns all clusters in the org.
+    By default excludes clusters whose tokens have been revoked.
+    """
+    stmt = select(K8sCluster).where(K8sCluster.org_id == org_id)
+
+    if team_node_id is not None:
+        stmt = stmt.where(K8sCluster.team_node_id == team_node_id)
+
+    if not include_revoked:
+        # Join with TeamToken to exclude revoked
+        stmt = stmt.join(
+            TeamToken,
+            K8sCluster.token_id == TeamToken.token_id,
+        ).where(TeamToken.revoked_at.is_(None))
+
+    stmt = stmt.order_by(K8sCluster.created_at.desc())
+
+    return list(session.execute(stmt).scalars().all())
+
+
+def get_k8s_cluster(
+    session: Session,
+    *,
+    cluster_id: str,
+) -> Optional[K8sCluster]:
+    """Get a K8s cluster by ID."""
+    return session.execute(
+        select(K8sCluster).where(K8sCluster.id == cluster_id)
+    ).scalar_one_or_none()
+
+
+def get_k8s_cluster_by_token(
+    session: Session,
+    *,
+    token_id: str,
+) -> Optional[K8sCluster]:
+    """Get a K8s cluster by its token ID (used by gateway for auth)."""
+    return session.execute(
+        select(K8sCluster).where(K8sCluster.token_id == token_id)
+    ).scalar_one_or_none()
+
+
+def update_k8s_cluster_status(
+    session: Session,
+    *,
+    cluster_id: str,
+    status: K8sClusterStatus,
+    agent_version: Optional[str] = None,
+    agent_pod_name: Optional[str] = None,
+    kubernetes_version: Optional[str] = None,
+    node_count: Optional[int] = None,
+    namespace_count: Optional[int] = None,
+    cluster_info: Optional[Dict[str, Any]] = None,
+    last_error: Optional[str] = None,
+) -> Optional[K8sCluster]:
+    """
+    Update K8s cluster connection status and metadata.
+
+    Called by the gateway when:
+    - Agent connects (status=connected, populate metadata)
+    - Agent heartbeats (update last_heartbeat_at)
+    - Agent disconnects (status=disconnected)
+    - Agent errors (status=error, set last_error)
+    """
+    cluster = get_k8s_cluster(session, cluster_id=cluster_id)
+    if cluster is None:
+        return None
+
+    cluster.status = status
+    cluster.last_heartbeat_at = datetime.utcnow()
+
+    if agent_version is not None:
+        cluster.agent_version = agent_version
+    if agent_pod_name is not None:
+        cluster.agent_pod_name = agent_pod_name
+    if kubernetes_version is not None:
+        cluster.kubernetes_version = kubernetes_version
+    if node_count is not None:
+        cluster.node_count = node_count
+    if namespace_count is not None:
+        cluster.namespace_count = namespace_count
+    if cluster_info is not None:
+        cluster.cluster_info = cluster_info
+    if last_error is not None:
+        cluster.last_error = last_error
+    elif status == K8sClusterStatus.connected:
+        # Clear error on successful connection
+        cluster.last_error = None
+
+    session.flush()
+    return cluster
+
+
+def update_k8s_cluster_heartbeat(
+    session: Session,
+    *,
+    cluster_id: str,
+) -> Optional[K8sCluster]:
+    """Update the heartbeat timestamp for a cluster (lightweight operation)."""
+    cluster = get_k8s_cluster(session, cluster_id=cluster_id)
+    if cluster is None:
+        return None
+
+    cluster.last_heartbeat_at = datetime.utcnow()
+    session.flush()
+    return cluster
+
+
+def revoke_k8s_cluster(
+    session: Session,
+    *,
+    cluster_id: str,
+    revoked_by: Optional[str] = None,
+) -> bool:
+    """
+    Revoke a K8s cluster's access by revoking its token.
+
+    This will cause the agent to be disconnected on next heartbeat/request.
+    Returns True if revoked, False if cluster not found.
+    """
+    cluster = get_k8s_cluster(session, cluster_id=cluster_id)
+    if cluster is None:
+        return False
+
+    # Revoke the associated token
+    revoke_team_token(session, token_id=cluster.token_id, revoked_by=revoked_by)
+
+    # Update cluster status
+    cluster.status = K8sClusterStatus.disconnected
+    cluster.last_error = "Cluster access revoked"
+    session.flush()
+
+    # Audit log
+    record_token_audit(
+        session,
+        org_id=cluster.org_id,
+        team_node_id=cluster.team_node_id,
+        token_id=cluster.token_id,
+        event_type="k8s_cluster_revoked",
+        actor=revoked_by,
+        details={
+            "cluster_id": cluster_id,
+            "cluster_name": cluster.cluster_name,
+        },
+    )
+
+    return True
+
+
+def get_stale_k8s_clusters(
+    session: Session,
+    *,
+    stale_seconds: int = 120,
+) -> List[K8sCluster]:
+    """
+    Get clusters that haven't sent a heartbeat in stale_seconds.
+
+    Used by gateway to detect disconnected agents.
+    """
+    cutoff = datetime.utcnow() - timedelta(seconds=stale_seconds)
+
+    stmt = select(K8sCluster).where(
+        K8sCluster.status == K8sClusterStatus.connected,
+        K8sCluster.last_heartbeat_at < cutoff,
+    )
+
+    return list(session.execute(stmt).scalars().all())
+
+
+def mark_stale_clusters_disconnected(
+    session: Session,
+    *,
+    stale_seconds: int = 120,
+) -> int:
+    """
+    Mark clusters that haven't sent a heartbeat as disconnected.
+
+    Returns the number of clusters marked as disconnected.
+    """
+    stale_clusters = get_stale_k8s_clusters(session, stale_seconds=stale_seconds)
+
+    for cluster in stale_clusters:
+        cluster.status = K8sClusterStatus.disconnected
+        cluster.last_error = f"No heartbeat for {stale_seconds}s"
+
+    session.flush()
+    return len(stale_clusters)
+
+
+# =============================================================================
+# Investigation Episodes
+# =============================================================================
+
+
+def create_episode(session: Session, *, data: Dict[str, Any]) -> Dict[str, Any]:
+    """Create a new investigation episode."""
+    from src.db.models import InvestigationEpisode
+
+    episode = InvestigationEpisode(
+        id=data.get("id", str(uuid4())),
+        agent_run_id=data.get("agent_run_id"),
+        org_id=data["org_id"],
+        team_node_id=data.get("team_node_id"),
+        alert_type=data.get("alert_type"),
+        alert_description=data.get("alert_description"),
+        severity=data.get("severity"),
+        services=data.get("services"),
+        agents_used=data.get("agents_used"),
+        skills_used=data.get("skills_used"),
+        key_findings=data.get("key_findings"),
+        resolved=data.get("resolved", False),
+        root_cause=data.get("root_cause"),
+        summary=data.get("summary"),
+        effectiveness_score=data.get("effectiveness_score"),
+        confidence=data.get("confidence"),
+        duration_seconds=data.get("duration_seconds"),
+    )
+    session.add(episode)
+    session.flush()
+    return _episode_to_dict(episode)
+
+
+def get_episode(session: Session, *, episode_id: str) -> Optional[Dict[str, Any]]:
+    """Get a single episode by ID."""
+    from src.db.models import InvestigationEpisode
+
+    ep = session.execute(
+        select(InvestigationEpisode).where(InvestigationEpisode.id == episode_id)
+    ).scalar_one_or_none()
+    return _episode_to_dict(ep) if ep else None
+
+
+def list_episodes(
+    session: Session,
+    *,
+    org_id: str,
+    team_node_id: Optional[str] = None,
+    alert_type: Optional[str] = None,
+    service: Optional[str] = None,
+    limit: int = 50,
+    offset: int = 0,
+) -> List[Dict[str, Any]]:
+    """List episodes with optional filters."""
+    from src.db.models import InvestigationEpisode
+
+    stmt = select(InvestigationEpisode).where(InvestigationEpisode.org_id == org_id)
+    if team_node_id:
+        stmt = stmt.where(InvestigationEpisode.team_node_id == team_node_id)
+    if alert_type:
+        stmt = stmt.where(InvestigationEpisode.alert_type == alert_type)
+    if service:
+        # JSONB contains check for service name in services array
+        stmt = stmt.where(InvestigationEpisode.services.op("@>")(f'["{service}"]'))
+    stmt = (
+        stmt.order_by(InvestigationEpisode.created_at.desc())
+        .limit(limit)
+        .offset(offset)
+    )
+    results = session.execute(stmt).scalars().all()
+    return [_episode_to_dict(ep) for ep in results]
+
+
+def search_similar_episodes(
+    session: Session,
+    *,
+    org_id: str,
+    alert_type: Optional[str] = None,
+    service_name: Optional[str] = None,
+    limit: int = 5,
+) -> List[Dict[str, Any]]:
+    """Find similar episodes using weighted scoring."""
+    import sqlalchemy as sa
+
+    from src.db.models import InvestigationEpisode
+
+    # Build weighted score expression
+    score_parts = []
+    if alert_type:
+        score_parts.append(
+            sa.case((InvestigationEpisode.alert_type == alert_type, 0.5), else_=0.0)
+        )
+    if service_name:
+        score_parts.append(
+            sa.case(
+                (InvestigationEpisode.services.op("@>")(f'["{service_name}"]'), 0.3),
+                else_=0.0,
+            )
+        )
+    score_parts.append(sa.case((InvestigationEpisode.resolved == True, 0.2), else_=0.0))
+
+    score_expr = sum(score_parts) if score_parts else sa.literal(0.0)
+
+    stmt = (
+        select(InvestigationEpisode, score_expr.label("score"))
+        .where(InvestigationEpisode.org_id == org_id)
+        .where(score_expr > 0.0)
+        .order_by(sa.desc("score"), InvestigationEpisode.created_at.desc())
+        .limit(limit)
+    )
+
+    results = session.execute(stmt).all()
+    episodes = []
+    for row in results:
+        ep_dict = _episode_to_dict(row[0])
+        ep_dict["similarity_score"] = float(row[1])
+        episodes.append(ep_dict)
+    return episodes
+
+
+def get_episode_stats(
+    session: Session,
+    *,
+    org_id: str,
+    team_node_id: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Get episode statistics."""
+    from src.db.models import InvestigationEpisode
+
+    base = (
+        select(func.count())
+        .select_from(InvestigationEpisode)
+        .where(InvestigationEpisode.org_id == org_id)
+    )
+    if team_node_id:
+        base = base.where(InvestigationEpisode.team_node_id == team_node_id)
+
+    total = session.execute(base).scalar() or 0
+
+    # Build a fresh statement for resolved count
+    resolved_stmt = (
+        select(func.count())
+        .select_from(InvestigationEpisode)
+        .where(
+            InvestigationEpisode.org_id == org_id,
+            InvestigationEpisode.resolved == True,
+        )
+    )
+    if team_node_id:
+        resolved_stmt = resolved_stmt.where(
+            InvestigationEpisode.team_node_id == team_node_id
+        )
+    resolved = session.execute(resolved_stmt).scalar() or 0
+    unresolved = total - resolved
+
+    # Count strategies
+    from src.db.models import InvestigationStrategy
+
+    strat_base = (
+        select(func.count())
+        .select_from(InvestigationStrategy)
+        .where(InvestigationStrategy.org_id == org_id)
+    )
+    if team_node_id:
+        strat_base = strat_base.where(
+            InvestigationStrategy.team_node_id == team_node_id
+        )
+    strategies_count = session.execute(strat_base).scalar() or 0
+
+    return {
+        "total_episodes": total,
+        "resolved_episodes": resolved,
+        "unresolved_episodes": unresolved,
+        "strategies_count": strategies_count,
+    }
+
+
+def _episode_to_dict(ep) -> Dict[str, Any]:
+    """Convert episode model to dict."""
+    return {
+        "id": ep.id,
+        "agent_run_id": ep.agent_run_id,
+        "org_id": ep.org_id,
+        "team_node_id": ep.team_node_id,
+        "alert_type": ep.alert_type,
+        "alert_description": ep.alert_description,
+        "severity": ep.severity,
+        "services": ep.services or [],
+        "agents_used": ep.agents_used or [],
+        "skills_used": ep.skills_used or [],
+        "key_findings": ep.key_findings or [],
+        "resolved": ep.resolved,
+        "root_cause": ep.root_cause,
+        "summary": ep.summary,
+        "effectiveness_score": ep.effectiveness_score,
+        "confidence": ep.confidence,
+        "duration_seconds": ep.duration_seconds,
+        "created_at": ep.created_at.isoformat() if ep.created_at else None,
+    }
+
+
+# =============================================================================
+# Investigation Strategies
+# =============================================================================
+
+
+def upsert_strategy(session: Session, *, data: Dict[str, Any]) -> Dict[str, Any]:
+    """Create or update an investigation strategy."""
+    from src.db.models import InvestigationStrategy
+
+    # Try to find existing
+    stmt = select(InvestigationStrategy).where(
+        InvestigationStrategy.org_id == data["org_id"],
+        InvestigationStrategy.alert_type == data.get("alert_type"),
+        InvestigationStrategy.service_name == data.get("service_name"),
+    )
+    if data.get("team_node_id"):
+        stmt = stmt.where(InvestigationStrategy.team_node_id == data["team_node_id"])
+    else:
+        stmt = stmt.where(InvestigationStrategy.team_node_id.is_(None))
+
+    existing = session.execute(stmt).scalar_one_or_none()
+
+    if existing:
+        existing.strategy_text = data["strategy_text"]
+        existing.source_episode_ids = data.get("source_episode_ids")
+        existing.episode_count = data.get("episode_count")
+        existing.generated_at = datetime.utcnow()
+        session.flush()
+        return _strategy_to_dict(existing)
+
+    strategy = InvestigationStrategy(
+        id=data.get("id", str(uuid4())),
+        org_id=data["org_id"],
+        team_node_id=data.get("team_node_id"),
+        alert_type=data.get("alert_type"),
+        service_name=data.get("service_name"),
+        strategy_text=data["strategy_text"],
+        source_episode_ids=data.get("source_episode_ids"),
+        episode_count=data.get("episode_count"),
+    )
+    session.add(strategy)
+    session.flush()
+    return _strategy_to_dict(strategy)
+
+
+def get_strategy(
+    session: Session,
+    *,
+    org_id: str,
+    team_node_id: Optional[str] = None,
+    alert_type: Optional[str] = None,
+    service_name: Optional[str] = None,
+) -> Optional[Dict[str, Any]]:
+    """Get a specific strategy."""
+    from src.db.models import InvestigationStrategy
+
+    stmt = select(InvestigationStrategy).where(
+        InvestigationStrategy.org_id == org_id,
+        InvestigationStrategy.alert_type == alert_type,
+        InvestigationStrategy.service_name == service_name,
+    )
+    if team_node_id:
+        stmt = stmt.where(InvestigationStrategy.team_node_id == team_node_id)
+    else:
+        stmt = stmt.where(InvestigationStrategy.team_node_id.is_(None))
+
+    s = session.execute(stmt).scalar_one_or_none()
+    return _strategy_to_dict(s) if s else None
+
+
+def list_strategies(
+    session: Session,
+    *,
+    org_id: str,
+    team_node_id: Optional[str] = None,
+) -> List[Dict[str, Any]]:
+    """List all strategies for an org/team."""
+    from src.db.models import InvestigationStrategy
+
+    stmt = select(InvestigationStrategy).where(InvestigationStrategy.org_id == org_id)
+    if team_node_id:
+        stmt = stmt.where(InvestigationStrategy.team_node_id == team_node_id)
+    stmt = stmt.order_by(InvestigationStrategy.generated_at.desc())
+    results = session.execute(stmt).scalars().all()
+    return [_strategy_to_dict(s) for s in results]
+
+
+def _strategy_to_dict(s) -> Dict[str, Any]:
+    """Convert strategy model to dict."""
+    return {
+        "id": s.id,
+        "org_id": s.org_id,
+        "team_node_id": s.team_node_id,
+        "alert_type": s.alert_type,
+        "service_name": s.service_name,
+        "strategy_text": s.strategy_text,
+        "source_episode_ids": s.source_episode_ids or [],
+        "episode_count": s.episode_count,
+        "generated_at": s.generated_at.isoformat() if s.generated_at else None,
+    }

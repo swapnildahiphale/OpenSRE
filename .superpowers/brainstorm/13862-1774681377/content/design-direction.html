@@ -1,0 +1,435 @@
+<style>
+  /* Google Fonts import for DM Serif Display */
+  @import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
+
+  /* OpenSRE design tokens */
+  :root {
+    --forest: #3D7B5F;
+    --forest-light: #4E9B77;
+    --forest-dark: #2D5B47;
+    --clay: #c25e4c;
+    --clay-light: #d67665;
+    --stone-50: #FAFAF7;
+    --stone-100: #F5F3EF;
+    --stone-200: #E8E5DE;
+    --stone-300: #D4D0C8;
+    --stone-400: #A09E97;
+    --stone-600: #5A5850;
+    --stone-700: #3D3B35;
+    --stone-900: #1A1A18;
+    --cyan: #00B4D8;
+    --blue: #0077B6;
+    --purple: #7209B7;
+    --slate-950: #0F172A;
+    --slate-900: #0F172A;
+    --slate-800: #1E293B;
+  }
+
+  .direction-heading {
+    font-family: 'DM Serif Display', Georgia, serif;
+    font-size: 1.35rem;
+    font-weight: 400;
+    margin-bottom: 0.3rem;
+    letter-spacing: -0.01em;
+  }
+
+  .direction-meta {
+    font-size: 0.78rem;
+    color: var(--text-secondary);
+    margin-bottom: 1.25rem;
+    font-style: italic;
+    line-height: 1.5;
+  }
+
+  /* ── Mini UI preview scaffold ── */
+  .mini-ui {
+    display: flex;
+    height: 160px;
+    border-radius: 8px;
+    overflow: hidden;
+    font-size: 10px;
+    line-height: 1.4;
+    user-select: none;
+  }
+
+  .mini-sidebar {
+    width: 88px;
+    flex-shrink: 0;
+    padding: 10px 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+
+  .mini-logo {
+    font-weight: 700;
+    font-size: 9px;
+    letter-spacing: 0.05em;
+    margin-bottom: 8px;
+    padding-left: 2px;
+  }
+
+  .mini-nav-item {
+    padding: 4px 6px;
+    border-radius: 5px;
+    font-size: 9px;
+    cursor: pointer;
+  }
+
+  .mini-main {
+    flex: 1;
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    overflow: hidden;
+  }
+
+  .mini-topbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 4px;
+  }
+
+  .mini-page-title {
+    font-size: 10px;
+    font-weight: 600;
+  }
+
+  .mini-badge {
+    font-size: 8px;
+    padding: 2px 5px;
+    border-radius: 3px;
+  }
+
+  .mini-cards-row {
+    display: flex;
+    gap: 5px;
+  }
+
+  .mini-card {
+    flex: 1;
+    padding: 6px;
+    border-radius: 5px;
+    font-size: 8px;
+  }
+
+  .mini-card-label {
+    font-size: 7px;
+    margin-bottom: 2px;
+    opacity: 0.6;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  .mini-card-value {
+    font-size: 11px;
+    font-weight: 700;
+  }
+
+  .mini-chart-bar {
+    height: 5px;
+    border-radius: 3px;
+    margin-top: 3px;
+  }
+
+  .mini-list {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+
+  .mini-list-item {
+    padding: 3px 5px;
+    border-radius: 4px;
+    font-size: 8px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .mini-dot {
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .mini-tag {
+    font-size: 8px;
+    padding: 1px 4px;
+    border-radius: 3px;
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  /* Option cards */
+  .option {
+    transition: all 0.18s ease;
+    position: relative;
+  }
+
+  .option:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+  }
+
+  .option.selected::after {
+    content: 'Selected';
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    background: var(--accent);
+    color: white;
+    font-size: 0.7rem;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 20px;
+  }
+
+  .choice-label {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+    font-size: 0.8rem;
+    font-weight: 700;
+    flex-shrink: 0;
+    margin-bottom: 0.75rem;
+  }
+
+  .trait-pill {
+    display: inline-block;
+    font-size: 0.7rem;
+    padding: 2px 8px;
+    border-radius: 20px;
+    margin: 0 3px 4px 0;
+    font-weight: 500;
+  }
+
+  .intro-block {
+    margin-bottom: 1.75rem;
+    padding-bottom: 1.25rem;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .intro-block h2 {
+    font-family: 'DM Serif Display', Georgia, serif;
+    font-size: 1.4rem;
+    font-weight: 400;
+    margin-bottom: 0.4rem;
+  }
+
+  .intro-block p {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    max-width: 560px;
+    line-height: 1.6;
+  }
+</style>
+
+<div class="intro-block">
+  <h2>Web UI Design Direction</h2>
+  <p>Three visual directions for redesigning the OpenSRE admin console. Each brings a different balance of the website's warm organic identity and the UI's ops-focused functionality. Click a card to select your preference.</p>
+</div>
+
+<div class="cards" style="grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.25rem;">
+
+  <!-- ── OPTION A: Forest & Stone ── -->
+  <div class="card option" id="opt-a" onclick="selectCard('opt-a', 'A: Forest & Stone')">
+    <div class="card-image" style="background: var(--stone-50); padding: 0; aspect-ratio: unset;">
+      <!-- Mini preview: Forest & Stone -->
+      <div class="mini-ui" style="width: 100%;">
+        <!-- Sidebar: stone-900 bg, forest active states, serif logo -->
+        <div class="mini-sidebar" style="background: var(--stone-900); border-right: 1px solid rgba(61,123,95,0.3);">
+          <div class="mini-logo" style="color: var(--forest-light); font-family: 'DM Serif Display', serif; font-size: 10px; letter-spacing: 0; font-weight: 400;">OpenSRE</div>
+          <div class="mini-nav-item" style="background: rgba(61,123,95,0.25); color: var(--forest-light); border-left: 2px solid var(--forest-light); border-radius: 0 5px 5px 0; margin-left: -8px; padding-left: 10px;">Dashboard</div>
+          <div class="mini-nav-item" style="color: var(--stone-400);">Investigate</div>
+          <div class="mini-nav-item" style="color: var(--stone-400);">Memory</div>
+          <div class="mini-nav-item" style="color: var(--stone-400);">Config</div>
+          <div class="mini-nav-item" style="color: var(--stone-400);">KnowledgeG</div>
+        </div>
+        <!-- Main: stone-50 warm bg -->
+        <div class="mini-main" style="background: var(--stone-50);">
+          <div class="mini-topbar">
+            <div class="mini-page-title" style="font-family: 'DM Serif Display', serif; font-weight: 400; color: var(--stone-900); font-size: 11px;">Dashboard</div>
+            <div class="mini-badge" style="background: var(--clay); color: white;">3 active</div>
+          </div>
+          <div class="mini-cards-row">
+            <div class="mini-card" style="background: white; border: 1px solid var(--stone-200);">
+              <div class="mini-card-label" style="color: var(--stone-600);">Incidents</div>
+              <div class="mini-card-value" style="color: var(--stone-900);">12</div>
+              <div class="mini-chart-bar" style="background: var(--forest); width: 60%;"></div>
+            </div>
+            <div class="mini-card" style="background: white; border: 1px solid var(--stone-200);">
+              <div class="mini-card-label" style="color: var(--stone-600);">Resolved</div>
+              <div class="mini-card-value" style="color: var(--forest);">9</div>
+              <div class="mini-chart-bar" style="background: var(--forest-light); width: 75%;"></div>
+            </div>
+          </div>
+          <div class="mini-list">
+            <div class="mini-list-item" style="background: white; border: 1px solid var(--stone-200);">
+              <div class="mini-dot" style="background: var(--clay);"></div>
+              <span style="color: var(--stone-700);">cart-service OOM</span>
+              <div class="mini-tag" style="background: var(--stone-100); color: var(--stone-600); margin-left: auto;">P1</div>
+            </div>
+            <div class="mini-list-item" style="background: white; border: 1px solid var(--stone-200);">
+              <div class="mini-dot" style="background: var(--forest-light);"></div>
+              <span style="color: var(--stone-700);">db latency spike</span>
+              <div class="mini-tag" style="background: var(--stone-100); color: var(--stone-600); margin-left: auto;">P2</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <div class="choice-label" style="background: rgba(61,123,95,0.15); color: var(--forest);">A</div>
+      <h3 class="direction-heading">Forest &amp; Stone</h3>
+      <p class="direction-meta">Full website palette migration. Warm, editorial, distinctive brand identity.</p>
+      <div>
+        <span class="trait-pill" style="background: rgba(61,123,95,0.12); color: var(--forest-dark);">DM Serif headings</span>
+        <span class="trait-pill" style="background: rgba(61,123,95,0.12); color: var(--forest-dark);">Stone-900 sidebar</span>
+        <span class="trait-pill" style="background: rgba(194,94,76,0.12); color: var(--clay);">Clay accents</span>
+        <span class="trait-pill" style="background: rgba(26,26,24,0.07); color: var(--stone-700);">Light workspace</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── OPTION B: Dark Command Center ── -->
+  <div class="card option" id="opt-b" onclick="selectCard('opt-b', 'B: Dark Command Center')">
+    <div class="card-image" style="background: var(--slate-950); padding: 0; aspect-ratio: unset;">
+      <!-- Mini preview: Dark Command Center -->
+      <div class="mini-ui" style="width: 100%;">
+        <!-- Sidebar: dark slate with glassy neon -->
+        <div class="mini-sidebar" style="background: #0D1626; border-right: 1px solid rgba(0,180,216,0.15);">
+          <div class="mini-logo" style="color: var(--cyan); font-weight: 700; font-size: 9px; letter-spacing: 0.08em;">OPENSRE</div>
+          <div class="mini-nav-item" style="background: linear-gradient(135deg, rgba(0,180,216,0.2), rgba(114,9,183,0.15)); color: var(--cyan); border: 1px solid rgba(0,180,216,0.3);">Dashboard</div>
+          <div class="mini-nav-item" style="color: rgba(148,163,184,0.7);">Investigate</div>
+          <div class="mini-nav-item" style="color: rgba(148,163,184,0.7);">Memory</div>
+          <div class="mini-nav-item" style="color: rgba(148,163,184,0.7);">Config</div>
+          <div class="mini-nav-item" style="color: rgba(148,163,184,0.7);">Knowledge G</div>
+        </div>
+        <!-- Main: dark slate-900 -->
+        <div class="mini-main" style="background: var(--slate-800);">
+          <div class="mini-topbar">
+            <div class="mini-page-title" style="color: #E2E8F0; font-size: 11px; letter-spacing: 0.02em;">DASHBOARD</div>
+            <div class="mini-badge" style="background: rgba(0,180,216,0.2); color: var(--cyan); border: 1px solid rgba(0,180,216,0.4);">3 active</div>
+          </div>
+          <div class="mini-cards-row">
+            <div class="mini-card" style="background: rgba(255,255,255,0.04); border: 1px solid rgba(0,180,216,0.2); backdrop-filter: blur(8px);">
+              <div class="mini-card-label" style="color: rgba(148,163,184,0.6);">Incidents</div>
+              <div class="mini-card-value" style="color: var(--cyan);">12</div>
+              <div class="mini-chart-bar" style="background: linear-gradient(90deg, var(--cyan), var(--purple)); width: 60%;"></div>
+            </div>
+            <div class="mini-card" style="background: rgba(255,255,255,0.04); border: 1px solid rgba(114,9,183,0.25); backdrop-filter: blur(8px);">
+              <div class="mini-card-label" style="color: rgba(148,163,184,0.6);">Resolved</div>
+              <div class="mini-card-value" style="color: #A78BFA;">9</div>
+              <div class="mini-chart-bar" style="background: var(--purple); width: 75%;"></div>
+            </div>
+          </div>
+          <div class="mini-list">
+            <div class="mini-list-item" style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,59,48,0.3);">
+              <div class="mini-dot" style="background: #FF3B30; box-shadow: 0 0 4px #FF3B30;"></div>
+              <span style="color: #CBD5E1; font-family: 'JetBrains Mono', monospace;">cart-service OOM</span>
+              <div class="mini-tag" style="background: rgba(255,59,48,0.2); color: #FF6B6B; margin-left: auto;">P1</div>
+            </div>
+            <div class="mini-list-item" style="background: rgba(255,255,255,0.03); border: 1px solid rgba(0,180,216,0.2);">
+              <div class="mini-dot" style="background: var(--cyan); box-shadow: 0 0 4px var(--cyan);"></div>
+              <span style="color: #CBD5E1; font-family: 'JetBrains Mono', monospace;">db latency spike</span>
+              <div class="mini-tag" style="background: rgba(0,180,216,0.15); color: var(--cyan); margin-left: auto;">P2</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <div class="choice-label" style="background: rgba(0,180,216,0.12); color: var(--cyan);">B</div>
+      <h3 class="direction-heading">Dark Command Center</h3>
+      <p class="direction-meta">Elevated ops-terminal feel. Keep dark base, add glass panels and neon gradient accents.</p>
+      <div>
+        <span class="trait-pill" style="background: rgba(0,180,216,0.1); color: var(--cyan);">Glassmorphism</span>
+        <span class="trait-pill" style="background: rgba(0,180,216,0.1); color: var(--cyan);">Neon accents</span>
+        <span class="trait-pill" style="background: rgba(114,9,183,0.1); color: #A78BFA;">Gradient borders</span>
+        <span class="trait-pill" style="background: rgba(255,255,255,0.06); color: #94A3B8;">Mono type</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── OPTION C: Hybrid Warm-Dark ── -->
+  <div class="card option" id="opt-c" onclick="selectCard('opt-c', 'C: Hybrid Warm-Dark')">
+    <div class="card-image" style="padding: 0; aspect-ratio: unset;">
+      <!-- Mini preview: Hybrid — dark stone sidebar, light stone main -->
+      <div class="mini-ui" style="width: 100%;">
+        <!-- Sidebar: stone-900 warm dark -->
+        <div class="mini-sidebar" style="background: var(--stone-900); border-right: 1px solid rgba(212,208,200,0.12);">
+          <div class="mini-logo" style="color: var(--forest-light); font-family: 'DM Serif Display', serif; font-size: 10px; letter-spacing: 0; font-weight: 400;">OpenSRE</div>
+          <div class="mini-nav-item" style="background: rgba(61,123,95,0.25); color: var(--forest-light); border-left: 2px solid var(--forest-light); border-radius: 0 5px 5px 0; margin-left: -8px; padding-left: 10px;">Dashboard</div>
+          <div class="mini-nav-item" style="color: var(--stone-400);">Investigate</div>
+          <div class="mini-nav-item" style="color: var(--stone-400);">Memory</div>
+          <div class="mini-nav-item" style="color: var(--stone-400);">Config</div>
+          <div class="mini-nav-item" style="color: rgba(161,158,151,0.5);">Knowledge G</div>
+          <!-- Bottom section hint -->
+          <div style="margin-top: auto; padding-top: 6px; border-top: 1px solid rgba(255,255,255,0.06);">
+            <div class="mini-nav-item" style="color: rgba(161,158,151,0.4); font-size: 8px;">Settings</div>
+          </div>
+        </div>
+        <!-- Main: stone-50 light warm -->
+        <div class="mini-main" style="background: var(--stone-100);">
+          <div class="mini-topbar">
+            <div class="mini-page-title" style="font-family: 'DM Serif Display', serif; font-weight: 400; color: var(--stone-900); font-size: 11px;">Dashboard</div>
+            <div class="mini-badge" style="background: var(--clay); color: white;">3 active</div>
+          </div>
+          <div class="mini-cards-row">
+            <div class="mini-card" style="background: white; border: 1px solid var(--stone-200); box-shadow: 0 1px 4px rgba(26,26,24,0.06);">
+              <div class="mini-card-label" style="color: var(--stone-600);">Incidents</div>
+              <div class="mini-card-value" style="color: var(--stone-900);">12</div>
+              <div class="mini-chart-bar" style="background: var(--forest); width: 60%;"></div>
+            </div>
+            <div class="mini-card" style="background: white; border: 1px solid var(--stone-200); box-shadow: 0 1px 4px rgba(26,26,24,0.06);">
+              <div class="mini-card-label" style="color: var(--stone-600);">Resolved</div>
+              <div class="mini-card-value" style="color: var(--forest);">9</div>
+              <div class="mini-chart-bar" style="background: var(--forest-light); width: 75%;"></div>
+            </div>
+          </div>
+          <div class="mini-list">
+            <div class="mini-list-item" style="background: white; border: 1px solid var(--stone-200); box-shadow: 0 1px 3px rgba(26,26,24,0.05);">
+              <div class="mini-dot" style="background: var(--clay);"></div>
+              <span style="color: var(--stone-700); font-family: 'JetBrains Mono', monospace; font-size: 7.5px;">cart-service OOM</span>
+              <div class="mini-tag" style="background: rgba(194,94,76,0.1); color: var(--clay); margin-left: auto;">P1</div>
+            </div>
+            <div class="mini-list-item" style="background: white; border: 1px solid var(--stone-200); box-shadow: 0 1px 3px rgba(26,26,24,0.05);">
+              <div class="mini-dot" style="background: var(--forest-light);"></div>
+              <span style="color: var(--stone-700); font-family: 'JetBrains Mono', monospace; font-size: 7.5px;">db latency spike</span>
+              <div class="mini-tag" style="background: rgba(61,123,95,0.1); color: var(--forest-dark); margin-left: auto;">P2</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <div class="choice-label" style="background: rgba(61,123,95,0.1); color: var(--forest-dark);">C</div>
+      <h3 class="direction-heading">Hybrid Warm-Dark</h3>
+      <p class="direction-meta">Dark stone-900 nav, light stone-50 workspace. Warm palette meets practical ops readability.</p>
+      <div>
+        <span class="trait-pill" style="background: rgba(26,26,24,0.08); color: var(--stone-700);">Stone-900 nav</span>
+        <span class="trait-pill" style="background: rgba(61,123,95,0.12); color: var(--forest-dark);">Forest active</span>
+        <span class="trait-pill" style="background: rgba(194,94,76,0.12); color: var(--clay);">Clay status</span>
+        <span class="trait-pill" style="background: rgba(61,123,95,0.1); color: var(--forest-dark);">Mono code</span>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  function selectCard(id, label) {
+    document.querySelectorAll('.option').forEach(el => el.classList.remove('selected'));
+    document.getElementById(id).classList.add('selected');
+    const indicator = document.getElementById('indicator-text');
+    if (indicator) {
+      indicator.innerHTML = 'Selected: <span class="selected-text">' + label + '</span> — tell me in the terminal to proceed';
+    }
+  }
+</script>

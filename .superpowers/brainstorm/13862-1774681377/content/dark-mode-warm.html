@@ -1,0 +1,808 @@
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+  .dm-root * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  }
+
+  .dm-root {
+    padding: 32px 24px;
+    background: #F0EDE8;
+    min-height: 100vh;
+  }
+
+  .dm-header {
+    text-align: center;
+    margin-bottom: 28px;
+  }
+
+  .dm-header h1 {
+    font-size: 22px;
+    font-weight: 700;
+    color: #1A1A18;
+    letter-spacing: -0.3px;
+  }
+
+  .dm-header p {
+    font-size: 13px;
+    color: #7A7870;
+    margin-top: 4px;
+  }
+
+  .split {
+    display: flex;
+    gap: 20px;
+    align-items: flex-start;
+    justify-content: center;
+  }
+
+  .mockup {
+    flex: 1;
+    max-width: 540px;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.18), 0 1px 4px rgba(0,0,0,0.10);
+  }
+
+  .mockup-label {
+    text-align: center;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 8px 0 12px;
+    color: #7A7870;
+  }
+
+  /* ---- SHARED CHROME ---- */
+  .browser-chrome {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 14px;
+    border-bottom: 1px solid rgba(0,0,0,0.08);
+  }
+
+  .bc-dot {
+    width: 11px;
+    height: 11px;
+    border-radius: 50%;
+  }
+
+  .bc-bar {
+    flex: 1;
+    height: 22px;
+    border-radius: 4px;
+    margin-left: 8px;
+    font-size: 11px;
+    display: flex;
+    align-items: center;
+    padding: 0 10px;
+    color: #9E9A94;
+    letter-spacing: 0.01em;
+  }
+
+  /* ---- APP SHELL ---- */
+  .app-shell {
+    display: flex;
+    height: 460px;
+  }
+
+  /* ---- SIDEBAR ---- */
+  .sidebar {
+    width: 188px;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    padding: 18px 0 16px;
+  }
+
+  .sidebar-logo {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    padding: 0 18px 20px;
+  }
+
+  .logo-mark {
+    width: 30px;
+    height: 30px;
+    border-radius: 8px;
+    background: #3D7B5F;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .logo-mark svg {
+    width: 16px;
+    height: 16px;
+  }
+
+  .logo-text {
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: -0.2px;
+  }
+
+  .sidebar-section-label {
+    font-size: 9.5px;
+    font-weight: 600;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    padding: 0 18px 8px;
+  }
+
+  .nav-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 18px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    border-radius: 0;
+    transition: background 0.15s;
+    margin: 1px 8px;
+    border-radius: 7px;
+  }
+
+  .nav-icon {
+    width: 17px;
+    height: 17px;
+    opacity: 0.85;
+  }
+
+  .sidebar-footer {
+    margin-top: auto;
+    padding: 12px 16px 0;
+    border-top: 1px solid rgba(255,255,255,0.06);
+  }
+
+  .user-pill {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    padding: 8px 10px;
+    border-radius: 8px;
+  }
+
+  .user-avatar {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: #3D7B5F;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 700;
+    color: #fff;
+    flex-shrink: 0;
+  }
+
+  .user-name {
+    font-size: 12px;
+    font-weight: 500;
+  }
+
+  /* ---- MAIN CONTENT ---- */
+  .main-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 22px 22px 20px;
+  }
+
+  .page-header {
+    margin-bottom: 20px;
+  }
+
+  .page-title {
+    font-size: 19px;
+    font-weight: 700;
+    letter-spacing: -0.3px;
+    line-height: 1.2;
+  }
+
+  .page-subtitle {
+    font-size: 12.5px;
+    margin-top: 3px;
+  }
+
+  /* ---- STAT CARDS ---- */
+  .stat-row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+
+  .stat-card {
+    border-radius: 10px;
+    padding: 14px 16px;
+    border: 1px solid;
+  }
+
+  .stat-label {
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+
+  .stat-value {
+    font-size: 26px;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+    line-height: 1;
+  }
+
+  .stat-delta {
+    font-size: 11px;
+    margin-top: 6px;
+    display: flex;
+    align-items: center;
+    gap: 3px;
+  }
+
+  .stat-delta-up {
+    color: #3D7B5F;
+  }
+
+  /* ---- ACTIVITY CARD ---- */
+  .activity-card {
+    border-radius: 10px;
+    border: 1px solid;
+    overflow: hidden;
+  }
+
+  .activity-card-header {
+    padding: 13px 16px 12px;
+    border-bottom: 1px solid;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .activity-card-title {
+    font-size: 13px;
+    font-weight: 600;
+  }
+
+  .activity-badge {
+    font-size: 10.5px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 20px;
+    letter-spacing: 0.02em;
+  }
+
+  .activity-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 11px 16px;
+  }
+
+  .activity-row + .activity-row {
+    border-top: 1px solid;
+  }
+
+  .activity-icon-wrap {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .activity-icon-wrap svg {
+    width: 15px;
+    height: 15px;
+  }
+
+  .activity-text {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .activity-title-text {
+    font-size: 12.5px;
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .activity-meta {
+    font-size: 11px;
+    margin-top: 2px;
+  }
+
+  .activity-status {
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 12px;
+    white-space: nowrap;
+  }
+
+  .status-success-light {
+    background: #D6EFE2;
+    color: #1F6644;
+  }
+
+  .status-running-light {
+    background: #FDE8CD;
+    color: #974B10;
+  }
+
+  .status-success-dark {
+    background: #1F3D2C;
+    color: #6BC99A;
+  }
+
+  .status-running-dark {
+    background: #3D2A10;
+    color: #D4913A;
+  }
+
+  /* ---- TOP BAR ---- */
+  .topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 22px;
+    border-bottom: 1px solid;
+  }
+
+  .topbar-search {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 6px 12px;
+    border-radius: 7px;
+    border: 1px solid;
+    font-size: 12px;
+    width: 160px;
+  }
+
+  .topbar-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .topbar-btn {
+    width: 30px;
+    height: 30px;
+    border-radius: 7px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid;
+    cursor: pointer;
+  }
+
+  .run-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 14px;
+    border-radius: 7px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    border: none;
+    background: #3D7B5F;
+    color: #fff;
+  }
+</style>
+
+<div class="dm-root">
+  <div class="dm-header">
+    <h1>Option A — Warm Dark Mode</h1>
+    <p>Team Dashboard — Light vs Warm Dark comparison</p>
+  </div>
+
+  <div class="split">
+
+    <!-- ============================================================ -->
+    <!--  LEFT PANEL — LIGHT MODE                                      -->
+    <!-- ============================================================ -->
+    <div>
+      <div class="mockup-label" style="color:#7A7870;">Light Mode (Current)</div>
+      <div class="mockup" style="background:#FAFAF7;">
+
+        <!-- Browser chrome -->
+        <div class="browser-chrome" style="background:#F0EDE8;">
+          <div class="bc-dot" style="background:#FF5F57;"></div>
+          <div class="bc-dot" style="background:#FFBD2E;"></div>
+          <div class="bc-dot" style="background:#28C840;"></div>
+          <div class="bc-bar" style="background:#E8E5DE;">app.opensre.io/dashboard</div>
+        </div>
+
+        <!-- App shell -->
+        <div class="app-shell">
+
+          <!-- Sidebar -->
+          <div class="sidebar" style="background:#2D2D2D;">
+            <div class="sidebar-logo">
+              <div class="logo-mark">
+                <svg viewBox="0 0 16 16" fill="none">
+                  <circle cx="8" cy="8" r="5.5" stroke="white" stroke-width="1.5"/>
+                  <circle cx="8" cy="8" r="2" fill="white"/>
+                  <line x1="8" y1="2" x2="8" y2="0.5" stroke="white" stroke-width="1.5" stroke-linecap="round"/>
+                  <line x1="8" y1="13.5" x2="8" y2="15.5" stroke="white" stroke-width="1.5" stroke-linecap="round"/>
+                  <line x1="2" y1="8" x2="0.5" y2="8" stroke="white" stroke-width="1.5" stroke-linecap="round"/>
+                  <line x1="13.5" y1="8" x2="15.5" y2="8" stroke="white" stroke-width="1.5" stroke-linecap="round"/>
+                </svg>
+              </div>
+              <span class="logo-text" style="color:#FAFAF7;">OpenSRE</span>
+            </div>
+
+            <div class="sidebar-section-label" style="color:#6B6965;">Navigation</div>
+
+            <div class="nav-item" style="background:#3D7B5F; color:#fff;">
+              <svg class="nav-icon" viewBox="0 0 17 17" fill="none">
+                <rect x="1.5" y="1.5" width="5.5" height="5.5" rx="1.5" fill="currentColor" opacity="0.9"/>
+                <rect x="10" y="1.5" width="5.5" height="5.5" rx="1.5" fill="currentColor" opacity="0.9"/>
+                <rect x="1.5" y="10" width="5.5" height="5.5" rx="1.5" fill="currentColor" opacity="0.9"/>
+                <rect x="10" y="10" width="5.5" height="5.5" rx="1.5" fill="currentColor" opacity="0.9"/>
+              </svg>
+              Dashboard
+            </div>
+
+            <div class="nav-item" style="color:#A09E97;">
+              <svg class="nav-icon" viewBox="0 0 17 17" fill="none">
+                <path d="M2.5 4.5h12M2.5 8.5h9M2.5 12.5h6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+              </svg>
+              Agent Runs
+            </div>
+
+            <div class="nav-item" style="color:#A09E97;">
+              <svg class="nav-icon" viewBox="0 0 17 17" fill="none">
+                <circle cx="8.5" cy="8.5" r="5" stroke="currentColor" stroke-width="1.5"/>
+                <path d="M8.5 5.5v3l2 2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+              </svg>
+              Memory
+            </div>
+
+            <div class="nav-item" style="color:#A09E97;">
+              <svg class="nav-icon" viewBox="0 0 17 17" fill="none">
+                <circle cx="4" cy="8.5" r="2" stroke="currentColor" stroke-width="1.5"/>
+                <circle cx="13" cy="4.5" r="2" stroke="currentColor" stroke-width="1.5"/>
+                <circle cx="13" cy="12.5" r="2" stroke="currentColor" stroke-width="1.5"/>
+                <line x1="5.8" y1="7.5" x2="11" y2="5.3" stroke="currentColor" stroke-width="1.2"/>
+                <line x1="5.8" y1="9.5" x2="11" y2="11.7" stroke="currentColor" stroke-width="1.2"/>
+              </svg>
+              Knowledge
+            </div>
+
+            <div class="nav-item" style="color:#A09E97;">
+              <svg class="nav-icon" viewBox="0 0 17 17" fill="none">
+                <circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/>
+                <circle cx="8.5" cy="8.5" r="2" stroke="currentColor" stroke-width="1.5"/>
+              </svg>
+              Settings
+            </div>
+
+            <div class="sidebar-footer" style="border-color:rgba(255,255,255,0.07);">
+              <div class="user-pill" style="background:rgba(255,255,255,0.05);">
+                <div class="user-avatar">SD</div>
+                <div>
+                  <div class="user-name" style="color:#E8E5DE;">Swapnil D.</div>
+                  <div style="font-size:10px;color:#7A7870;">Admin</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Right side -->
+          <div style="flex:1; display:flex; flex-direction:column; overflow:hidden;">
+            <!-- Top bar -->
+            <div class="topbar" style="background:#FAFAF7; border-color:#E8E5DE;">
+              <div class="topbar-search" style="background:#F0EDE8; border-color:#E8E5DE; color:#7A7870;">
+                <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                  <circle cx="5" cy="5" r="3.5" stroke="#A09E97" stroke-width="1.3"/>
+                  <line x1="7.5" y1="7.5" x2="11" y2="11" stroke="#A09E97" stroke-width="1.3" stroke-linecap="round"/>
+                </svg>
+                Search...
+              </div>
+              <div class="topbar-actions">
+                <div class="topbar-btn" style="background:#F0EDE8; border-color:#E8E5DE; color:#7A7870;">
+                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                    <path d="M7 1.5C7 1.5 2 4 2 7.5C2 10.5 4.5 12.5 7 12.5C9.5 12.5 12 10.5 12 7.5C12 4 7 1.5 7 1.5Z" stroke="currentColor" stroke-width="1.3"/>
+                    <circle cx="7" cy="4.5" r="1" fill="currentColor"/>
+                  </svg>
+                </div>
+                <button class="run-btn">
+                  <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
+                    <path d="M3 2L9 5.5L3 9V2Z" fill="white"/>
+                  </svg>
+                  New Run
+                </button>
+              </div>
+            </div>
+
+            <!-- Main content -->
+            <div class="main-content" style="background:#FAFAF7;">
+              <div class="page-header">
+                <div class="page-title" style="color:#1A1A18;">Team Dashboard</div>
+                <div class="page-subtitle" style="color:#7A7870;">Monitor your AI agents</div>
+              </div>
+
+              <!-- Stat cards -->
+              <div class="stat-row">
+                <div class="stat-card" style="background:#fff; border-color:#E8E5DE;">
+                  <div class="stat-label" style="color:#7A7870;">Total Runs</div>
+                  <div class="stat-value" style="color:#1A1A18;">247</div>
+                  <div class="stat-delta stat-delta-up">
+                    <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M5 2L8 5H2L5 2Z" fill="#3D7B5F"/></svg>
+                    +12 this week
+                  </div>
+                </div>
+                <div class="stat-card" style="background:#fff; border-color:#E8E5DE;">
+                  <div class="stat-label" style="color:#7A7870;">Success Rate</div>
+                  <div class="stat-value" style="color:#1A1A18;">94%</div>
+                  <div class="stat-delta stat-delta-up">
+                    <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M5 2L8 5H2L5 2Z" fill="#3D7B5F"/></svg>
+                    +2.1% vs last month
+                  </div>
+                </div>
+                <div class="stat-card" style="background:#fff; border-color:#E8E5DE;">
+                  <div class="stat-label" style="color:#7A7870;">Avg MTTD</div>
+                  <div class="stat-value" style="color:#1A1A18;">4m</div>
+                  <div class="stat-delta stat-delta-up">
+                    <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M5 8L2 5H8L5 8Z" fill="#c25e4c"/></svg>
+                    <span style="color:#c25e4c;">−38s vs last week</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Activity card -->
+              <div class="activity-card" style="background:#fff; border-color:#E8E5DE;">
+                <div class="activity-card-header" style="border-color:#E8E5DE;">
+                  <span class="activity-card-title" style="color:#1A1A18;">Recent Activity</span>
+                  <span class="activity-badge" style="background:#FCE8E4; color:#c25e4c;">2 active</span>
+                </div>
+
+                <div class="activity-row">
+                  <div class="activity-icon-wrap" style="background:#D6EFE2;">
+                    <svg viewBox="0 0 15 15" fill="none">
+                      <circle cx="7.5" cy="7.5" r="5.5" stroke="#3D7B5F" stroke-width="1.4"/>
+                      <path d="M5 7.5L7 9.5L10.5 6" stroke="#3D7B5F" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                  </div>
+                  <div class="activity-text">
+                    <div class="activity-title-text" style="color:#2D2D2D;">cart-service high error rate</div>
+                    <div class="activity-meta" style="color:#7A7870;">cart-service · 6m ago · 38 tool calls</div>
+                  </div>
+                  <span class="activity-status status-success-light">Resolved</span>
+                </div>
+
+                <div class="activity-row" style="border-color:#E8E5DE;">
+                  <div class="activity-icon-wrap" style="background:#FDE8CD;">
+                    <svg viewBox="0 0 15 15" fill="none">
+                      <circle cx="7.5" cy="7.5" r="5.5" stroke="#974B10" stroke-width="1.4"/>
+                      <path d="M7.5 4.5v4" stroke="#974B10" stroke-width="1.4" stroke-linecap="round"/>
+                      <circle cx="7.5" cy="10.5" r="0.8" fill="#974B10"/>
+                    </svg>
+                  </div>
+                  <div class="activity-text">
+                    <div class="activity-title-text" style="color:#2D2D2D;">payment-svc latency spike</div>
+                    <div class="activity-meta" style="color:#7A7870;">payment-service · 2m ago · investigating…</div>
+                  </div>
+                  <span class="activity-status status-running-light">Running</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============================================================ -->
+    <!--  RIGHT PANEL — WARM DARK MODE                                 -->
+    <!-- ============================================================ -->
+    <div>
+      <div class="mockup-label" style="color:#A09E97;">Warm Dark Mode (Option A)</div>
+      <div class="mockup" style="background:#2D2D2D;">
+
+        <!-- Browser chrome -->
+        <div class="browser-chrome" style="background:#1A1A18; border-color:rgba(255,255,255,0.07);">
+          <div class="bc-dot" style="background:#FF5F57;"></div>
+          <div class="bc-dot" style="background:#FFBD2E;"></div>
+          <div class="bc-dot" style="background:#28C840;"></div>
+          <div class="bc-bar" style="background:#2D2D2D; color:#5A5850; border:1px solid #3D3B35;">app.opensre.io/dashboard</div>
+        </div>
+
+        <!-- App shell -->
+        <div class="app-shell">
+
+          <!-- Sidebar -->
+          <div class="sidebar" style="background:#1A1A18;">
+            <div class="sidebar-logo">
+              <div class="logo-mark">
+                <svg viewBox="0 0 16 16" fill="none">
+                  <circle cx="8" cy="8" r="5.5" stroke="white" stroke-width="1.5"/>
+                  <circle cx="8" cy="8" r="2" fill="white"/>
+                  <line x1="8" y1="2" x2="8" y2="0.5" stroke="white" stroke-width="1.5" stroke-linecap="round"/>
+                  <line x1="8" y1="13.5" x2="8" y2="15.5" stroke="white" stroke-width="1.5" stroke-linecap="round"/>
+                  <line x1="2" y1="8" x2="0.5" y2="8" stroke="white" stroke-width="1.5" stroke-linecap="round"/>
+                  <line x1="13.5" y1="8" x2="15.5" y2="8" stroke="white" stroke-width="1.5" stroke-linecap="round"/>
+                </svg>
+              </div>
+              <span class="logo-text" style="color:#FAFAF7;">OpenSRE</span>
+            </div>
+
+            <div class="sidebar-section-label" style="color:#4A4845;">Navigation</div>
+
+            <div class="nav-item" style="background:#3D7B5F; color:#fff;">
+              <svg class="nav-icon" viewBox="0 0 17 17" fill="none">
+                <rect x="1.5" y="1.5" width="5.5" height="5.5" rx="1.5" fill="currentColor" opacity="0.9"/>
+                <rect x="10" y="1.5" width="5.5" height="5.5" rx="1.5" fill="currentColor" opacity="0.9"/>
+                <rect x="1.5" y="10" width="5.5" height="5.5" rx="1.5" fill="currentColor" opacity="0.9"/>
+                <rect x="10" y="10" width="5.5" height="5.5" rx="1.5" fill="currentColor" opacity="0.9"/>
+              </svg>
+              Dashboard
+            </div>
+
+            <div class="nav-item" style="color:#7A7870;">
+              <svg class="nav-icon" viewBox="0 0 17 17" fill="none">
+                <path d="M2.5 4.5h12M2.5 8.5h9M2.5 12.5h6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+              </svg>
+              Agent Runs
+            </div>
+
+            <div class="nav-item" style="color:#7A7870;">
+              <svg class="nav-icon" viewBox="0 0 17 17" fill="none">
+                <circle cx="8.5" cy="8.5" r="5" stroke="currentColor" stroke-width="1.5"/>
+                <path d="M8.5 5.5v3l2 2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+              </svg>
+              Memory
+            </div>
+
+            <div class="nav-item" style="color:#7A7870;">
+              <svg class="nav-icon" viewBox="0 0 17 17" fill="none">
+                <circle cx="4" cy="8.5" r="2" stroke="currentColor" stroke-width="1.5"/>
+                <circle cx="13" cy="4.5" r="2" stroke="currentColor" stroke-width="1.5"/>
+                <circle cx="13" cy="12.5" r="2" stroke="currentColor" stroke-width="1.5"/>
+                <line x1="5.8" y1="7.5" x2="11" y2="5.3" stroke="currentColor" stroke-width="1.2"/>
+                <line x1="5.8" y1="9.5" x2="11" y2="11.7" stroke="currentColor" stroke-width="1.2"/>
+              </svg>
+              Knowledge
+            </div>
+
+            <div class="nav-item" style="color:#7A7870;">
+              <svg class="nav-icon" viewBox="0 0 17 17" fill="none">
+                <circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/>
+                <circle cx="8.5" cy="8.5" r="2" stroke="currentColor" stroke-width="1.5"/>
+              </svg>
+              Settings
+            </div>
+
+            <div class="sidebar-footer" style="border-color:rgba(255,255,255,0.06);">
+              <div class="user-pill" style="background:rgba(255,255,255,0.04);">
+                <div class="user-avatar">SD</div>
+                <div>
+                  <div class="user-name" style="color:#E8E5DE;">Swapnil D.</div>
+                  <div style="font-size:10px;color:#5A5850;">Admin</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Right side -->
+          <div style="flex:1; display:flex; flex-direction:column; overflow:hidden;">
+            <!-- Top bar -->
+            <div class="topbar" style="background:#2D2D2D; border-color:#3D3B35;">
+              <div class="topbar-search" style="background:#3D3B35; border-color:#5A5850; color:#7A7870;">
+                <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                  <circle cx="5" cy="5" r="3.5" stroke="#5A5850" stroke-width="1.3"/>
+                  <line x1="7.5" y1="7.5" x2="11" y2="11" stroke="#5A5850" stroke-width="1.3" stroke-linecap="round"/>
+                </svg>
+                Search...
+              </div>
+              <div class="topbar-actions">
+                <div class="topbar-btn" style="background:#3D3B35; border-color:#5A5850; color:#7A7870;">
+                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                    <path d="M7 1.5C7 1.5 2 4 2 7.5C2 10.5 4.5 12.5 7 12.5C9.5 12.5 12 10.5 12 7.5C12 4 7 1.5 7 1.5Z" stroke="currentColor" stroke-width="1.3"/>
+                    <circle cx="7" cy="4.5" r="1" fill="currentColor"/>
+                  </svg>
+                </div>
+                <button class="run-btn">
+                  <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
+                    <path d="M3 2L9 5.5L3 9V2Z" fill="white"/>
+                  </svg>
+                  New Run
+                </button>
+              </div>
+            </div>
+
+            <!-- Main content -->
+            <div class="main-content" style="background:#2D2D2D;">
+              <div class="page-header">
+                <div class="page-title" style="color:#FAFAF7;">Team Dashboard</div>
+                <div class="page-subtitle" style="color:#A09E97;">Monitor your AI agents</div>
+              </div>
+
+              <!-- Stat cards -->
+              <div class="stat-row">
+                <div class="stat-card" style="background:#3D3B35; border-color:#5A5850;">
+                  <div class="stat-label" style="color:#A09E97;">Total Runs</div>
+                  <div class="stat-value" style="color:#FAFAF7;">247</div>
+                  <div class="stat-delta stat-delta-up">
+                    <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M5 2L8 5H2L5 2Z" fill="#3D7B5F"/></svg>
+                    +12 this week
+                  </div>
+                </div>
+                <div class="stat-card" style="background:#3D3B35; border-color:#5A5850;">
+                  <div class="stat-label" style="color:#A09E97;">Success Rate</div>
+                  <div class="stat-value" style="color:#FAFAF7;">94%</div>
+                  <div class="stat-delta stat-delta-up">
+                    <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M5 2L8 5H2L5 2Z" fill="#3D7B5F"/></svg>
+                    +2.1% vs last month
+                  </div>
+                </div>
+                <div class="stat-card" style="background:#3D3B35; border-color:#5A5850;">
+                  <div class="stat-label" style="color:#A09E97;">Avg MTTD</div>
+                  <div class="stat-value" style="color:#FAFAF7;">4m</div>
+                  <div class="stat-delta">
+                    <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M5 8L2 5H8L5 8Z" fill="#d67665"/></svg>
+                    <span style="color:#d67665;">−38s vs last week</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Activity card -->
+              <div class="activity-card" style="background:#3D3B35; border-color:#5A5850;">
+                <div class="activity-card-header" style="border-color:#5A5850;">
+                  <span class="activity-card-title" style="color:#FAFAF7;">Recent Activity</span>
+                  <span class="activity-badge" style="background:#3D2820; color:#d67665;">2 active</span>
+                </div>
+
+                <div class="activity-row">
+                  <div class="activity-icon-wrap" style="background:#1F3D2C;">
+                    <svg viewBox="0 0 15 15" fill="none">
+                      <circle cx="7.5" cy="7.5" r="5.5" stroke="#6BC99A" stroke-width="1.4"/>
+                      <path d="M5 7.5L7 9.5L10.5 6" stroke="#6BC99A" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                  </div>
+                  <div class="activity-text">
+                    <div class="activity-title-text" style="color:#E8E5DE;">cart-service high error rate</div>
+                    <div class="activity-meta" style="color:#A09E97;">cart-service · 6m ago · 38 tool calls</div>
+                  </div>
+                  <span class="activity-status status-success-dark">Resolved</span>
+                </div>
+
+                <div class="activity-row" style="border-color:#5A5850;">
+                  <div class="activity-icon-wrap" style="background:#3D2A10;">
+                    <svg viewBox="0 0 15 15" fill="none">
+                      <circle cx="7.5" cy="7.5" r="5.5" stroke="#D4913A" stroke-width="1.4"/>
+                      <path d="M7.5 4.5v4" stroke="#D4913A" stroke-width="1.4" stroke-linecap="round"/>
+                      <circle cx="7.5" cy="10.5" r="0.8" fill="#D4913A"/>
+                    </svg>
+                  </div>
+                  <div class="activity-text">
+                    <div class="activity-title-text" style="color:#E8E5DE;">payment-svc latency spike</div>
+                    <div class="activity-meta" style="color:#A09E97;">payment-service · 2m ago · investigating…</div>
+                  </div>
+                  <span class="activity-status status-running-dark">Running</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>

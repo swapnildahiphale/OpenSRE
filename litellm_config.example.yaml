@@ -1,0 +1,24 @@
+# LiteLLM Proxy Configuration — Example
+#
+# Copy this file to litellm_config.yaml and configure your LLM provider.
+# See https://docs.litellm.ai/docs/proxy/configs for full docs.
+#
+# Required env vars:
+#   OPENROUTER_API_KEY  — if using OpenRouter
+#   NVIDIA_API_KEY      — if using NVIDIA NIM
+
+model_list:
+  - model_name: "*"
+    litellm_params:
+      # Option 1: OpenRouter (recommended for getting started)
+      # model: openrouter/anthropic/claude-sonnet-4
+      # api_key: os.environ/OPENROUTER_API_KEY
+
+      # Option 2: NVIDIA NIM
+      model: nvidia_nim/nvidia/llama-3.1-nemotron-ultra-253b-v1
+      api_key: os.environ/NVIDIA_API_KEY
+
+litellm_settings:
+  drop_params: true
+  num_retries: 3
+  request_timeout: 300
