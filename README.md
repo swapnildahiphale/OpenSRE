@@ -5,12 +5,17 @@
 </p>
 
 <h4 align="center">
+  <a href="https://opensre.in">Website</a> |
+  <a href="https://demo.opensre.in">Live Demo</a> |
   <a href="docs/FORK_ROADMAP.md">Roadmap</a> |
   <a href="docs/FEATURES.md">Features</a> |
   <a href="ATTRIBUTION.md">Attribution</a>
 </h4>
 
 <h4 align="center">
+  <a href="https://opensre.in">
+    <img src="https://img.shields.io/badge/website-opensre.in-green.svg" alt="OpenSRE Website" />
+  </a>
   <a href="LICENSE">
     <img src="https://img.shields.io/badge/license-Apache%202.0-blue.svg" alt="Apache 2.0 License" />
   </a>
