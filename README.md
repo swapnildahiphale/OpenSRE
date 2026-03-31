@@ -21,6 +21,10 @@
   </a>
 </h4>
 
+<p align="center">
+  Created by <a href="https://swapnil.one">Swapnil Dahiphale</a> — SRE & AI Engineer
+</p>
+
 ## What is OpenSRE?
 
 OpenSRE is an AI SRE platform that automatically investigates production incidents, correlates alerts, analyzes logs, and finds root causes.
@@ -85,3 +89,11 @@ This starts Postgres, config-service, LiteLLM proxy, Neo4j, sre-agent, and the w
 ## License
 
 OpenSRE is licensed under the [Apache License 2.0](LICENSE).
+
+## About the Creator
+
+OpenSRE is created and maintained by [Swapnil Dahiphale](https://swapnil.one), an SRE & AI Engineer with 10+ years of experience in infrastructure, platform engineering, and incident response automation. OpenSRE was born from real-world production incident investigation — combining episodic memory with LLM-driven agents to automate what SRE teams do manually.
+
+- [Portfolio](https://swapnil.one)
+- [LinkedIn](https://www.linkedin.com/in/swapnil2233/)
+- [GitHub](https://github.com/swapnildahiphale/)
