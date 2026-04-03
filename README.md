@@ -153,8 +153,11 @@ We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
       <em>"Built by someone who's been paged at 3am."</em>
     </td>
     <td align="right">
+      <a href="https://swapnil.one">
+        <img src="https://img.shields.io/badge/Portfolio-000000?style=for-the-badge&logo=safari&logoColor=white" alt="Portfolio" />
+      </a>&nbsp;
       <a href="https://www.linkedin.com/in/swapnil2233/">
-        <img src="https://img.shields.io/badge/Connect_on_LinkedIn-0A66C2?style=for-the-badge&logo=linkedin&logoColor=white" alt="LinkedIn" />
+        <img src="https://img.shields.io/badge/LinkedIn-0A66C2?style=for-the-badge&logo=linkedin&logoColor=white" alt="LinkedIn" />
       </a>
     </td>
   </tr>
