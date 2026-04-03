@@ -1,0 +1,66 @@
+# OpenSRE E2E Test — otel-demo shared base values
+# Cluster-specific overrides in kind/ and eks/ directories
+
+# Fix: Set OTEL exporter endpoint for all services.
+# Without this, OTel SDKs default to localhost:4317 which is unreachable
+# inside each pod (no collector sidecar). Only loadgenerator and flagd
+# explicitly set this, so all other services silently drop telemetry.
+default:
+  envOverrides:
+    - name: OTEL_EXPORTER_OTLP_ENDPOINT
+      value: http://$(OTEL_COLLECTOR_NAME):4317
+
+# Jaeger: In-memory storage grows unbounded → GC pressure → OOMKilled.
+# 600Mi was too tight with 20K traces from 24 services — bumped to 1Gi
+# and reduced max-traces to 8000 (still plenty for investigation).
+jaeger:
+  allInOne:
+    args:
+      - "--memory.max-traces=8000"
+      - "--query.base-path=/jaeger/ui"
+      - "--prometheus.server-url=http://otel-demo-prometheus-server:9090"
+      - "--prometheus.query.normalize-calls=true"
+      - "--prometheus.query.normalize-duration=true"
+    resources:
+      limits:
+        memory: 1Gi
+      requests:
+        memory: 1Gi
+
+# otel-collector: Default memory is too low for 24 services → OOM → Jaeger gets
+# zero traces ("data refused due to high memory usage").  Also fix log timestamps:
+# OTel SDKs don't set the log Timestamp field → collector receives epoch zero →
+# OpenSearch writes @timestamp: 1970-01-01.  The transform processor copies
+# observedTimestamp → Timestamp so the exporter writes the real time.
+opentelemetry-collector:
+  resources:
+    limits:
+      memory: 2Gi
+    requests:
+      memory: 1Gi
+  extraEnvs:
+    - name: GOMEMLIMIT
+      value: "1600MiB"
+  config:
+    processors:
+      transform:
+        error_mode: ignore
+        log_statements:
+          - context: log
+            statements:
+              - set(time, observed_time) where observed_time != nil
+    service:
+      pipelines:
+        logs:
+          processors: [memory_limiter, resource, transform, batch]
+          exporters: [opensearch]
+
+# Grafana: anonymous auth for E2E convenience
+grafana:
+  grafana.ini:
+    auth:
+      disable_login_form: true
+    auth.anonymous:
+      enabled: true
+      org_name: Main Org.
+      org_role: Admin

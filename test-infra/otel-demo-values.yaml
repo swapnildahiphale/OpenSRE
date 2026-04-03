@@ -1,0 +1,116 @@
+# OpenSRE E2E Test — otel-demo overrides for kind cluster
+# Exposes services via NodePort for host access
+# Memory limits tuned for single-node kind cluster stability
+#
+# Issues fixed (Mar 2026):
+# - otelcol: 200Mi too low → probes timeout, 0/1 Ready, 5+ restarts
+# - Kafka: 500Mi with Xmx400M → OOMKilled (32 restarts, exit 137)
+# - accountingservice: 120Mi → SIGSEGV crashes (21 restarts, exit 139)
+# - Jaeger: 400Mi in-memory storage → probes timeout, 0/1 Ready
+# - debug exporter in all pipelines → wasted CPU/memory on stdout dumps
+
+# Fix: Set OTEL exporter endpoint for all services.
+# Without this, OTel SDKs default to localhost:4317 which is unreachable
+# inside each pod (no collector sidecar). Only loadgenerator and flagd
+# explicitly set this, so all other services silently drop telemetry.
+default:
+  envOverrides:
+    - name: OTEL_EXPORTER_OTLP_ENDPOINT
+      value: http://$(OTEL_COLLECTOR_NAME):4317
+
+components:
+  # Fix: Envoy STRICT_DNS resolves to IPv6 in kind, causing 503 errors.
+  # Override startup command to inject dns_lookup_family: V4_ONLY into all clusters.
+  frontendProxy:
+    command:
+      - /bin/sh
+      - -c
+      - |
+        envsubst < envoy.tmpl.yaml > envoy.yaml
+        sed -i 's/type: STRICT_DNS/type: STRICT_DNS\n      dns_lookup_family: V4_ONLY/g' envoy.yaml
+        envoy -c envoy.yaml
+  frontend:
+    service:
+      type: NodePort
+      port: 8080
+      nodePort: 30080
+
+  # Kafka: Chart default is -Xmx400M -Xms400M with 600Mi limit.
+  # JVM heap 400M + non-heap + threads + OTel agent needs ~800Mi.
+  # Previous 500Mi override was LOWER than default → OOMKilled 32 times.
+  # Keep default heap (400M), increase container limit to 800Mi.
+  kafka:
+    resources:
+      limits:
+        memory: 800Mi
+      requests:
+        memory: 800Mi
+
+  # Accountingservice: Kafka consumer + OTel SDK in Go.
+  # Default 120Mi too low → SIGSEGV (exit 139) under memory pressure.
+  accountingService:
+    resources:
+      limits:
+        memory: 300Mi
+      requests:
+        memory: 200Mi
+
+# OTel Collector: Central telemetry hub for 24 services.
+# Default 200Mi + GOMEMLIMIT=160MiB far too low for this workload.
+# Increased to 500Mi. Removed debug exporter from pipelines (it dumps
+# every telemetry item to stdout, wasting CPU and memory).
+opentelemetry-collector:
+  resources:
+    limits:
+      memory: 500Mi
+    requests:
+      memory: 500Mi
+  extraEnvs:
+    - name: GOMEMLIMIT
+      value: "400MiB"
+
+# Jaeger: In-memory storage grows unbounded → GC pressure → probe timeouts.
+# Increased memory to 600Mi and max-traces from 5000 to 20000.
+jaeger:
+  allInOne:
+    args:
+      - "--memory.max-traces=20000"
+      - "--query.base-path=/jaeger/ui"
+      - "--prometheus.server-url=http://otel-demo-prometheus-server:9090"
+      - "--prometheus.query.normalize-calls=true"
+      - "--prometheus.query.normalize-duration=true"
+    resources:
+      limits:
+        memory: 600Mi
+      requests:
+        memory: 600Mi
+
+# Prometheus
+prometheus:
+  server:
+    service:
+      type: NodePort
+      nodePort: 30090
+
+# Grafana
+grafana:
+  service:
+    type: NodePort
+    nodePort: 30030
+  grafana.ini:
+    auth:
+      disable_login_form: true
+    auth.anonymous:
+      enabled: true
+      org_name: Main Org.
+      org_role: Admin
+
+# Jaeger — query service is created by allInOne sub-chart.
+# The sre-agent accesses Jaeger via kubectl port-forward tunnel (entrypoint-e2e.sh).
+# NodePort not used for Jaeger (headless service from allInOne chart).
+
+# OpenSearch — expose via NodePort for sre-agent log queries
+opensearch:
+  service:
+    type: NodePort
+    nodePort: 30920
