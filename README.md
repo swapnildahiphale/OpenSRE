@@ -144,6 +144,22 @@ make e2e-teardown    # Delete Kind cluster and clean up
 
 We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines. Please open an issue before starting major work.
 
+## Creator
+
+<table>
+  <tr>
+    <td>
+      <strong>Swapnil Dahiphale</strong> · SRE · Builder<br>
+      <em>"Built by someone who's been paged at 3am."</em>
+    </td>
+    <td align="right">
+      <a href="https://www.linkedin.com/in/swapnil2233/">
+        <img src="https://img.shields.io/badge/Connect_on_LinkedIn-0A66C2?style=for-the-badge&logo=linkedin&logoColor=white" alt="LinkedIn" />
+      </a>
+    </td>
+  </tr>
+</table>
+
 ## License
 
 OpenSRE is licensed under the [Apache License 2.0](LICENSE).

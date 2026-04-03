@@ -18,18 +18,7 @@ By participating in this project, you agree to maintain a respectful, inclusive,
 
 ## Licensing
 
-OpenSRE uses a dual-license model. Before contributing, please understand:
-
-- **Contributions to core components** (those under Apache 2.0) are licensed
-  under the Apache License 2.0.
-- **Contributions to enterprise components** (those under BSL 1.1) are licensed
-  under the Business Source License 1.1.
-
-See [LICENSING.md](LICENSING.md) for the full directory-to-license mapping.
-
-By submitting a pull request, you agree that your contributions will be licensed
-under the same license as the files you are modifying. If your PR spans both
-Apache 2.0 and BSL 1.1 components, the respective license applies to each file.
+OpenSRE is licensed under the [Apache License 2.0](LICENSE). By submitting a pull request, you agree that your contributions will be licensed under the same terms.
 
 ## How Can I Contribute?
 
