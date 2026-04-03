@@ -1,4 +1,6 @@
-<h1 align="center">OpenSRE</h1>
+<p align="center">
+  <img src=".github/assets/logo.png" alt="OpenSRE" width="320" />
+</p>
 
 <p align="center">
   <b>Your AI SRE that investigates production incidents</b><br>
