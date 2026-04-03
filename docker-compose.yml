@@ -152,7 +152,7 @@ services:
       - OPENSRE_TEAM_ID=default
       # LLM access via LiteLLM proxy (OpenAI-compatible endpoint for LangGraph)
       - LITELLM_BASE_URL=http://litellm:4000/v1
-      - LITELLM_API_KEY=${OPENROUTER_API_KEY:-sk-placeholder}
+      - LITELLM_API_KEY=${LITELLM_API_KEY:-sk-placeholder}
       # Legacy vars (kept for memory system LLM calls)
       - ANTHROPIC_API_KEY=placeholder-routed-via-litellm
       - ANTHROPIC_BASE_URL=http://litellm:4000
@@ -166,8 +166,10 @@ services:
       - ENABLED_SKILLS=${ENABLED_SKILLS:-all}
       # Investigation timeout (seconds)
       - AGENT_TIMEOUT_SECONDS=900
-      # Memory LLM model (must match a model the LLM proxy can route)
-      - MEMORY_LLM_MODEL=arcee-ai/trinity-large-preview:free
+      # LLM models — all use the same model from .env
+      - MEMORY_LLM_MODEL=${LLM_MODEL}
+      - SUMMARY_LLM_MODEL=${LLM_MODEL}
+      - WRITEUP_LLM_MODEL=${LLM_MODEL}
       # Other services
       - LMNR_PROJECT_API_KEY=${LMNR_PROJECT_API_KEY:-}
     depends_on:

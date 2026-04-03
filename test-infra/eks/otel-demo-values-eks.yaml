@@ -1,0 +1,6 @@
+# EKS-specific otel-demo overrides
+# EKS has real multi-node resources — no memory tuning or NodePort hacks needed.
+# Services use ClusterIP (default); access via kubectl port-forward from host.
+
+# No special overrides needed — EKS nodes have sufficient resources
+# and networking works natively (no IPv4 DNS hack, no NodePort mappings).

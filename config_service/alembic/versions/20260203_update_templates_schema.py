@@ -80,13 +80,11 @@ def upgrade():
     op.alter_column("templates", "org_id", nullable=True)
 
     # Update slug from name (generate slug from existing data)
-    op.execute(
-        """
+    op.execute("""
         UPDATE templates
         SET slug = LOWER(REPLACE(REPLACE(name, ' ', '-'), '.', ''))
         WHERE slug IS NULL
-    """
-    )
+    """)
 
     # Now make slug NOT NULL and unique
     op.alter_column("templates", "slug", nullable=False)

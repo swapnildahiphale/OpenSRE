@@ -1,9 +1,14 @@
-# LiteLLM Proxy Configuration — Example
+# LiteLLM Proxy Configuration — Reference Example
 #
-# Copy this file to litellm_config.yaml and configure your LLM provider.
+# NOTE: You do NOT need to create litellm_config.yaml manually.
+# Running `make dev` auto-generates it from LLM_PROVIDER and LLM_MODEL in .env.
+#
+# This file is kept as a reference for the config structure.
 # See https://docs.litellm.ai/docs/proxy/configs for full docs.
 #
-# Required env vars:
+# Required env vars (set in .env):
+#   LLM_PROVIDER        — nvidia or openrouter
+#   LLM_MODEL           — model name matching your provider
 #   OPENROUTER_API_KEY  — if using OpenRouter
 #   NVIDIA_API_KEY      — if using NVIDIA NIM
 

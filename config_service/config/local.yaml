@@ -75,8 +75,8 @@ team_id: default
 #     # Full list: https://openrouter.ai/models
 #
 ai_model:
-  provider: openrouter  # see options above
-  model_id: arcee-ai/trinity-large-preview:free
+  provider: ${LLM_PROVIDER}  # see options above
+  model_id: ${LLM_MODEL}
   # Optional: Override base URL (required for ollama, azure, bedrock)
   # base_url: http://host.docker.internal:11434
 

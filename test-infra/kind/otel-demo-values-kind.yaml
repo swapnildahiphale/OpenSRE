@@ -1,0 +1,71 @@
+# Kind-specific otel-demo overrides
+# NodePort exposure, memory tuning for single-node, IPv4 DNS hack
+#
+# Issues fixed (Mar 2026):
+# - otelcol: 200Mi too low → probes timeout, 0/1 Ready, 5+ restarts
+# - Kafka: 500Mi with Xmx400M → OOMKilled (32 restarts, exit 137)
+# - accountingservice: 120Mi → SIGSEGV crashes (21 restarts, exit 139)
+# - debug exporter in all pipelines → wasted CPU/memory on stdout dumps
+
+components:
+  # Fix: Envoy STRICT_DNS resolves to IPv6 in kind, causing 503 errors.
+  # Override startup command to inject dns_lookup_family: V4_ONLY into all clusters.
+  frontendProxy:
+    command:
+      - /bin/sh
+      - -c
+      - |
+        envsubst < envoy.tmpl.yaml > envoy.yaml
+        sed -i 's/type: STRICT_DNS/type: STRICT_DNS\n      dns_lookup_family: V4_ONLY/g' envoy.yaml
+        envoy -c envoy.yaml
+  frontend:
+    service:
+      type: NodePort
+      port: 8080
+      nodePort: 30080
+
+  # Kafka: JVM heap 400M + non-heap + threads + OTel agent needs ~800Mi.
+  kafka:
+    resources:
+      limits:
+        memory: 800Mi
+      requests:
+        memory: 800Mi
+
+  # Accountingservice: Kafka consumer + OTel SDK in Go.
+  # Default 120Mi too low → SIGSEGV (exit 139) under memory pressure.
+  accountingService:
+    resources:
+      limits:
+        memory: 300Mi
+      requests:
+        memory: 200Mi
+
+# OTel Collector: Central telemetry hub for 24 services.
+# Default 200Mi + GOMEMLIMIT=160MiB far too low for this workload.
+opentelemetry-collector:
+  resources:
+    limits:
+      memory: 500Mi
+    requests:
+      memory: 500Mi
+  extraEnvs:
+    - name: GOMEMLIMIT
+      value: "400MiB"
+
+# Expose via NodePort for host access through kind port mappings
+prometheus:
+  server:
+    service:
+      type: NodePort
+      nodePort: 30090
+
+grafana:
+  service:
+    type: NodePort
+    nodePort: 30030
+
+opensearch:
+  service:
+    type: NodePort
+    nodePort: 30920

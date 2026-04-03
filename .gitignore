@@ -1,4 +1,5 @@
 .env
+litellm_config.yaml
 docker-compose.override.yml
 .venv
 __pycache__/
@@ -85,4 +86,4 @@ test-infra/eks/kubeconfig-eks.yaml
 
 # Large video/media files
 video-analysis-frames/
-IncidentFox*.mp4
+OpenSRE*.mp4

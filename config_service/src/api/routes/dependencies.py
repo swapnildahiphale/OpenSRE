@@ -102,8 +102,7 @@ def get_team_dependency_graph(
     logger.info("get_dependency_graph", team_id=team_id, min_confidence=min_confidence)
 
     # Query all dependencies for this team
-    query = text(
-        """
+    query = text("""
         SELECT
             source_service,
             target_service,
@@ -116,8 +115,7 @@ def get_team_dependency_graph(
         WHERE team_id = :team_id
           AND confidence >= :min_confidence
         ORDER BY confidence DESC, call_count DESC
-    """
-    )
+    """)
 
     result = db.execute(query, {"team_id": team_id, "min_confidence": min_confidence})
     rows = result.fetchall()
@@ -186,8 +184,7 @@ def get_service_neighbors(
     )
 
     # Get dependencies (services this service calls)
-    deps_query = text(
-        """
+    deps_query = text("""
         SELECT
             source_service,
             target_service,
@@ -201,8 +198,7 @@ def get_service_neighbors(
           AND source_service = :service_name
           AND confidence >= :min_confidence
         ORDER BY call_count DESC
-    """
-    )
+    """)
 
     deps_result = db.execute(
         deps_query,
@@ -227,8 +223,7 @@ def get_service_neighbors(
     ]
 
     # Get dependents (services that call this service)
-    dependents_query = text(
-        """
+    dependents_query = text("""
         SELECT
             source_service,
             target_service,
@@ -242,8 +237,7 @@ def get_service_neighbors(
           AND target_service = :service_name
           AND confidence >= :min_confidence
         ORDER BY call_count DESC
-    """
-    )
+    """)
 
     dependents_result = db.execute(
         dependents_query,
@@ -319,8 +313,7 @@ def get_related_services(
             break
 
         # Find neighbors of current frontier
-        neighbors_query = text(
-            """
+        neighbors_query = text("""
             SELECT DISTINCT
                 CASE
                     WHEN source_service = ANY(:frontier) THEN target_service
@@ -330,8 +323,7 @@ def get_related_services(
             WHERE team_id = :team_id
               AND confidence >= :min_confidence
               AND (source_service = ANY(:frontier) OR target_service = ANY(:frontier))
-        """
-        )
+        """)
 
         result = db.execute(
             neighbors_query,

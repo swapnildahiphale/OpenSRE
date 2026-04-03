@@ -1,0 +1,28 @@
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+name: opensre-test
+networking:
+  ipFamily: ipv4
+nodes:
+  - role: control-plane
+    extraPortMappings:
+      # Prometheus
+      - containerPort: 30090
+        hostPort: 9090
+        protocol: TCP
+      # Grafana
+      - containerPort: 30030
+        hostPort: 3001
+        protocol: TCP
+      # Jaeger UI
+      - containerPort: 30686
+        hostPort: 16686
+        protocol: TCP
+      # otel-demo frontend
+      - containerPort: 30080
+        hostPort: 8090
+        protocol: TCP
+      # OpenSearch (for log queries from host)
+      - containerPort: 30920
+        hostPort: 9200
+        protocol: TCP

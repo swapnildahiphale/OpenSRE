@@ -1583,8 +1583,7 @@ def create_recall_bot(
     )
 
     session.execute(
-        text(
-            """
+        text("""
             INSERT INTO recall_bots (
                 id, org_id, team_node_id, recall_bot_id, meeting_url,
                 incident_id, bot_name, status, slack_channel_id, slack_thread_ts
@@ -1592,8 +1591,7 @@ def create_recall_bot(
                 :id, :org_id, :team_node_id, :recall_bot_id, :meeting_url,
                 :incident_id, :bot_name, 'requested', :slack_channel_id, :slack_thread_ts
             )
-        """
-        ),
+        """),
         {
             "id": request.id,
             "org_id": request.org_id,
@@ -1636,15 +1634,13 @@ def get_recall_bot(
     from sqlalchemy import text
 
     result = session.execute(
-        text(
-            """
+        text("""
             SELECT id, org_id, team_node_id, recall_bot_id, meeting_url,
                    incident_id, status, slack_channel_id, slack_thread_ts,
                    slack_summary_ts, transcript_segments_count, created_at
             FROM recall_bots
             WHERE recall_bot_id = :recall_bot_id
-        """
-        ),
+        """),
         {"recall_bot_id": recall_bot_id},
     ).fetchone()
 
@@ -1713,16 +1709,14 @@ def update_recall_bot_status(
         timestamp_field = ", left_at = NOW()"
 
     session.execute(
-        text(
-            f"""
+        text(f"""
             UPDATE recall_bots
             SET status = :status,
                 status_message = :status_message,
                 updated_at = NOW()
                 {timestamp_field}
             WHERE recall_bot_id = :recall_bot_id
-        """
-        ),
+        """),
         {
             "recall_bot_id": recall_bot_id,
             "status": mapped_status,
@@ -1763,8 +1757,7 @@ def store_recall_transcript_segment(
     from sqlalchemy import text
 
     session.execute(
-        text(
-            """
+        text("""
             INSERT INTO recall_transcript_segments (
                 id, recall_bot_id, org_id, incident_id, speaker, text,
                 timestamp_ms, is_partial, raw_event
@@ -1772,8 +1765,7 @@ def store_recall_transcript_segment(
                 :id, :recall_bot_id, :org_id, :incident_id, :speaker, :text,
                 :timestamp_ms, :is_partial, CAST(:raw_event AS jsonb)
             )
-        """
-        ),
+        """),
         {
             "id": request.segment_id,
             "recall_bot_id": request.recall_bot_id,
@@ -1803,15 +1795,13 @@ def increment_recall_bot_transcript_count(
     from sqlalchemy import text
 
     session.execute(
-        text(
-            """
+        text("""
             UPDATE recall_bots
             SET transcript_segments_count = transcript_segments_count + 1,
                 last_transcript_at = NOW(),
                 updated_at = NOW()
             WHERE recall_bot_id = :recall_bot_id
-        """
-        ),
+        """),
         {"recall_bot_id": recall_bot_id},
     )
     session.commit()
@@ -1840,15 +1830,13 @@ def update_recall_bot_slack_summary(
     from sqlalchemy import text
 
     session.execute(
-        text(
-            """
+        text("""
             UPDATE recall_bots
             SET slack_summary_ts = :slack_summary_ts,
                 last_summary_at = NOW(),
                 updated_at = NOW()
             WHERE recall_bot_id = :recall_bot_id
-        """
-        ),
+        """),
         {
             "recall_bot_id": recall_bot_id,
             "slack_summary_ts": request.slack_summary_ts,
@@ -1889,8 +1877,7 @@ def get_recall_transcript_segments(
 
     if since_id:
         result = session.execute(
-            text(
-                """
+            text("""
                 SELECT id, speaker, text, timestamp_ms, is_partial, created_at
                 FROM recall_transcript_segments
                 WHERE recall_bot_id = :recall_bot_id
@@ -1898,22 +1885,19 @@ def get_recall_transcript_segments(
                   AND is_partial = false
                 ORDER BY timestamp_ms ASC, created_at ASC
                 LIMIT :limit
-            """
-            ),
+            """),
             {"recall_bot_id": recall_bot_id, "since_id": since_id, "limit": limit},
         ).fetchall()
     else:
         result = session.execute(
-            text(
-                """
+            text("""
                 SELECT id, speaker, text, timestamp_ms, is_partial, created_at
                 FROM recall_transcript_segments
                 WHERE recall_bot_id = :recall_bot_id
                   AND is_partial = false
                 ORDER BY timestamp_ms ASC, created_at ASC
                 LIMIT :limit
-            """
-            ),
+            """),
             {"recall_bot_id": recall_bot_id, "limit": limit},
         ).fetchall()
 

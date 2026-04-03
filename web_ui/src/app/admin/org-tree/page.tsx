@@ -156,6 +156,7 @@ export default function OrgTreePage() {
   const [editNodeOpen, setEditNodeOpen] = useState(false);
   const [configOpen, setConfigOpen] = useState(false);
   const [tokensOpen, setTokensOpen] = useState(false);
+  const [issuedToken, setIssuedToken] = useState<string | null>(null);
   
   // Form state
   const [newNodeId, setNewNodeId] = useState('');
@@ -174,7 +175,7 @@ export default function OrgTreePage() {
   // Tokens state
   const [tokens, setTokens] = useState<{ token_id: string; revoked_at?: string }[]>([]);
 
-  const orgId = identity?.org_id;
+  const orgId = identity?.org_id || (identity?.role === 'admin' ? 'local' : undefined);
 
   const loadNodes = useCallback(async () => {
     if (!orgId) return; // Wait for identity to load
@@ -342,7 +343,7 @@ export default function OrgTreePage() {
       });
       if (!res.ok) throw new Error(`${res.status}: ${await res.text()}`);
       const data = await res.json();
-      alert(`Token issued! Copy now:\n\n${data.token}`);
+      setIssuedToken(data.token);
       await loadTokens(selectedNode.node_id);
     } catch (e) {
       alert(`Failed: ${e instanceof Error ? e.message : String(e)}`);
@@ -676,6 +677,36 @@ export default function OrgTreePage() {
                 ))}
               </div>
             )}
+          </div>
+        </Modal>
+
+        {/* Issued Token Modal */}
+        <Modal isOpen={!!issuedToken} onClose={() => setIssuedToken(null)} title="Token Issued">
+          <p className="text-sm text-stone-600 dark:text-stone-400 mb-3">
+            Copy this token now — it won&apos;t be shown again.
+          </p>
+          <div className="relative">
+            <pre className="p-3 bg-stone-100 dark:bg-stone-800 rounded-lg text-xs font-mono break-all whitespace-pre-wrap select-all border border-stone-200 dark:border-stone-700">
+              {issuedToken}
+            </pre>
+            <button
+              onClick={() => {
+                if (issuedToken) {
+                  navigator.clipboard.writeText(issuedToken);
+                }
+              }}
+              className="absolute top-2 right-2 px-2 py-1 text-xs bg-forest text-white rounded hover:bg-forest-dark"
+            >
+              Copy
+            </button>
+          </div>
+          <div className="flex justify-end mt-4">
+            <button
+              onClick={() => setIssuedToken(null)}
+              className="px-4 py-2 text-sm bg-forest text-white rounded-lg hover:bg-forest-dark"
+            >
+              Done
+            </button>
           </div>
         </Modal>
       </div>
