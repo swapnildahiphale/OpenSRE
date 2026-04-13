@@ -93,7 +93,7 @@ pytest                          # Backend tests
 cd web_ui && pnpm test         # Frontend tests
 ```
 
-See [DEVELOPMENT_KNOWLEDGE.md](DEVELOPMENT_KNOWLEDGE.md) for detailed architecture and development guide.
+See the [Architecture docs](https://www.opensre.in/docs/architecture) for detailed architecture and development guide.
 
 ## Development Workflow
 
@@ -234,19 +234,18 @@ Closes #123
 
 - Watch this repo for updates
 - Follow [@opensre](https://twitter.com/opensre) on Twitter
-- Read our [blog](https://opensre.ai/blog) for deep dives
+- Read our [blog](https://opensre.in/blog) for deep dives
 
 ### Recognition
 
 Contributors are recognized in:
-- [CONTRIBUTORS.md](CONTRIBUTORS.md) — all contributors listed
 - GitHub contributor graph
 - Release notes for significant contributions
 
 ## Questions?
 
 If you're unsure about anything:
-1. Check [DEVELOPMENT_KNOWLEDGE.md](DEVELOPMENT_KNOWLEDGE.md) for technical details
+1. Check the [docs](https://www.opensre.in/docs) for technical details
 2. Ask in [GitHub Discussions](https://github.com/swapnildahiphale/OpenSRE/discussions)
 3. Reach out to maintainers in Slack
 

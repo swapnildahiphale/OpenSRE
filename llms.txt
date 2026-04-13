@@ -1,0 +1,35 @@
+# OpenSRE
+
+> OpenSRE is an open-source AI SRE platform that investigates production incidents autonomously.
+> It uses episodic memory to learn from past incidents and a Neo4j knowledge graph to map service
+> dependencies. Licensed Apache 2.0, self-hosted, and provider-agnostic via LiteLLM.
+
+## Links
+
+- Website: https://opensre.in
+- Documentation: https://opensre.in/docs
+- GitHub: https://github.com/swapnildahiphale/OpenSRE
+- Live Demo: https://demo.opensre.in
+- Full knowledge dump: https://opensre.in/llms-full.txt
+
+## Key Features
+
+- 46 production investigation skills (Datadog, Grafana, PagerDuty, Elasticsearch, K8s, AWS)
+- Episodic memory system that learns from every investigation
+- Neo4j knowledge graph for service topology and blast radius analysis
+- Multi-provider LLM support via LiteLLM (Claude, OpenAI, Gemini, DeepSeek, Mistral, Ollama)
+- LangGraph agent orchestration (planner, subagents, synthesizer, writeup)
+- Web console with dashboard, agent runs, memory browser, config editor
+- Slack, Microsoft Teams, Google Chat integration
+- Self-hosted, Apache 2.0 licensed
+
+## Architecture
+
+Slack / Web UI / API → sre-agent (LangGraph orchestration) → Memory System (episodic) + 46 Skills (production tools) + Knowledge Graph (Neo4j)
+
+## Quick Start
+
+git clone https://github.com/swapnildahiphale/OpenSRE.git
+cd OpenSRE
+cp .env.example .env
+make dev

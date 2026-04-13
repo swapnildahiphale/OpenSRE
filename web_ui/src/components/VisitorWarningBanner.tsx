@@ -61,7 +61,7 @@ export function VisitorWarningBanner() {
                 Leave now
               </button>
               <a
-                href="mailto:support@opensre.ai?subject=OpenSRE Demo Interest"
+                href="mailto:swapnil@opensre.in?subject=OpenSRE Demo Interest"
                 className="text-xs text-orange-100 hover:text-white underline"
               >
                 Contact us for a team account

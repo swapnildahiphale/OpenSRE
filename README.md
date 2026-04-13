@@ -1,5 +1,5 @@
 <p align="center">
-  <img src=".github/assets/logo.png" alt="OpenSRE" width="320" />
+  <img src=".github/assets/logo.png" alt="OpenSRE — Open-source AI SRE platform for automated incident investigation" width="320" />
 </p>
 
 <p align="center">
@@ -12,13 +12,15 @@
   <a href="https://github.com/swapnildahiphale/OpenSRE/stargazers"><img src="https://img.shields.io/github/stars/swapnildahiphale/OpenSRE?style=social" alt="GitHub Stars" /></a>
   <a href="https://github.com/swapnildahiphale/OpenSRE/network/members"><img src="https://img.shields.io/github/forks/swapnildahiphale/OpenSRE?style=social" alt="GitHub Forks" /></a>
   <a href="https://github.com/swapnildahiphale/OpenSRE/pulls"><img src="https://img.shields.io/badge/PRs-welcome-brightgreen.svg" alt="PRs Welcome" /></a>
-  <a href="https://www.opensre.in/docs"><img src="https://img.shields.io/badge/docs-opensre.in-green.svg" alt="Documentation" /></a>
-  <a href="https://www.opensre.in"><img src="https://img.shields.io/badge/website-opensre.in-green.svg" alt="Website" /></a>
+  <a href="https://www.opensre.in/docs"><img src="https://img.shields.io/badge/docs-opensre.in-green.svg" alt="OpenSRE Documentation" /></a>
+  <a href="https://www.opensre.in"><img src="https://img.shields.io/badge/website-opensre.in-green.svg" alt="OpenSRE Website" /></a>
 </p>
+
+OpenSRE is an open-source AI SRE agent that automatically investigates production incidents, finds root causes, and learns from every investigation. It combines **episodic memory** (remembering past incidents and what fixed them) with a **Neo4j knowledge graph** (understanding service dependencies and blast radius) and **46 production-ready skills** for tools like Datadog, Grafana, PagerDuty, Elasticsearch, Kubernetes, and AWS. Self-hosted, provider-agnostic via LiteLLM, and licensed Apache 2.0.
 
 <p align="center">
   <a href="https://g1ctb3hnwvhw6s5v.public.blob.vercel-storage.com/how-it-works.mp4">
-    <img src=".github/assets/hero-thumbnail.webp" alt="OpenSRE — How it works" width="720" />
+    <img src=".github/assets/hero-thumbnail.webp" alt="OpenSRE demo — AI SRE agent investigating a production incident with episodic memory and knowledge graph" width="720" />
   </a>
   <br>
   <sub>Click to watch OpenSRE investigate an incident in 60 seconds</sub>
@@ -51,13 +53,15 @@ make dev
 
 This starts Postgres, config-service, LiteLLM proxy, Neo4j, sre-agent, and the web console. Migrations run automatically. Open **http://localhost:3002** and paste the admin token shown in the terminal to sign in.
 
-> **[Full setup guide](https://www.opensre.in/docs)** · **[Slack integration](docs/SLACK_SETUP.md)**
+> **[Full setup guide](https://www.opensre.in/docs/quick-start)** · **[Slack integration](https://www.opensre.in/docs/integrations)** · **[Configuration](https://www.opensre.in/docs/configuration)**
 
 ## Architecture
 
 <p align="center">
-  <img src=".github/assets/architecture.png" alt="OpenSRE Architecture" width="900" />
+  <img src=".github/assets/architecture.png" alt="OpenSRE architecture diagram — LangGraph orchestration with episodic memory, 46 investigation skills, and Neo4j knowledge graph" width="900" />
 </p>
+
+> **[→ Detailed architecture docs](https://www.opensre.in/docs/architecture)** · **[Architecture overview](docs/ARCHITECTURE.md)**
 
 ## Features
 
@@ -70,7 +74,7 @@ This starts Postgres, config-service, LiteLLM proxy, Neo4j, sre-agent, and the w
 | **Web Console** | Dashboard, agent runs, memory browser |
 | **Slack Integration** | Investigate incidents directly from Slack |
 
-**[→ See all features](https://www.opensre.in)**
+**[→ See all features](https://www.opensre.in)** · **[Roadmap](https://www.opensre.in/docs)**
 
 ## Useful Commands
 
@@ -86,7 +90,7 @@ This starts Postgres, config-service, LiteLLM proxy, Neo4j, sre-agent, and the w
 
 ### Slack integration
 
-[Create a Slack app](https://api.slack.com/apps?new_app=1) using the [manifest](slack-bot/slack-manifest.json), add `SLACK_BOT_TOKEN` and `SLACK_APP_TOKEN` to `.env`, and run `make dev-slack`. [Full guide](docs/SLACK_SETUP.md).
+[Create a Slack app](https://api.slack.com/apps?new_app=1), add `SLACK_BOT_TOKEN` and `SLACK_APP_TOKEN` to `.env`, and run `make dev-slack`. [Full guide](https://www.opensre.in/docs/integrations).
 
 ## E2E Testing with EKS
 
@@ -139,6 +143,23 @@ For testing without a cloud cluster, you can use Kind instead:
 make e2e-setup       # Create Kind cluster + install otel-demo + start agent
 make e2e-teardown    # Delete Kind cluster and clean up
 ```
+
+## Comparing OpenSRE
+
+How does OpenSRE compare to commercial incident response tools like PagerDuty Copilot, Rootly AI, and Shoreline? See the full breakdown:
+
+**[→ Comparison matrix](https://www.opensre.in/compare)** · **[Blog: OpenSRE vs Commercial Tools](https://www.opensre.in/blog/opensre-vs-commercial-incident-tools)**
+
+## Built With
+
+OpenSRE is built on top of proven open-source technologies:
+
+- **[LangGraph](https://github.com/langchain-ai/langgraph)** — Agent orchestration (planner → subagents → synthesizer)
+- **[Neo4j](https://neo4j.com/)** — Knowledge graph for service topology and dependency traversal
+- **[FastAPI](https://fastapi.tiangolo.com/)** — Backend API with SSE streaming
+- **[Next.js](https://nextjs.org/)** — Web console (dashboard, memory browser, config editor)
+- **[LiteLLM](https://github.com/BerriAI/litellm)** — Multi-provider LLM proxy (18+ providers)
+- **[PostgreSQL](https://www.postgresql.org/)** — Persistent storage for configs and agent state
 
 ## Contributing
 
