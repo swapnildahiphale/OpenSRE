@@ -68,7 +68,7 @@ We're building a community focused on learning and collaboration. Please:
 - **Documentation**: [docs/](../docs/)
 - **Slack**: [Join our community](https://join.slack.com/t/opensre/shared_invite/zt-3ojlxvs46-xuEJEplqBHPlymxtzQi8KQ)
 - **Issues**: [Report bugs or request features](https://github.com/swapnildahiphale/OpenSRE/issues)
-- **Blog**: [opensre.ai/blog](https://opensre.ai/blog)
+- **Blog**: [opensre.in/blog](https://opensre.in/blog)
 
 ## 🦊 About OpenSRE
 
