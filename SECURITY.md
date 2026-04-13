@@ -28,7 +28,7 @@ Report security vulnerabilities privately through GitHub:
 
 ### 2. Email
 
-Send details to **security@opensre.ai** with:
+Send details to **swapnil@opensre.in** with:
 
 - Type of vulnerability (RCE, injection, XSS, etc.)
 - Affected component(s)
@@ -181,8 +181,8 @@ We recognize security researchers who help keep OpenSRE secure:
 
 ## Contact
 
-- **Security issues**: security@opensre.ai
-- **General questions**: founders@opensre.ai
+- **Security issues**: swapnil@opensre.in
+- **General questions**: swapnil@opensre.in
 - **Community**: [Slack](https://join.slack.com/t/opensre/shared_invite/zt-3ojlxvs46-xuEJEplqBHPlymxtzQi8KQ) | [Discussions](https://github.com/swapnildahiphale/OpenSRE/discussions)
 
 ## Learn More
