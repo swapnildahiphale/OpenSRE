@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>OpenSRE — Open-Source AI SRE Agent for Automated Incident Investigation</title>
+  <meta name="description" content="OpenSRE is an open-source AI SRE agent that investigates production incidents using episodic memory and a Neo4j knowledge graph. 46 production skills. Self-hosted. Apache 2.0.">
+  <meta name="keywords" content="OpenSRE, AI SRE, incident investigation, site reliability engineering, episodic memory, knowledge graph, Neo4j, LangGraph, open source, DevOps, AIOps, incident response, SRE agent">
+  <link rel="canonical" href="https://swapnildahiphale.github.io/OpenSRE/">
+
+  <!-- Open Graph -->
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="OpenSRE — Open-Source AI SRE Agent">
+  <meta property="og:description" content="AI SRE agent that investigates production incidents using episodic memory and a Neo4j knowledge graph. 46 production skills. Self-hosted.">
+  <meta property="og:url" content="https://swapnildahiphale.github.io/OpenSRE/">
+  <meta property="og:image" content="https://raw.githubusercontent.com/swapnildahiphale/OpenSRE/main/.github/assets/social-preview.png">
+
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="OpenSRE — Open-Source AI SRE Agent">
+  <meta name="twitter:description" content="AI SRE agent that investigates production incidents using episodic memory and a Neo4j knowledge graph.">
+  <meta name="twitter:image" content="https://raw.githubusercontent.com/swapnildahiphale/OpenSRE/main/.github/assets/social-preview.png">
+
+  <!-- JSON-LD Structured Data -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "OpenSRE",
+    "applicationCategory": "DeveloperApplication",
+    "operatingSystem": "Linux, macOS",
+    "description": "Open-source AI SRE agent that investigates production incidents using episodic memory and a Neo4j knowledge graph.",
+    "url": "https://opensre.in",
+    "codeRepository": "https://github.com/swapnildahiphale/OpenSRE",
+    "license": "https://opensource.org/licenses/Apache-2.0",
+    "author": {
+      "@type": "Person",
+      "name": "Swapnil Dahiphale",
+      "url": "https://swapnil.one"
+    },
+    "offers": {
+      "@type": "Offer",
+      "price": "0",
+      "priceCurrency": "USD"
+    }
+  }
+  </script>
+
+  <style>
+    :root {
+      --green: #00c853;
+      --green-dim: #00a844;
+      --bg: #0d1117;
+      --surface: #161b22;
+      --border: #30363d;
+      --text: #e6edf3;
+      --text-secondary: #8b949e;
+      --radius: 8px;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .container { max-width: 800px; margin: 0 auto; padding: 0 24px; }
+
+    header {
+      padding: 48px 0 32px;
+      text-align: center;
+      border-bottom: 1px solid var(--border);
+    }
+
+    header img {
+      height: 64px;
+      margin-bottom: 16px;
+    }
+
+    h1 {
+      font-size: 2rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      margin-bottom: 12px;
+    }
+
+    h1 span { color: var(--green); }
+
+    .tagline {
+      font-size: 1.125rem;
+      color: var(--text-secondary);
+      max-width: 600px;
+      margin: 0 auto 24px;
+    }
+
+    .actions {
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 20px;
+      border-radius: var(--radius);
+      font-size: 0.938rem;
+      font-weight: 600;
+      text-decoration: none;
+      transition: opacity 0.15s;
+    }
+
+    .btn:hover { opacity: 0.85; }
+    .btn-primary { background: var(--green); color: #000; }
+    .btn-secondary { background: var(--surface); color: var(--text); border: 1px solid var(--border); }
+
+    section { padding: 40px 0; border-bottom: 1px solid var(--border); }
+    section:last-of-type { border-bottom: none; }
+
+    h2 {
+      font-size: 1.375rem;
+      font-weight: 700;
+      margin-bottom: 16px;
+      letter-spacing: -0.01em;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    @media (max-width: 600px) { .grid { grid-template-columns: 1fr; } }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px;
+    }
+
+    .card strong { color: var(--green); display: block; margin-bottom: 4px; font-size: 0.938rem; }
+    .card p { color: var(--text-secondary); font-size: 0.875rem; }
+
+    .quick-start {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px;
+    }
+
+    .quick-start code {
+      display: block;
+      font-family: "SF Mono", "Fira Code", "Fira Mono", Menlo, monospace;
+      font-size: 0.875rem;
+      line-height: 1.8;
+      color: var(--text);
+    }
+
+    .tech-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      list-style: none;
+    }
+
+    .tech-list li {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 6px 14px;
+      font-size: 0.813rem;
+      color: var(--text-secondary);
+    }
+
+    footer {
+      padding: 32px 0;
+      text-align: center;
+      color: var(--text-secondary);
+      font-size: 0.813rem;
+    }
+
+    footer a { color: var(--green); text-decoration: none; }
+    footer a:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <header>
+    <img src="https://raw.githubusercontent.com/swapnildahiphale/OpenSRE/main/logo.png" alt="OpenSRE — open-source AI SRE agent logo" width="64" height="64">
+    <h1><span>Open</span>SRE</h1>
+    <p class="tagline">Open-source AI SRE agent that investigates production incidents using episodic memory and a Neo4j knowledge graph.</p>
+    <div class="actions">
+      <a href="https://github.com/swapnildahiphale/OpenSRE" class="btn btn-primary">GitHub Repository</a>
+      <a href="https://opensre.in/docs" class="btn btn-secondary">Documentation</a>
+      <a href="https://demo.opensre.in" class="btn btn-secondary">Live Demo</a>
+    </div>
+  </header>
+
+  <section>
+    <h2>How OpenSRE Investigates Incidents</h2>
+    <p style="color: var(--text-secondary); margin-bottom: 16px;">OpenSRE receives an alert, correlates signals across your observability stack, runs a structured investigation using parallel AI subagents, and produces a root cause analysis. It remembers every investigation so it gets faster over time.</p>
+    <div class="grid">
+      <div class="card">
+        <strong>46 Production Skills</strong>
+        <p>Elasticsearch, Datadog, Grafana, PagerDuty, Kubernetes, AWS, Splunk, New Relic, Jaeger, Sentry, and more.</p>
+      </div>
+      <div class="card">
+        <strong>Episodic Memory</strong>
+        <p>Stores every investigation and surfaces past solutions for similar incidents via multi-factor similarity matching.</p>
+      </div>
+      <div class="card">
+        <strong>Knowledge Graph</strong>
+        <p>Neo4j-powered service topology, dependency traversal, and blast radius analysis before investigation begins.</p>
+      </div>
+      <div class="card">
+        <strong>LangGraph Orchestration</strong>
+        <p>Planner, parallel subagent fan-out, synthesizer, and writeup pipeline for structured investigations.</p>
+      </div>
+      <div class="card">
+        <strong>Multi-Provider LLM</strong>
+        <p>Claude, GPT, Gemini, DeepSeek, Mistral, Ollama via LiteLLM proxy. 18+ providers supported.</p>
+      </div>
+      <div class="card">
+        <strong>Self-Hosted</strong>
+        <p>Runs entirely on your infrastructure. Apache 2.0 licensed. No data leaves your environment.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Quick Start</h2>
+    <div class="quick-start">
+      <code>
+        git clone https://github.com/swapnildahiphale/OpenSRE.git<br>
+        cd OpenSRE<br>
+        cp .env.example .env<br>
+        make dev
+      </code>
+    </div>
+    <p style="color: var(--text-secondary); margin-top: 12px; font-size: 0.875rem;">Starts PostgreSQL, Neo4j, the SRE agent, and the web console locally. Only an OPENROUTER_API_KEY is needed in .env.</p>
+  </section>
+
+  <section>
+    <h2>Built With</h2>
+    <ul class="tech-list">
+      <li>LangGraph</li>
+      <li>Neo4j</li>
+      <li>FastAPI</li>
+      <li>Next.js</li>
+      <li>LiteLLM</li>
+      <li>PostgreSQL</li>
+      <li>Python</li>
+      <li>TypeScript</li>
+      <li>Docker</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Resources</h2>
+    <div class="grid">
+      <div class="card">
+        <strong><a href="https://opensre.in" style="color: var(--green); text-decoration: none;">Website</a></strong>
+        <p>Project homepage, blog, and comparison with commercial tools.</p>
+      </div>
+      <div class="card">
+        <strong><a href="https://opensre.in/docs" style="color: var(--green); text-decoration: none;">Documentation</a></strong>
+        <p>Setup guides, integrations, and configuration reference.</p>
+      </div>
+      <div class="card">
+        <strong><a href="https://github.com/swapnildahiphale/OpenSRE/blob/main/docs/ARCHITECTURE.md" style="color: var(--green); text-decoration: none;">Architecture</a></strong>
+        <p>System design, agent topology, and data flow.</p>
+      </div>
+      <div class="card">
+        <strong><a href="https://github.com/swapnildahiphale/OpenSRE/discussions" style="color: var(--green); text-decoration: none;">Discussions</a></strong>
+        <p>Ask questions, share setups, request features.</p>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <p>OpenSRE is open-source under <a href="https://github.com/swapnildahiphale/OpenSRE/blob/main/LICENSE">Apache 2.0</a>. Built by <a href="https://swapnil.one">Swapnil Dahiphale</a>.</p>
+  </footer>
+</div>
+
+</body>
+</html>
