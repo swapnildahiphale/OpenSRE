@@ -161,6 +161,16 @@ OpenSRE is built on top of proven open-source technologies:
 - **[LiteLLM](https://github.com/BerriAI/litellm)** — Multi-provider LLM proxy (18+ providers)
 - **[PostgreSQL](https://www.postgresql.org/)** — Persistent storage for configs and agent state
 
+## Star History
+
+<a href="https://www.star-history.com/?repos=swapnildahiphale%2FOpenSRE&type=date&legend=top-left">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=swapnildahiphale/OpenSRE&type=date&theme=dark&legend=top-left" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=swapnildahiphale/OpenSRE&type=date&legend=top-left" />
+   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=swapnildahiphale/OpenSRE&type=date&legend=top-left" />
+ </picture>
+</a>
+
 ## Contributing
 
 We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines. Please open an issue before starting major work.
