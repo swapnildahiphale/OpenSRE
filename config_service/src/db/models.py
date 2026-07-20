@@ -627,7 +627,7 @@ class AgentRun(Base):
     )
     status: Mapped[str] = mapped_column(
         String(32), nullable=False
-    )  # running, completed, failed, timeout
+    )  # running, completed, failed, timeout, interrupted
 
     # Results
     tool_calls_count: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
@@ -645,6 +645,11 @@ class AgentRun(Base):
     thoughts: Mapped[Optional[list]] = mapped_column(
         JSON().with_variant(JSONB, "postgresql"), nullable=True
     )
+
+    # SDK session id for resuming a conversation after the agent process
+    # recycles (ClaudeAgentOptions.resume). Captured at completion; one per
+    # thread/correlation, so the latest run for a correlation_id carries it.
+    sdk_session_id: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
 
     # Extra metadata
     extra_metadata: Mapped[Optional[dict]] = mapped_column(
@@ -680,6 +685,15 @@ class AgentToolCall(Base):
     # Agent info (for sub-agent tracking)
     agent_name: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
     parent_agent: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    # Nested-agent attribution (hook-based, added 2026-07-01, redefined 2026-07-02):
+    # agent_id/parent_agent_id are the STABLE invocation identity (the tool_use_id of
+    # the Task/Agent dispatch that spawned this agent), not the SDK's own agent_id —
+    # the SDK reuses its agent_id across unrelated dispatches within one run (confirmed
+    # live in run 34b47dd08d23426884c13a1e0b9dd552), so it cannot be used as a tree key.
+    # depth is the nesting depth (0 == root). Lets the UI render a real agent tree.
+    agent_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    parent_agent_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    depth: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
 
     # Tool info
     tool_name: Mapped[str] = mapped_column(String(128), nullable=False)
@@ -742,87 +756,6 @@ class AgentFeedback(Base):
         Index("ix_agent_feedback_type", "feedback_type"),
         Index("ix_agent_feedback_source", "source"),
         Index("ix_agent_feedback_created_at", "created_at"),
-    )
-
-
-class InvestigationEpisode(Base):
-    __tablename__ = "investigation_episodes"
-
-    id: Mapped[str] = mapped_column(String(64), primary_key=True)
-    agent_run_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
-    org_id: Mapped[str] = mapped_column(String(64), nullable=False)
-    team_node_id: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
-
-    # Alert context
-    alert_type: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
-    alert_description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    severity: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
-
-    # Services & agents
-    services: Mapped[Optional[dict]] = mapped_column(
-        JSON().with_variant(JSONB, "postgresql"), nullable=True
-    )
-    agents_used: Mapped[Optional[dict]] = mapped_column(
-        JSON().with_variant(JSONB, "postgresql"), nullable=True
-    )
-    skills_used: Mapped[Optional[dict]] = mapped_column(
-        JSON().with_variant(JSONB, "postgresql"), nullable=True
-    )
-    key_findings: Mapped[Optional[dict]] = mapped_column(
-        JSON().with_variant(JSONB, "postgresql"), nullable=True
-    )
-
-    # Outcome
-    resolved: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
-    root_cause: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    summary: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    effectiveness_score: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
-    confidence: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
-
-    # Timing
-    duration_seconds: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=datetime.utcnow, nullable=False
-    )
-
-    __table_args__ = (
-        Index("ix_episodes_org_id", "org_id"),
-        Index("ix_episodes_team", "org_id", "team_node_id"),
-        Index("ix_episodes_alert_type", "alert_type"),
-        Index("ix_episodes_created_at", "created_at"),
-        Index("ix_episodes_run_id", "agent_run_id"),
-    )
-
-
-class InvestigationStrategy(Base):
-    __tablename__ = "investigation_strategies"
-
-    id: Mapped[str] = mapped_column(String(64), primary_key=True)
-    org_id: Mapped[str] = mapped_column(String(64), nullable=False)
-    team_node_id: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
-
-    alert_type: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
-    service_name: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
-
-    strategy_text: Mapped[str] = mapped_column(Text, nullable=False)
-    source_episode_ids: Mapped[Optional[dict]] = mapped_column(
-        JSON().with_variant(JSONB, "postgresql"), nullable=True
-    )
-    episode_count: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
-
-    generated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=datetime.utcnow, nullable=False
-    )
-
-    __table_args__ = (
-        Index(
-            "ix_strategies_lookup",
-            "org_id",
-            "team_node_id",
-            "alert_type",
-            "service_name",
-        ),
-        Index("ix_strategies_generated", "generated_at"),
     )
 
 

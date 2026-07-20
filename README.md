@@ -4,7 +4,7 @@
 
 <p align="center">
   <b>Your AI SRE that investigates production incidents</b><br>
-  <sub>Long-term memory · Knowledge graph · 46 production skills</sub>
+  <sub>Long-term memory · Knowledge graph · 51 production skills</sub>
 </p>
 
 <p align="center">
@@ -16,7 +16,7 @@
   <a href="https://www.opensre.in"><img src="https://img.shields.io/badge/website-opensre.in-green.svg" alt="OpenSRE Website" /></a>
 </p>
 
-OpenSRE is an open-source AI SRE agent that automatically investigates production incidents, finds root causes, and learns from every investigation. It combines **episodic memory** (remembering past incidents and what fixed them) with a **Neo4j knowledge graph** (understanding service dependencies and blast radius) and **46 production-ready skills** for tools like Datadog, Grafana, PagerDuty, Elasticsearch, Kubernetes, and AWS. Self-hosted, provider-agnostic via LiteLLM, and licensed Apache 2.0.
+OpenSRE is an open-source AI SRE agent that automatically investigates production incidents, finds root causes, and learns from every investigation. It combines **episodic memory** (remembering past incidents and what fixed them) with a **Neo4j knowledge graph** (understanding service dependencies and blast radius) and **51 production-ready skills** for tools like Datadog, Grafana, PagerDuty, Elasticsearch, Kubernetes, and AWS. Self-hosted, direct Anthropic by default (provider-agnostic via the optional LiteLLM proxy), and licensed Apache 2.0.
 
 <p align="center">
   <a href="https://g1ctb3hnwvhw6s5v.public.blob.vercel-storage.com/how-it-works.mp4">
@@ -39,7 +39,7 @@ OpenSRE is an open-source AI SRE agent that automatically investigates productio
 |:--|:--|
 | **Learns from every incident** | OpenSRE remembers past investigations — what worked, what didn't. Similar incident at 3am? It already knows the playbook. |
 | **Understands your infrastructure** | Neo4j knowledge graph maps service dependencies, so the agent knows blast radius before it starts investigating. |
-| **Plugs into what you already use** | 46 production skills for Datadog, Grafana, PagerDuty, Elasticsearch, Kubernetes, AWS, and more. No rip-and-replace. |
+| **Plugs into what you already use** | 51 production skills for Datadog, Grafana, PagerDuty, Elasticsearch, Kubernetes, AWS, and more. No rip-and-replace. |
 
 ## Quick Start
 
@@ -47,18 +47,18 @@ OpenSRE is an open-source AI SRE agent that automatically investigates productio
 git clone https://github.com/swapnildahiphale/OpenSRE.git
 cd OpenSRE
 cp .env.example .env
-# Add your OPENROUTER_API_KEY (or ANTHROPIC_API_KEY) to .env
+# Add your ANTHROPIC_API_KEY to .env (OpenRouter via the optional LiteLLM proxy)
 make dev
 ```
 
-This starts Postgres, config-service, LiteLLM proxy, Neo4j, sre-agent, and the web console. Migrations run automatically. Open **http://localhost:3002** and paste the admin token shown in the terminal to sign in.
+This starts Postgres, config-service, Neo4j, sre-agent, and the web console. Migrations run automatically. Open **http://localhost:3002** and paste the admin token shown in the terminal to sign in. (LiteLLM is an optional `--profile litellm` add-on.)
 
 > **[Full setup guide](https://www.opensre.in/docs/quick-start)** · **[Slack integration](https://www.opensre.in/docs/integrations)** · **[Configuration](https://www.opensre.in/docs/configuration)**
 
 ## Architecture
 
 <p align="center">
-  <img src=".github/assets/architecture.png" alt="OpenSRE architecture diagram — LangGraph orchestration with episodic memory, 46 investigation skills, and Neo4j knowledge graph" width="900" />
+  <img src=".github/assets/architecture.png" alt="OpenSRE architecture diagram — Claude Agent SDK orchestration with episodic memory, 51 investigation skills, and Neo4j knowledge graph" width="900" />
 </p>
 
 > **[→ Detailed architecture docs](https://www.opensre.in/docs/architecture)** · **[Architecture overview](docs/ARCHITECTURE.md)**
@@ -67,12 +67,12 @@ This starts Postgres, config-service, LiteLLM proxy, Neo4j, sre-agent, and the w
 
 | Feature | Description |
 |:--------|:------------|
-| **46 Production Skills** | Elasticsearch, Datadog, Grafana, PagerDuty, K8s, AWS, and more |
-| **Long-term Memory** | Stores investigations, surfaces past solutions for similar incidents |
+| **51 Production Skills** | Elasticsearch, Datadog, Grafana, PagerDuty, K8s, AWS, Jenkins, Argo CD, and more |
+| **Long-term Memory** | Neo4j episodic memory — surfaces past solutions mid-investigation via `memory-search` |
 | **Knowledge Graph** | Neo4j service topology, dependency traversal, blast radius |
-| **Multi-provider LLM** | Claude, OpenAI, Gemini, DeepSeek, Mistral, Ollama, and more |
-| **Web Console** | Dashboard, agent runs, memory browser |
-| **Slack Integration** | Investigate incidents directly from Slack |
+| **Multi-provider LLM** | Direct Anthropic by default; optional LiteLLM for OpenAI, Gemini, and more |
+| **Web Console** | Investigations, memory hub, config editor |
+| **Teams Bot** | Investigate incidents from Microsoft Teams (`make dev-teams`) |
 
 **[→ See all features](https://www.opensre.in)** · **[Roadmap](https://www.opensre.in/docs)**
 
@@ -80,17 +80,17 @@ This starts Postgres, config-service, LiteLLM proxy, Neo4j, sre-agent, and the w
 
 | Command | What it does |
 |---------|-------------|
-| `make dev` | Start all services (Postgres, config, LiteLLM, agent, web UI) |
-| `make dev-slack` | Start all services + Slack bot |
+| `make dev` | Start all services (Postgres, config, Neo4j, agent, web UI) |
+| `make dev-teams` | Start all services + Microsoft Teams bot |
 | `make stop` | Stop all services |
 | `make status` | Show service health status |
 | `make logs` | Follow all service logs |
 | `make logs-agent` | Follow sre-agent logs only |
 | `make clean` | Remove containers, volumes, and images |
 
-### Slack integration
+### Microsoft Teams
 
-[Create a Slack app](https://api.slack.com/apps?new_app=1), add `SLACK_BOT_TOKEN` and `SLACK_APP_TOKEN` to `.env`, and run `make dev-slack`. [Full guide](https://www.opensre.in/docs/integrations).
+Configure `TEAMS_APP_ID`, `TEAMS_APP_PASSWORD`, and `TEAMS_TENANT_ID` in `.env`, then run `make dev-teams`. The bot listens on port **3978**. See `teams-bot/README.md`.
 
 ## E2E Testing with EKS
 
@@ -154,12 +154,12 @@ How does OpenSRE compare to commercial incident response tools like PagerDuty Co
 
 OpenSRE is built on top of proven open-source technologies:
 
-- **[LangGraph](https://github.com/langchain-ai/langgraph)** — Agent orchestration (planner → subagents → synthesizer)
+- **[Claude Agent SDK](https://github.com/anthropics/claude-agent-sdk-python)** — Agent orchestration (root investigator → specialist subagents)
 - **[Neo4j](https://neo4j.com/)** — Knowledge graph for service topology and dependency traversal
 - **[FastAPI](https://fastapi.tiangolo.com/)** — Backend API with SSE streaming
 - **[Next.js](https://nextjs.org/)** — Web console (dashboard, memory browser, config editor)
-- **[LiteLLM](https://github.com/BerriAI/litellm)** — Multi-provider LLM proxy (18+ providers)
-- **[PostgreSQL](https://www.postgresql.org/)** — Persistent storage for configs and agent state
+- **[LiteLLM](https://github.com/BerriAI/litellm)** — Optional multi-provider LLM proxy
+- **[PostgreSQL](https://www.postgresql.org/)** — Config and agent-run storage (episodes live in Neo4j)
 
 ## Star History
 

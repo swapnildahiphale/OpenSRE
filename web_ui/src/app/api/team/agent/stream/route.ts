@@ -45,7 +45,7 @@ export async function POST(request: NextRequest) {
 
     // Get entrance_agent from team config if agent_name not explicitly provided
     const defaultAgent = body.agent_name ? body.agent_name : await getEntranceAgent(token);
-    const { message, previous_response_id, max_turns = 20, timeout = 300 } = body;
+    const { message, thread_id, resume_session_id } = body;
     const agent_name = defaultAgent;
 
     if (!message) {
@@ -67,7 +67,8 @@ export async function POST(request: NextRequest) {
       },
       body: JSON.stringify({
         prompt: message,
-        thread_id: previous_response_id || undefined,
+        ...(thread_id && { thread_id }),
+        ...(thread_id && resume_session_id && { resume_session_id }),
       }),
     });
 

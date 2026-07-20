@@ -1,0 +1,35 @@
+{
+  "$schema": "https://developer.microsoft.com/en-us/json-schemas/teams/v1.17/MicrosoftTeams.schema.json",
+  "manifestVersion": "1.17",
+  "version": "1.0.0",
+  "id": "{{TEAMS_APP_ID}}",
+  "developer": {
+    "name": "OpenSRE",
+    "websiteUrl": "https://opensre.in",
+    "privacyUrl": "https://opensre.in/privacy",
+    "termsOfUseUrl": "https://opensre.in/terms"
+  },
+  "name": {
+    "short": "OpenSRE",
+    "full": "OpenSRE — AI Incident Investigation"
+  },
+  "description": {
+    "short": "AI SRE investigations in Teams",
+    "full": "Self-hosted OpenSRE bot. @mention in a channel to investigate incidents. Progress streams live; clarifying questions appear as Adaptive Cards."
+  },
+  "icons": {
+    "color": "color.png",
+    "outline": "outline.png"
+  },
+  "accentColor": "#2F6F4E",
+  "bots": [
+    {
+      "botId": "{{TEAMS_APP_ID}}",
+      "scopes": ["personal", "team", "groupChat"],
+      "supportsFiles": false,
+      "isNotificationOnly": false
+    }
+  ],
+  "permissions": ["identity", "messageTeamMembers"],
+  "validDomains": []
+}

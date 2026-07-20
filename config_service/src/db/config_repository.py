@@ -113,6 +113,30 @@ def get_or_create_node_configuration(
     return config
 
 
+def build_agent_prompt_patch(proposed_value: Any) -> Dict[str, Any]:
+    """Build a canonical nested config patch from a prompt pending change.
+
+    Canonical ``proposed_value`` shape for a ``change_type == "prompt"`` change::
+
+        {"agent": "<agent_id>", "prompt": "<system prompt text>", ...metadata}
+
+    Only ``agent`` and ``prompt`` are read; any sibling metadata keys the AI
+    pipeline adds (``confidence``, ``evidence``, ``title``, ``source`` ...) are
+    ignored. Returns ``{"agents": {<id>: {"prompt": {"system": text}}}}`` — the
+    only shape the SDK runtime reads (``agents.{id}.prompt.system``).
+
+    Returns ``{"agents": {}}`` for any malformed input (non-dict, missing/blank
+    agent id) so approving a bad record is a safe no-op rather than a 500 or a
+    write of phantom agent entries.
+    """
+    if not isinstance(proposed_value, dict):
+        return {"agents": {}}
+    agent_id = proposed_value.get("agent")
+    if not isinstance(agent_id, str) or not agent_id:
+        return {"agents": {}}
+    return {"agents": {agent_id: {"prompt": {"system": proposed_value.get("prompt")}}}}
+
+
 def update_node_configuration(
     session: Session,
     org_id: str,

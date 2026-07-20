@@ -1,407 +1,252 @@
 'use client';
 
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, type MutableRefObject } from 'react';
+import {
+  applyEvent,
+  initialTimelineState,
+  withUserMessage,
+  type TimelineState,
+  type TimelineItem,
+  type BackgroundWaitingState,
+} from '@/lib/agentTimeline';
+import { queueMessage } from '@/lib/queueMessage';
+import { buildStreamBody, interruptThread } from '@/lib/streamRequest';
 
-export interface AgentMessage {
-  id: string;
-  role: 'user' | 'assistant' | 'system';
-  content: string;
-  timestamp: Date;
-  toolCalls?: ToolCall[];
-  isStreaming?: boolean;
-}
-
-export interface ToolCall {
-  id: string;
-  name: string;
-  status: 'running' | 'completed' | 'error';
-  input?: Record<string, unknown>;
-  output?: string;
-  startedAt: Date;
-  completedAt?: Date;
-}
-
-export interface StreamEvent {
-  type: string;
-  data: Record<string, unknown>;
-}
+const STOP_WAIT_MS = 5000;
+const STOP_POLL_MS = 50;
 
 interface UseAgentStreamOptions {
-  /** Agent name to use. If not provided, uses team's configured entrance_agent from config. */
   agentName?: string;
+  threadId?: string;          // resume an existing conversation (detail page)
+  resumeSessionId?: string;   // its stored SDK session id (cold-revive)
   onComplete?: (output: string) => void;
   onError?: (error: string) => void;
 }
 
+function isTerminalRunStatus(status: TimelineState['runStatus']): boolean {
+  return status === 'completed' || status === 'failed' || status === 'interrupted' || status === 'timeout';
+}
+
+/** Exported for unit tests — whether stream end should push a synthetic result. */
+export function shouldSynthesizeStreamEnd(state: TimelineState): boolean {
+  return !isTerminalRunStatus(state.runStatus) && !state.backgroundWaiting;
+}
+
+/** Exported for unit tests — whether stream-end callbacks / busy UX may finalize. */
+export function shouldFinalizeStream(state: TimelineState): boolean {
+  return isTerminalRunStatus(state.runStatus);
+}
+
+/** UI-only — hide the waiting label once all background tasks have notified. */
+export function visibleBackgroundWaiting(
+  waiting: BackgroundWaitingState | null,
+): BackgroundWaitingState | null {
+  if (!waiting || waiting.pendingCount <= 0) return null;
+  return waiting;
+}
+
+function waitForStopResolution(
+  stateRef: MutableRefObject<TimelineState>,
+  deadlineMs: number,
+): Promise<void> {
+  return new Promise((resolve) => {
+    const start = Date.now();
+    const tick = () => {
+      if (isTerminalRunStatus(stateRef.current.runStatus)) {
+        resolve();
+        return;
+      }
+      if (Date.now() - start >= deadlineMs) {
+        resolve();
+        return;
+      }
+      setTimeout(tick, STOP_POLL_MS);
+    };
+    tick();
+  });
+}
+
+/** Exported for unit testing. Pure — no side effects. */
+export function trimQueuedMessages(prev: string[], added: string, pendingCount: number): string[] {
+  const next = [...prev, added];
+  if (pendingCount <= 0) return [];
+  return pendingCount >= next.length ? next : next.slice(-pendingCount);
+}
+
 export function useAgentStream(options: UseAgentStreamOptions = {}) {
-  // Note: If agentName is undefined, the API route will fetch the team's entrance_agent from config
-  const { agentName, onComplete, onError } = options;
-
-  const [messages, setMessages] = useState<AgentMessage[]>([]);
+  const { agentName, threadId, resumeSessionId, onComplete, onError } = options;
+  const [state, setState] = useState<TimelineState>(initialTimelineState);
   const [isStreaming, setIsStreaming] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [currentToolCalls, setCurrentToolCalls] = useState<ToolCall[]>([]);
-  const abortControllerRef = useRef<AbortController | null>(null);
-  const lastResponseIdRef = useRef<string | null>(null);
+  const [queuedMessages, setQueuedMessages] = useState<string[]>([]);
+  const abortRef = useRef<AbortController | null>(null);
+  const stoppingRef = useRef(false);
+  const stateRef = useRef<TimelineState>(initialTimelineState);
+  // Conversation continuity: once a run starts, every SSE event carries the
+  // backend thread_id. We capture it and send it back on follow-up messages so
+  // the same in-process agent session continues (keeps prior context) instead of
+  // spawning a fresh investigation each time. Cleared by reset() (new conversation).
+  const threadIdRef = useRef<string | null>(null);
 
-  // Track tool call count for stable IDs
-  const toolCallCountRef = useRef(0);
+  const push = useCallback((event: { type?: string; data?: Record<string, unknown> }) => {
+    const eventType = event.type || (event.data?.type as string | undefined);
 
-  // Define handleStreamEvent FIRST so it can be used in sendMessage's dependency array
-  // Supports both orchestrator format and sre-agent format:
-  //   Orchestrator: {type: "tool_started", tool: "...", sequence: N, ...}
-  //   SRE-Agent:    {type: "tool_start", data: {name: "...", ...}, thread_id: "...", ...}
-  const handleStreamEvent = useCallback((event: Record<string, unknown>, assistantMsgId: string) => {
-    const eventType = event.type as string || (event.agent ? 'agent_started' : 'unknown');
-    // sre-agent nests details inside "data", flatten for uniform access
-    const eventData = (event.data && typeof event.data === 'object') ? event.data as Record<string, unknown> : {};
-    console.log('[useAgentStream] handleStreamEvent:', eventType, event);
-
-    switch (eventType) {
-      case 'agent_started':
-        console.log('[useAgentStream] Agent started');
-        break;
-
-      // sre-agent: "thought" events contain agent reasoning
-      case 'thought': {
-        const text = eventData.text as string || '';
-        // Skip empty/placeholder thought events
-        if (text && text.trim() !== '(no content)') {
-          setMessages(prev => prev.map(m =>
-            m.id === assistantMsgId
-              ? { ...m, content: m.content + (m.content ? '\n' : '') + text }
-              : m
-          ));
-        }
-        break;
+    if (eventType === 'message_queued') {
+      const pending = event.data?.pending_count;
+      if (typeof pending === 'number' && pending === 0) {
+        setQueuedMessages([]);
       }
-
-      // Support both "tool_started" (orchestrator) and "tool_start" (sre-agent)
-      case 'tool_started':
-      case 'tool_start': {
-        toolCallCountRef.current += 1;
-        const toolName = event.tool as string || eventData.name as string || 'unknown';
-        const toolCall: ToolCall = {
-          id: eventData.tool_use_id as string || `tool-${Date.now()}-${toolCallCountRef.current}`,
-          name: toolName,
-          status: 'running',
-          input: event.input as Record<string, unknown> || eventData.input as Record<string, unknown>,
-          startedAt: new Date(),
-        };
-        setCurrentToolCalls(prev => [...prev, toolCall]);
-        setMessages(prev => prev.map(m =>
-          m.id === assistantMsgId
-            ? { ...m, toolCalls: [...(m.toolCalls || []), toolCall] }
-            : m
-        ));
-        break;
-      }
-
-      // Support both "tool_completed" (orchestrator) and "tool_end" (sre-agent)
-      case 'tool_completed':
-      case 'tool_end': {
-        const toolUseId = eventData.tool_use_id as string;
-        const outputText = event.output_preview as string || eventData.output as string || eventData.summary as string || '';
-        const success = eventData.success !== false;
-
-        if (toolUseId) {
-          // Match by tool_use_id
-          setCurrentToolCalls(prev => prev.map(tc =>
-            tc.id === toolUseId
-              ? { ...tc, status: success ? 'completed' : 'error', output: outputText, completedAt: new Date() }
-              : tc
-          ));
-          setMessages(prev => prev.map(m => {
-            if (m.id !== assistantMsgId) return m;
-            const updatedToolCalls = (m.toolCalls || []).map(tc =>
-              tc.id === toolUseId
-                ? { ...tc, status: (success ? 'completed' : 'error') as 'completed' | 'error', output: outputText, completedAt: new Date() }
-                : tc
-            );
-            return { ...m, toolCalls: updatedToolCalls };
-          }));
-        } else {
-          // Fallback: mark the last running tool as completed
-          setCurrentToolCalls(prev => {
-            const updated = [...prev];
-            for (let i = updated.length - 1; i >= 0; i--) {
-              if (updated[i].status === 'running') {
-                updated[i] = { ...updated[i], status: success ? 'completed' : 'error', output: outputText, completedAt: new Date() };
-                break;
-              }
-            }
-            return updated;
-          });
-          setMessages(prev => prev.map(m => {
-            if (m.id !== assistantMsgId) return m;
-            const updatedToolCalls = [...(m.toolCalls || [])];
-            for (let i = updatedToolCalls.length - 1; i >= 0; i--) {
-              if (updatedToolCalls[i].status === 'running') {
-                updatedToolCalls[i] = { ...updatedToolCalls[i], status: (success ? 'completed' : 'error') as 'completed' | 'error', output: outputText, completedAt: new Date() };
-                break;
-              }
-            }
-            return { ...m, toolCalls: updatedToolCalls };
-          }));
-        }
-        break;
-      }
-
-      case 'message':
-      case 'text_delta': {
-        const content = event.content_preview as string || event.content as string || '';
-        setMessages(prev => prev.map(m =>
-          m.id === assistantMsgId
-            ? { ...m, content: m.content + content }
-            : m
-        ));
-        break;
-      }
-
-      // sre-agent: "result" is the final output
-      case 'result': {
-        // Clean up "(no content)" placeholders from the concatenated result
-        const rawResultText = eventData.text as string || '';
-        const resultText = rawResultText
-          .replace(/\n*\(no content\)\n*/g, '\n')
-          .replace(/\n{3,}/g, '\n\n')
-          .trim();
-        const success = eventData.success !== false;
-
-        setMessages(prev => prev.map(m =>
-          m.id === assistantMsgId
-            ? { ...m, content: resultText || m.content, isStreaming: false }
-            : m
-        ));
-
-        if (success) {
-          onComplete?.(resultText);
-        } else {
-          setError('Investigation failed');
-          onError?.('Investigation failed');
-        }
-        break;
-      }
-
-      case 'agent_completed': {
-        console.log('[useAgentStream] Agent completed, event.output:', event.output, 'type:', typeof event.output);
-        let output = '';
-        if (typeof event.output === 'string') {
-          output = event.output;
-        } else if (event.output && typeof event.output === 'object') {
-          const structured = event.output as Record<string, unknown>;
-          if (structured.summary && typeof structured.summary === 'string') {
-            output = structured.summary;
-          } else {
-            output = JSON.stringify(event.output, null, 2);
-          }
-        }
-
-        const lastResponseId = event.last_response_id as string;
-        if (lastResponseId) {
-          lastResponseIdRef.current = lastResponseId;
-        }
-
-        setMessages(prev => prev.map(m =>
-          m.id === assistantMsgId
-            ? { ...m, content: output || m.content, isStreaming: false }
-            : m
-        ));
-
-        if (event.success) {
-          onComplete?.(output);
-        } else if (event.error) {
-          setError(event.error as string);
-          onError?.(event.error as string);
-        }
-        break;
-      }
-
-      case 'error': {
-        const errorMsg = eventData.message as string || 'Unknown error';
-        setError(errorMsg);
-        setMessages(prev => prev.map(m =>
-          m.id === assistantMsgId
-            ? { ...m, content: m.content || `Error: ${errorMsg}`, isStreaming: false }
-            : m
-        ));
-        onError?.(errorMsg);
-        break;
-      }
-
-      case 'subagent_started':
-      case 'subagent_completed':
-        // Sub-agent events - could show nested progress
-        break;
     }
-  }, [onComplete, onError]);
+
+    stateRef.current = applyEvent(stateRef.current, event);
+    setState(stateRef.current);
+
+    if (eventType === 'result' || eventType === 'error') {
+      setQueuedMessages([]);
+    }
+  }, []);
 
   const sendMessage = useCallback(async (userMessage: string) => {
-    console.log('[useAgentStream] sendMessage called:', userMessage);
-    if (isStreaming) {
-      console.log('[useAgentStream] Already streaming, returning');
-      return;
-    }
-
-    setError(null);
+    if (isStreaming) return;
+    // A seeded threadId (detail-page resume) makes every send a follow-up.
+    const effectiveThreadId = threadId ?? threadIdRef.current;
+    const isFollowUp = effectiveThreadId != null;
+    // Append the user's message as a turn marker; new conversation starts clean.
+    stateRef.current = withUserMessage(isFollowUp ? stateRef.current : initialTimelineState, userMessage);
+    setState(stateRef.current);
     setIsStreaming(true);
-
-    // Add user message
-    const userMsgId = `user-${Date.now()}`;
-    const userMsg: AgentMessage = {
-      id: userMsgId,
-      role: 'user',
-      content: userMessage,
-      timestamp: new Date(),
-    };
-    setMessages(prev => [...prev, userMsg]);
-
-    // Add placeholder assistant message
-    const assistantMsgId = `assistant-${Date.now()}`;
-    const assistantMsg: AgentMessage = {
-      id: assistantMsgId,
-      role: 'assistant',
-      content: '',
-      timestamp: new Date(),
-      toolCalls: [],
-      isStreaming: true,
-    };
-    setMessages(prev => [...prev, assistantMsg]);
-    setCurrentToolCalls([]);
-
-    // Create abort controller
-    abortControllerRef.current = new AbortController();
+    abortRef.current = new AbortController();
 
     try {
-      console.log('[useAgentStream] Fetching /api/team/agent/stream...');
       const response = await fetch('/api/team/agent/stream', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+        body: JSON.stringify(buildStreamBody({
           message: userMessage,
-          // Only include agent_name if explicitly provided; otherwise API uses team's entrance_agent
-          ...(agentName && { agent_name: agentName }),
-          previous_response_id: lastResponseIdRef.current,
-        }),
-        signal: abortControllerRef.current.signal,
+          threadId: effectiveThreadId,
+          resumeSessionId,
+          agentName,
+        })),
+        signal: abortRef.current.signal,
       });
-
-      console.log('[useAgentStream] Response status:', response.status, response.ok);
-
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || `HTTP ${response.status}`);
+        const err = await response.json().catch(() => ({}));
+        throw new Error(err.error || `HTTP ${response.status}`);
       }
-
       const reader = response.body?.getReader();
       if (!reader) throw new Error('No response body');
-
       const decoder = new TextDecoder();
       let buffer = '';
-      let chunkCount = 0;
-
-      console.log('[useAgentStream] Starting to read stream...');
-
-      let currentEventType = '';  // Track the event type from "event:" line
-
       while (true) {
         const { done, value } = await reader.read();
-        if (done) {
-          console.log('[useAgentStream] Stream done, total chunks:', chunkCount);
-
-          // Finalize: mark any still-running tool calls as completed and stop streaming
-          setMessages(prev => prev.map(m => {
-            if (m.id !== assistantMsgId) return m;
-            const finalizedToolCalls = (m.toolCalls || []).map(tc =>
-              tc.status === 'running'
-                ? { ...tc, status: 'completed' as const, completedAt: new Date() }
-                : tc
-            );
-            return { ...m, toolCalls: finalizedToolCalls, isStreaming: false };
-          }));
-          setCurrentToolCalls(prev => prev.map(tc =>
-            tc.status === 'running'
-              ? { ...tc, status: 'completed' as const, completedAt: new Date() }
-              : tc
-          ));
-
-          break;
-        }
-
-        chunkCount++;
-        const chunk = decoder.decode(value, { stream: true });
-        console.log('[useAgentStream] Chunk', chunkCount, ':', chunk.substring(0, 200));
-        buffer += chunk;
-
-        // Parse SSE events
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
         const lines = buffer.split('\n');
-        buffer = lines.pop() || ''; // Keep incomplete line in buffer
-
+        buffer = lines.pop() || '';
         for (const line of lines) {
-          if (line.startsWith('event: ')) {
-            // Capture the event type for the next data line
-            currentEventType = line.slice(7).trim();
-            console.log('[useAgentStream] Event type:', currentEventType);
-          } else if (line.startsWith('data: ')) {
+          if (line.startsWith('data: ')) {
             try {
-              const data = JSON.parse(line.slice(6));
-              // Inject the event type from the "event:" line into the data
-              const eventWithType = { ...data, type: currentEventType || data.type };
-              console.log('[useAgentStream] Parsed data with type:', eventWithType);
-              handleStreamEvent(eventWithType, assistantMsgId);
-              currentEventType = ''; // Reset after use
-            } catch (e) {
-              console.log('[useAgentStream] Parse error for line:', line, e);
-            }
+              const parsed = JSON.parse(line.slice(6));
+              if (parsed.thread_id) threadIdRef.current = parsed.thread_id as string;
+              push(parsed);
+            } catch { /* partial line */ }
           }
         }
       }
-
+      // If the stream closed without a terminal event, push a synthetic result so
+      // runStatus transitions out of 'running' and the spinner clears — unless we
+      // are still waiting on background agents (backend should keep the stream open).
+      if (shouldSynthesizeStreamEnd(stateRef.current)) {
+        const lastResult = [...stateRef.current.items]
+          .reverse()
+          .find((i): i is Extract<TimelineItem, { kind: 'result' }> => i.kind === 'result');
+        push({ type: 'result', data: { text: lastResult?.text ?? '', success: true } });
+      }
+      const final = stateRef.current;
+      if (shouldFinalizeStream(final)) {
+        const resultItem = [...final.items].reverse().find((i): i is Extract<TimelineItem, { kind: 'result' }> => i.kind === 'result');
+        if (final.error) onError?.(final.error);
+        else onComplete?.(resultItem?.text ?? '');
+      }
     } catch (err) {
-      console.log('[useAgentStream] Caught error:', err);
-      if ((err as Error).name === 'AbortError') {
-        console.log('[useAgentStream] User cancelled');
-        setMessages(prev => prev.map(m =>
-          m.id === assistantMsgId
-            ? { ...m, content: m.content || 'Cancelled', isStreaming: false }
-            : m
-        ));
-      } else {
-        const errorMessage = (err as Error).message || 'Failed to run agent';
-        console.log('[useAgentStream] Error message:', errorMessage);
-        setError(errorMessage);
-        setMessages(prev => prev.map(m =>
-          m.id === assistantMsgId
-            ? { ...m, content: `Error: ${errorMessage}`, isStreaming: false }
-            : m
-        ));
-        onError?.(errorMessage);
+      const isIntentionalStop =
+        stoppingRef.current && (err as Error).name === 'AbortError';
+      if (!isIntentionalStop && (err as Error).name !== 'AbortError') {
+        const msg = (err as Error).message || 'Failed to run agent';
+        push({ type: 'error', data: { message: msg } });
+        onError?.(msg);
       }
     } finally {
-      console.log('[useAgentStream] Finally block - setting isStreaming=false');
-      setIsStreaming(false);
-      abortControllerRef.current = null;
+      stoppingRef.current = false;
+      // Keep busy/streaming UX while run is still non-terminal (e.g. background wait
+      // with a dropped connection) — only unlock when a true terminal event landed.
+      if (shouldFinalizeStream(stateRef.current)) {
+        setIsStreaming(false);
+      }
+      abortRef.current = null;
     }
-  }, [isStreaming, agentName, onError, handleStreamEvent]);
+  }, [isStreaming, agentName, threadId, resumeSessionId, onComplete, onError, push]);
 
-  const cancel = useCallback(() => {
-    abortControllerRef.current?.abort();
-  }, []);
+  const cancel = useCallback(() => abortRef.current?.abort(), []);
+
+  const queueMessageDuringRun = useCallback(async (text: string) => {
+    const effectiveThreadId = threadId ?? threadIdRef.current;
+    if (!effectiveThreadId || !isStreaming) {
+      throw new Error('No active investigation');
+    }
+    const { pending_count } = await queueMessage(effectiveThreadId, text);
+    setQueuedMessages((prev) => trimQueuedMessages(prev, text, pending_count));
+  }, [isStreaming, threadId]);
+
+  const stop = useCallback(async () => {
+    if (!isStreaming) return;
+    stoppingRef.current = true;
+    const effectiveThreadId = threadId ?? threadIdRef.current;
+    if (effectiveThreadId) {
+      try {
+        await interruptThread(effectiveThreadId);
+      } catch {
+        // Best-effort — wait/abort below still runs.
+      }
+    }
+
+    await waitForStopResolution(stateRef, STOP_WAIT_MS);
+
+    if (stateRef.current.runStatus === 'running') {
+      push({
+        type: 'result',
+        data: {
+          text: 'Investigation stopped.',
+          success: true,
+          subtype: 'interrupted',
+        },
+      });
+    }
+
+    abortRef.current?.abort();
+    setQueuedMessages([]);
+    // sendMessage's finally may skip clearing isStreaming while backgroundWaiting
+    // gates finalize; intentional stop must always unlock the composer.
+    setIsStreaming(false);
+  }, [isStreaming, threadId, push]);
 
   const reset = useCallback(() => {
-    setMessages([]);
-    setError(null);
-    setCurrentToolCalls([]);
-    lastResponseIdRef.current = null;
+    threadIdRef.current = null;
+    stateRef.current = initialTimelineState;
+    setState(initialTimelineState);
   }, []);
 
   return {
-    messages,
+    timeline: state.items,
+    runStatus: state.runStatus,
+    runId: state.runId,
+    backgroundWaiting: visibleBackgroundWaiting(state.backgroundWaiting),
+    error: state.error ?? null,
     isStreaming,
-    error,
-    currentToolCalls,
     sendMessage,
+    queueMessage: queueMessageDuringRun,
+    queuedMessages,
     cancel,
+    stop,
     reset,
   };
 }

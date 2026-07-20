@@ -12,7 +12,7 @@ from config import AgentConfig, ModelConfig, PromptConfig, ToolsConfig
 def test_model_config_defaults():
     """Test ModelConfig with default values."""
     model = ModelConfig()
-    assert model.name == "claude-sonnet-4-20250514"
+    assert model.name == "claude-sonnet-4-6"
     assert model.temperature is None
     assert model.max_tokens is None
     assert model.top_p is None
@@ -64,7 +64,7 @@ def test_agent_config_backward_compatibility():
     )
 
     # New fields should have sensible defaults
-    assert agent.model.name == "claude-sonnet-4-20250514"
+    assert agent.model.name == "claude-sonnet-4-6"
     assert agent.model.temperature is None
     assert agent.max_turns is None
 
@@ -84,7 +84,7 @@ def test_agent_config_full_example():
             disabled=["Write", "Edit"],
         ),
         model=ModelConfig(
-            name="claude-sonnet-4-20250514",
+            name="claude-sonnet-4-6",
             temperature=0.3,
             max_tokens=4000,
             top_p=0.9,

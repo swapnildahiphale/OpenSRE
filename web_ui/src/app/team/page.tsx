@@ -1,27 +1,34 @@
 'use client';
 
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { RequireRole } from '@/components/RequireRole';
 import { useIdentity } from '@/lib/useIdentity';
 import { useOnboarding } from '@/lib/useOnboarding';
+import { apiFetch } from '@/lib/apiClient';
 import { QuickStartWizard } from '@/components/onboarding/QuickStartWizard';
+import {
+  buildEpisodeMap,
+  pickThreadSummary,
+  type ThreadEpisode,
+} from '@/lib/pickThreadSummary';
+import { formatRelativeTime } from '@/lib/formatRelativeTime';
+import { RunStatusBadge } from '@/components/RunStatusBadge';
 import {
   Bot,
   Activity,
   Brain,
   TrendingUp,
   Clock,
-  CheckCircle,
-  XCircle,
-  Settings,
   BookOpen,
   RefreshCw,
   Upload,
   Wrench,
-  LayoutTemplate,
   GitPullRequest,
+  Sparkles,
 } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import { NewInvestigationDrawer } from '@/components/NewInvestigationDrawer';
 
 interface TeamStats {
   totalRuns: number;
@@ -32,24 +39,39 @@ interface TeamStats {
   trend: 'up' | 'down' | 'stable';
 }
 
-interface ActivityItem {
-  id: string;
-  type: 'run' | 'config' | 'knowledge' | 'template';
-  description: string;
-  timestamp: string;
-  status: 'success' | 'failed' | 'pending' | 'info';
-}
-
 interface PendingItems {
   configChanges: number;
   knowledgeChanges: number;
 }
 
+interface AgentRun {
+  id: string;
+  correlationId: string;
+  status: 'running' | 'completed' | 'failed' | 'timeout' | 'interrupted';
+  triggerMessage?: string | null;
+  outputJson?: Record<string, unknown> | null;
+  errorMessage?: string | null;
+  startedAt: string;
+}
+
+interface Conversation {
+  correlationId: string;
+  firstRun: AgentRun;
+  latestRun: AgentRun;
+  turnCount: number;
+}
+
+const RECENT_THREAD_LIMIT = 10;
+
 export default function TeamDashboardPage() {
+  const router = useRouter();
   const { identity } = useIdentity();
   const [stats, setStats] = useState<TeamStats | null>(null);
-  const [activities, setActivities] = useState<ActivityItem[]>([]);
+  const [runs, setRuns] = useState<AgentRun[]>([]);
+  const [episodes, setEpisodes] = useState<ThreadEpisode[]>([]);
   const [pending, setPending] = useState<PendingItems>({ configChanges: 0, knowledgeChanges: 0 });
+  // Opens the shared investigation slide-over (same drawer the Agent Runs page uses).
+  const [showChat, setShowChat] = useState(false);
 
   // Onboarding state - visitors use localStorage only
   const isVisitor = identity?.auth_kind === 'visitor';
@@ -67,8 +89,10 @@ export default function TeamDashboardPage() {
     }
   }, [shouldShowWelcome]);
 
-  useEffect(() => {
-    // Fetch team stats
+  // Re-fetch dashboard stats, investigations, and pending items.
+  // Called on mount and again after an investigation completes so a fresh
+  // thread shows up without a manual refresh.
+  const refreshDashboard = useCallback(() => {
     fetch('/api/team/stats')
       .then(res => res.ok ? res.json() : null)
       .then(data => {
@@ -77,58 +101,57 @@ export default function TeamDashboardPage() {
       })
       .catch(err => console.error('Failed to load stats:', err));
 
-    // Fetch recent activity
-    fetch('/api/team/activity?limit=10')
-      .then(res => res.ok ? res.json() : null)
-      .then(data => data && setActivities(data.activities || []))
-      .catch(err => console.error('Failed to load activity:', err));
-
-    // Fetch pending items
     fetch('/api/team/pending')
       .then(res => res.ok ? res.json() : null)
       .then(data => data && setPending(data))
       .catch(err => console.error('Failed to load pending items:', err));
+
+    // Enrich run rows with episode summaries (same join as /team/agent-runs).
+    Promise.all([apiFetch('/api/team/agent-runs'), fetch('/api/memory/episodes')])
+      .then(async ([runsRes, episodesRes]) => {
+        if (runsRes.ok) {
+          const data = await runsRes.json();
+          if (Array.isArray(data)) setRuns(data);
+        }
+        if (episodesRes.ok) {
+          const epData = await episodesRes.json();
+          setEpisodes(epData.episodes ?? []);
+        }
+      })
+      .catch(err => console.error('Failed to load investigation context:', err));
   }, []);
 
-  const formatRelativeTime = (timestamp: string) => {
-    const now = Date.now();
-    const then = new Date(timestamp).getTime();
-    const diff = now - then;
-    const minutes = Math.floor(diff / 60000);
-    const hours = Math.floor(diff / 3600000);
-    const days = Math.floor(diff / 86400000);
+  useEffect(() => {
+    refreshDashboard();
+  }, [refreshDashboard]);
 
-    if (minutes < 1) return 'just now';
-    if (minutes < 60) return `${minutes}m ago`;
-    if (hours < 24) return `${hours}h ago`;
-    return `${days}d ago`;
-  };
+  const episodeMap = useMemo(() => buildEpisodeMap(episodes), [episodes]);
 
-  const getActivityIcon = (type: ActivityItem['type']) => {
-    switch (type) {
-      case 'run':
-        return <Bot className="w-4 h-4" />;
-      case 'config':
-        return <Settings className="w-4 h-4" />;
-      case 'knowledge':
-        return <BookOpen className="w-4 h-4" />;
-      case 'template':
-        return <LayoutTemplate className="w-4 h-4" />;
+  // One row per investigation thread (correlation_id), not per agent run.
+  const recentThreads = useMemo(() => {
+    const groups = new Map<string, AgentRun[]>();
+    for (const run of runs) {
+      const key = run.correlationId || run.id;
+      const arr = groups.get(key) ?? [];
+      arr.push(run);
+      groups.set(key, arr);
     }
-  };
 
-  const getActivityStatusIcon = (status: ActivityItem['status']) => {
-    switch (status) {
-      case 'success':
-        return <CheckCircle className="w-4 h-4 text-green-500" />;
-      case 'failed':
-        return <XCircle className="w-4 h-4 text-clay" />;
-      case 'pending':
-        return <Clock className="w-4 h-4 text-yellow-500" />;
-      case 'info':
-        return <Activity className="w-4 h-4 text-stone-500" />;
+    const threads: Conversation[] = [];
+    for (const [correlationId, arr] of groups) {
+      const sorted = [...arr].sort((a, b) => a.startedAt.localeCompare(b.startedAt));
+      threads.push({
+        correlationId,
+        firstRun: sorted[0],
+        latestRun: sorted[sorted.length - 1],
+        turnCount: sorted.length,
+      });
     }
-  };
+
+    return threads
+      .sort((a, b) => b.latestRun.startedAt.localeCompare(a.latestRun.startedAt))
+      .slice(0, RECENT_THREAD_LIMIT);
+  }, [runs]);
 
   const totalPending = pending.configChanges + pending.knowledgeChanges;
 
@@ -167,6 +190,9 @@ export default function TeamDashboardPage() {
             </div>
           </div>
           <div className="flex items-center gap-4">
+            <button onClick={() => setShowChat(true)} className="flex items-center gap-2 px-4 py-2 bg-forest hover:bg-forest-dark text-white rounded-lg text-sm font-medium transition-colors">
+              <Sparkles className="w-4 h-4" />Investigate
+            </button>
             <div className="text-xs text-stone-500 text-right">
               <div>
                 Team: <span className="font-mono">{identity?.team_node_id || identity?.org_id || 'unknown'}</span>
@@ -244,36 +270,61 @@ export default function TeamDashboardPage() {
               <div className="p-5 border-b border-stone-200 dark:border-stone-700 flex-shrink-0">
                 <div className="flex items-center justify-between">
                   <h2 className="text-lg font-semibold text-stone-900 dark:text-white">Recent Activity</h2>
-                  <button className="text-xs text-stone-500 hover:text-stone-700 dark:hover:text-stone-300 flex items-center gap-1">
+                  <button
+                    onClick={refreshDashboard}
+                    className="text-xs text-stone-500 hover:text-stone-700 dark:hover:text-stone-300 flex items-center gap-1"
+                  >
                     <RefreshCw className="w-3 h-3" />
                     Refresh
                   </button>
                 </div>
               </div>
               <div className="divide-y divide-stone-200 dark:divide-stone-700 overflow-y-auto flex-1">
-                {activities.length === 0 && (
-                  <div className="p-8 text-center text-sm text-stone-500">No recent activity</div>
+                {recentThreads.length === 0 && (
+                  <div className="p-8 text-center text-sm text-stone-500">No recent investigations</div>
                 )}
-                {activities.map((activity) => (
-                  <div key={activity.id} className="p-4 hover:bg-stone-50 dark:hover:bg-stone-800/50 transition-colors">
-                    <div className="flex items-start gap-3">
-                      <div className="flex-shrink-0 mt-0.5">
-                        <div className="p-2 rounded-lg bg-stone-100 dark:bg-stone-700 text-stone-700 dark:text-stone-300">
-                          {getActivityIcon(activity.type)}
+                {recentThreads.map((thread) => {
+                  const ep = episodeMap.get(thread.correlationId);
+                  const summary = pickThreadSummary(ep, thread.latestRun, thread.firstRun);
+
+                  return (
+                    <button
+                      key={thread.correlationId}
+                      type="button"
+                      onClick={() => router.push(`/team/agent-runs/${thread.latestRun.id}`)}
+                      className="w-full text-left p-4 hover:bg-stone-50 dark:hover:bg-stone-800/50 transition-colors"
+                    >
+                      <div className="flex items-start gap-3">
+                        <div className="flex-shrink-0 mt-0.5">
+                          <div className="p-2 rounded-lg bg-stone-100 dark:bg-stone-700 text-stone-700 dark:text-stone-300">
+                            <Bot className="w-4 h-4" />
+                          </div>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap mb-1">
+                            <RunStatusBadge status={thread.latestRun.status} size="sm" />
+                            {ep?.issue_type && (
+                              <span className="text-xs font-medium text-stone-700 dark:text-stone-300">
+                                {ep.issue_type}
+                              </span>
+                            )}
+                            {thread.turnCount > 1 && (
+                              <span className="text-xs text-stone-400">
+                                {thread.turnCount} turns
+                              </span>
+                            )}
+                            <span className="text-xs text-stone-400">
+                              {formatRelativeTime(thread.latestRun.startedAt)}
+                            </span>
+                          </div>
+                          <p className="text-sm text-stone-900 dark:text-white line-clamp-2">
+                            {summary}
+                          </p>
                         </div>
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          {getActivityStatusIcon(activity.status)}
-                          <p className="text-sm text-stone-900 dark:text-white">{activity.description}</p>
-                        </div>
-                        <div className="flex items-center gap-2 mt-1">
-                          <span className="text-xs text-stone-500">{formatRelativeTime(activity.timestamp)}</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ))}
+                    </button>
+                  );
+                })}
               </div>
             </div>
           </div>
@@ -376,23 +427,8 @@ export default function TeamDashboardPage() {
                       <Brain className="w-4 h-4" />
                     </div>
                     <div>
-                      <div className="text-sm font-medium text-stone-900 dark:text-white">Episodic Memory</div>
+                      <div className="text-sm font-medium text-stone-900 dark:text-white">Memory</div>
                       <div className="text-xs text-stone-500">Past investigations</div>
-                    </div>
-                  </div>
-                </Link>
-
-                <Link
-                  href="/team/templates"
-                  className="block p-2.5 rounded-lg border border-stone-200 dark:border-stone-700 hover:border-stone-400 dark:hover:border-stone-600 transition-colors group"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="p-1.5 rounded-lg bg-stone-100 dark:bg-stone-700 text-stone-600 dark:text-stone-400 group-hover:bg-stone-200 dark:group-hover:bg-stone-700 transition-colors">
-                      <LayoutTemplate className="w-4 h-4" />
-                    </div>
-                    <div>
-                      <div className="text-sm font-medium text-stone-900 dark:text-white">View Templates</div>
-                      <div className="text-xs text-stone-500">Browse presets</div>
                     </div>
                   </div>
                 </Link>
@@ -401,6 +437,14 @@ export default function TeamDashboardPage() {
           </div>
         </div>
       </div>
+
+      {/* Shared investigation slide-over — same drawer the Agent Runs page uses.
+          On completion, refresh dashboard stats/activity so the new run shows up. */}
+      <NewInvestigationDrawer
+        open={showChat}
+        onClose={() => setShowChat(false)}
+        onComplete={refreshDashboard}
+      />
     </RequireRole>
   );
 }

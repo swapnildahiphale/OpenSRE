@@ -9,6 +9,7 @@ import {
   Network,
   Server,
   BookOpen,
+  ScrollText,
   Brain,
   GitPullRequest,
   Bot,
@@ -25,12 +26,13 @@ import { AccountMenu } from './AccountMenu';
 // Navigation for team users
 const teamNavigation = [
   { name: 'Dashboard', href: '/team', icon: LayoutDashboard },
+  { name: 'Agent Runs', href: '/team/agent-runs', icon: Bot },
   { name: 'Agent Topology', href: '/team/agents', icon: Bot },
   { name: 'Tools & MCPs', href: '/team/tools', icon: Server },
   { name: 'Knowledge Base', href: '/team/knowledge', icon: BookOpen },
+  { name: 'Team Context', href: '/team/context', icon: ScrollText },
   { name: 'Memory', href: '/team/memory', icon: Brain },
   { name: 'Proposed Changes', href: '/team/pending-changes', icon: GitPullRequest },
-  { name: 'Agent Runs', href: '/team/agent-runs', icon: Bot },
   { name: 'Settings', href: '/settings', icon: ShieldCheck },
 ];
 
@@ -47,6 +49,13 @@ const adminNavigation = [
 const guestNavigation = [
   { name: 'Sign In', href: '/settings', icon: ShieldCheck },
 ];
+
+function isNavActive(pathname: string, href: string): boolean {
+  if (href === '/team') {
+    return pathname === '/team' || pathname === '/team/';
+  }
+  return pathname === href || pathname.startsWith(href + '/');
+}
 
 export function Sidebar() {
   const pathname = usePathname();
@@ -83,7 +92,7 @@ export function Sidebar() {
           {/* Navigation */}
           <nav className="flex-1 px-4 py-6 space-y-1 overflow-y-auto">
             {nav.map((item) => {
-              const isActive = pathname.startsWith(item.href) && item.href !== '/' ? true : pathname === item.href;
+              const isActive = isNavActive(pathname, item.href);
               return (
                 <Link
                   key={item.name}

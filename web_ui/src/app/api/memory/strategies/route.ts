@@ -1,20 +1,26 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
+import { cookies } from 'next/headers';
 
 const AGENT_URL = process.env.AGENT_SERVICE_URL || 'http://localhost:8000';
 
-export async function GET(request: NextRequest) {
-  const { searchParams } = new URL(request.url);
-  const alert_type = searchParams.get('alert_type') || '';
-  const service_name = searchParams.get('service_name') || '';
+export async function GET() {
+  const cookieStore = await cookies();
+  const token = cookieStore.get('opensre_session_token')?.value;
+
+  if (!token) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
 
   try {
-    const params = new URLSearchParams();
-    if (alert_type) params.set('alert_type', alert_type);
-    if (service_name) params.set('service_name', service_name);
-    const res = await fetch(`${AGENT_URL}/memory/strategies?${params}`);
+    const res = await fetch(`${AGENT_URL}/memory/strategies`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
     const data = await res.json();
-    return NextResponse.json(data, { status: res.status });
-  } catch (e: any) {
+    const result = data?.result ?? data;
+    return NextResponse.json({ strategies: result.strategies ?? [] });
+  } catch {
     return NextResponse.json({ strategies: [] }, { status: 200 });
   }
 }

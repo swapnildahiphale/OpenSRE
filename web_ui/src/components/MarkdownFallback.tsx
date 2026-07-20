@@ -67,12 +67,28 @@ const components: Components = {
   ),
 };
 
-export default function MarkdownFallback({ content }: { content: string }) {
+export function MarkdownContent({ content }: { content: string }) {
+  return (
+    <ReactMarkdown remarkPlugins={[remarkGfm]} components={components}>
+      {content}
+    </ReactMarkdown>
+  );
+}
+
+export default function MarkdownFallback({
+  content,
+  bare = false,
+}: {
+  content: string;
+  bare?: boolean;
+}) {
+  if (bare) {
+    return <MarkdownContent content={content} />;
+  }
+
   return (
     <div className="bg-white dark:bg-stone-800 p-3 rounded-lg border border-stone-200 dark:border-stone-600">
-      <ReactMarkdown remarkPlugins={[remarkGfm]} components={components}>
-        {content}
-      </ReactMarkdown>
+      <MarkdownContent content={content} />
     </div>
   );
 }

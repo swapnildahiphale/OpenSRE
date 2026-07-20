@@ -15,9 +15,12 @@ description: Kubernetes debugging methodology and scripts. Use for pod crashes, 
 
 ## Access Mode
 
-Scripts support two modes. Try **direct mode first** (no --cluster-id), then gateway if direct fails.
+**Default: skip cluster discovery, go straight to direct mode.** Do not run
+`list_clusters.py` "just in case" before every namespace query — it's only
+needed when you specifically must target a *different, remote, gateway-registered*
+cluster than the one this agent is already running in/against.
 
-### Direct mode (kubectl / kubeconfig)
+### Direct mode (kubectl / kubeconfig) — use this unless told otherwise
 Run scripts WITHOUT --cluster-id. They use the local kubeconfig (~/.kube/config) or in-cluster service account.
 ```bash
 python .claude/skills/infrastructure-kubernetes/scripts/list_pods.py -n otel-demo
@@ -33,12 +36,13 @@ kubectl logs -n <namespace> <pod-name> --tail=100
 kubectl describe pod -n <namespace> <pod-name>
 ```
 
-### Gateway mode (remote clusters via k8s-gateway)
-Only if `K8S_GATEWAY_URL` is configured and clusters are registered. Use --cluster-id.
+### Gateway mode (remote clusters via k8s-gateway) — only if you actually need a different cluster
+Only works if the `K8S_GATEWAY_URL` env var is set on this agent AND the target cluster is registered with the gateway. Most environments do NOT have this configured — `list_clusters.py` will tell you plainly if gateway mode is unavailable; when it does, **do not pass `--cluster-id` at all, and do not try it "to be safe" against a second context** — every context resolves to the same identical result, so a second attempt is a wasted, redundant call, not a more thorough one.
 ```bash
 python .claude/skills/infrastructure-kubernetes/scripts/list_clusters.py
 python .claude/skills/infrastructure-kubernetes/scripts/list_pods.py -n production --cluster-id <CLUSTER_ID>
 ```
+If you ignore this and pass `--cluster-id` anyway while gateway mode is off, the scripts print a `[k8s-gateway] ... ignored` warning to stderr as a last-resort safety net — but treat that as a signal you already made a mistake, not as normal output to work around.
 
 ## Available Scripts
 
@@ -46,8 +50,9 @@ All scripts are in `.claude/skills/infrastructure-kubernetes/scripts/`
 
 ### list_pods.py - List pods with status
 ```bash
-python .claude/skills/infrastructure-kubernetes/scripts/list_pods.py -n <namespace> [--label <selector>]
+python .claude/skills/infrastructure-kubernetes/scripts/list_pods.py -n <namespace> [--label <selector>] [--json] [--cluster-id <id>]
 ```
+Only `-n/--namespace`, `--label`, `--json`, and `--cluster-id` are supported — there is no `--output`/`--show-age`/etc. Pod age is only included with `--json`; the plain-text table does not show it.
 
 ### get_events.py - Get pod events (USE FIRST!)
 ```bash

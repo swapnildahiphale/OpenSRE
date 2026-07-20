@@ -11,6 +11,7 @@ Manages visitor access to the playground with queue-based fairness:
 
 from __future__ import annotations
 
+import os
 import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Optional
@@ -36,8 +37,8 @@ def _utc_now() -> datetime:
 
 
 # Playground configuration
-PLAYGROUND_ORG_ID = "playground"
-PLAYGROUND_TEAM_NODE_ID = "visitor-playground"
+PLAYGROUND_ORG_ID = os.getenv("PLAYGROUND_ORG_ID", "playground")
+PLAYGROUND_TEAM_NODE_ID = os.getenv("PLAYGROUND_TEAM_NODE_ID", "visitor-playground")
 
 
 class VisitorSessionManager:

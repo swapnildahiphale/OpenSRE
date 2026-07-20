@@ -47,7 +47,7 @@ def test_backward_compatibility():
     )
 
     # New fields should have defaults
-    assert agent.model.name == "claude-sonnet-4-20250514"
+    assert agent.model.name == "claude-sonnet-4-6"
     assert agent.model.temperature is None
     assert agent.max_turns is None
 
@@ -136,7 +136,7 @@ def test_complete_integration():
             enabled=cfg.get("enabled", True),
             name=name,
             model=ModelConfig(
-                name=model_data.get("name", "claude-sonnet-4-20250514"),
+                name=model_data.get("name", "claude-sonnet-4-6"),
                 temperature=model_data.get("temperature"),
                 max_tokens=model_data.get("max_tokens"),
                 top_p=model_data.get("top_p"),

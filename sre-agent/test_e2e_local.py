@@ -72,9 +72,12 @@ async def main():
     team_config = load_team_config()
     print(f"  Agents: {len(team_config.agents)}")
     print(f"  Agent names: {list(team_config.agents.keys())}")
-    print(f"  Business context: {len(team_config.business_context)} chars")
-    if team_config.business_context:
-        print(f"  BC preview: {team_config.business_context[:120]}...")
+    print(f"  Team context sections: {len(team_config.team_context)}")
+    team_context_chars = sum(len(s.content) for s in (team_config.team_context or []))
+    print(f"  Team context: {team_context_chars} chars")
+    if team_config.team_context:
+        preview = team_config.team_context[0].content[:120]
+        print(f"  TC preview: {preview}...")
 
     # ── Step 3: Resolve root agent and build system prompt ──────────────────
     print("\n" + "=" * 60)

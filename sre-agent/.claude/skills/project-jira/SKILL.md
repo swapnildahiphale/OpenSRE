@@ -8,10 +8,23 @@ allowed-tools: Bash(python *)
 
 ## Authentication
 
-**IMPORTANT**: Credentials are injected automatically by a proxy layer. Do NOT check for `JIRA_API_TOKEN` or `JIRA_EMAIL` in environment variables - they won't be visible to you. Just run the scripts directly; authentication is handled transparently.
+**IMPORTANT**: In proxy/production mode, credentials are injected automatically by a proxy layer. Do NOT check for `JIRA_API_TOKEN` or `JIRA_EMAIL` in environment variables in that mode — they won't be visible to you. Just run the scripts directly; authentication is handled transparently.
+
+In **direct/local mode** the scripts also support self-hosted Jira Data Center via a Personal Access Token (PAT). Set the following env vars (see `.env.example` for the full block):
+
+- Cloud (atlassian.net): `JIRA_URL`, `JIRA_EMAIL`, `JIRA_API_TOKEN`. Leave `JIRA_AUTH_SCHEME`/`JIRA_API_VERSION` unset → defaults to Basic auth + REST API v3 (ADF bodies).
+- Data Center (self-hosted): `JIRA_URL`, `JIRA_API_TOKEN`, `JIRA_AUTH_SCHEME=bearer`, `JIRA_API_VERSION=2`. Omit `JIRA_EMAIL`. The token is sent as `Authorization: Bearer <token>` and requests go to `/rest/api/2`.
 
 Configuration environment variables you CAN check (non-secret):
-- `JIRA_URL` - Jira instance URL (e.g., `https://your-company.atlassian.net`)
+- `JIRA_URL` - Jira instance URL (e.g., `https://your-company.atlassian.net` for Cloud, `https://jira.yourcorp.com` for Data Center)
+- `JIRA_API_VERSION` - `3` (Cloud, default) or `2` (Data Center)
+- `JIRA_AUTH_SCHEME` - `bearer` for Data Center PAT auth; unset for Cloud Basic auth
+
+### Body format note (v2 vs v3)
+Jira Cloud (v3) uses Atlassian Document Format (ADF JSON) for `description`/`body` fields. Jira Data Center (v2) uses **Jira Wiki Markup** — a plain string that supports rich formatting: `*bold*`, `_italic_`, `||...||` tables, `{code}...{code}` blocks, headings, lists, etc. The scripts auto-pick the right format from `JIRA_API_VERSION`, so callers can pass the same `--description` / `--comment` text regardless of flavor; for v2 you may use Wiki Markup syntax to get rich rendering.
+
+### Assignee format note (v2 vs v3)
+The `--assignee` arg also adapts to the API version: Cloud (v3) expects the Atlassian **accountId**; Data Center (v2) expects the **username** (e.g. `jane.doe`). The scripts pick the right field key (`accountId` vs `name`) from `JIRA_API_VERSION`.
 
 ---
 

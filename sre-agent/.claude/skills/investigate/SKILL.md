@@ -35,6 +35,26 @@ For K8s/infrastructure issues:
 - Spawn `k8s-debugger` subagent
 - **Events BEFORE logs** - events explain most issues faster
 
+## Phase 2.4: Query Knowledge Graph
+
+After you identify an affected service or deployment (not on the raw alert alone):
+
+1. Add a todo: **Query knowledge graph for service topology**
+2. Invoke the `infrastructure-neo4j` skill with `--service <name>`
+3. Use blast radius and dependencies to focus evidence gathering
+
+Skip if no service name is known yet, or if the graph returns no data.
+
+## Phase 2.5: Search Memory
+
+After you have concrete evidence (not on the raw alert alone):
+
+1. Add a todo: **Search memory for similar past investigations**
+2. Invoke the `memory-search` skill with a specific query (symptom + component + system)
+3. Prioritize resolved hits with matching root cause and `skills_used`
+
+Skip this phase only if memory search returns no relevant hits and you have no component/symptom to query yet.
+
 ## Phase 3: Form Hypotheses
 
 Based on evidence, rank hypotheses:
@@ -93,6 +113,7 @@ Structure your conclusion:
 - Don't repeat queries with same parameters
 - Start narrow, expand only if needed
 - Maximum 6-8 tool calls per investigation phase
+- For config/repo tasks (Bitbucket, repo crawls, manifest hunts), prefer **sequential** subagent work over parallel Bitbucket + Kubernetes crawls — each subagent forks many shells and can exhaust the container process budget
 
 ## When to Use Subagents
 

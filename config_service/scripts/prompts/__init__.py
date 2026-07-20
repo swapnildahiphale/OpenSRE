@@ -28,17 +28,12 @@ from .layers import (
     # Builder functions - shared sections
     build_agent_prompt_sections,
     build_agent_shared_sections,
-    build_behavior_overrides,
     build_capabilities_section,
-    build_contextual_info,
     build_delegation_section,
     build_error_handling_section,
-    build_runtime_metadata,
     build_subagent_response_section,
     build_tool_call_limits,
     build_tool_guidance,
-    # User context builder (for user/task message)
-    build_user_context,
     format_local_context,
     get_integration_errors,
     get_integration_tool_limits,
@@ -63,8 +58,6 @@ __all__ = [
     "build_planner_system_prompt",
     "DEFAULT_PLANNER_PROMPT",
     "PLANNER_SYSTEM_PROMPT",  # Deprecated alias for backwards compatibility
-    # User context builder (for user/task message)
-    "build_user_context",
     # Role-based and delegation guidance
     "SUBAGENT_RESPONSE_GUIDANCE",
     "DELEGATION_GUIDANCE",
@@ -88,10 +81,7 @@ __all__ = [
     "INTEGRATION_ERRORS_REGISTRY",
     "INTEGRATION_TOOL_LIMITS",
     # Builder functions - context and layers
-    "build_runtime_metadata",  # Deprecated - use build_user_context instead
     "build_capabilities_section",
-    "build_contextual_info",
-    "build_behavior_overrides",
     "build_subagent_response_section",
     "build_delegation_section",
     "apply_role_based_prompt",

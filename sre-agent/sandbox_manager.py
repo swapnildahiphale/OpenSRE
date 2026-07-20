@@ -1,0 +1,1794 @@
+# Copyright 2026 OpenSRE, Inc.
+#
+# Licensed under the Business Source License 1.1 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     https://github.com/opensre/opensre/blob/main/LICENSE-ENTERPRISE
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+"""
+Kubernetes Sandbox Manager
+
+Manages isolated sandboxes for investigations using K8s agent-sandbox.
+Follows the agent-sandbox pattern with FastAPI servers running on port 8888.
+
+Security: Each sandbox gets a unique JWT embedded in its Envoy config.
+The credential-resolver validates this JWT to ensure only legitimate
+sandboxes can request credentials for their designated tenant/team.
+"""
+
+import json
+import os
+import re
+import time
+from dataclasses import dataclass
+from datetime import datetime, timedelta
+from typing import Optional
+
+import requests
+from auth import generate_sandbox_jwt
+from kubernetes import client
+from kubernetes import config as k8s_config
+from kubernetes.client.rest import ApiException
+
+# K8s names must be lowercase alphanumeric + hyphens, 1-63 chars
+_K8S_NAME_RE = re.compile(r"^[a-z0-9][a-z0-9\-]{0,61}[a-z0-9]$")
+
+
+def _validate_thread_id(thread_id: str) -> None:
+    """Validate thread_id is safe for use in K8s names and labels."""
+    if not thread_id or not _K8S_NAME_RE.match(thread_id):
+        raise ValueError(
+            f"Invalid thread_id '{thread_id}': must be lowercase alphanumeric/hyphens, 2-63 chars"
+        )
+
+
+def fetch_configured_integrations(jwt_token: str, tenant_id: str, team_id: str) -> str:
+    """Fetch configured integrations from credential-resolver.
+
+    This is called when creating a sandbox to inject integration metadata
+    into the sandbox environment. The agent can then know what integrations
+    are available without making runtime API calls.
+
+    Args:
+        jwt_token: JWT for authentication
+        tenant_id: Tenant ID
+        team_id: Team ID
+
+    Returns:
+        JSON string of integration metadata (non-sensitive)
+    """
+    cred_resolver_ns = os.getenv("CREDENTIAL_RESOLVER_NAMESPACE", "opensre-prod")
+
+    # In local dev, use port-forwarded URL
+    local_port = os.getenv("CREDENTIAL_RESOLVER_LOCAL_PORT")
+    if local_port:
+        url = f"http://localhost:{local_port}/api/integrations"
+    else:
+        url = f"http://credential-resolver-svc.{cred_resolver_ns}.svc.cluster.local:8002/api/integrations"
+
+    headers = {
+        "Accept": "application/json",
+        "X-Sandbox-JWT": jwt_token,
+        "X-Tenant-Id": tenant_id,
+        "X-Team-Id": team_id,
+    }
+
+    try:
+        response = requests.get(url, headers=headers, timeout=5)
+        response.raise_for_status()
+        data = response.json()
+        # Return as compact JSON string for env var
+        return json.dumps(data.get("integrations", []))
+    except Exception as e:
+        print(f"⚠️ Failed to fetch integrations: {e}")
+        # Return empty list on failure - skills will handle gracefully
+        return "[]"
+
+
+class SandboxExecutionError(Exception):
+    """Raised when sandbox execution fails."""
+
+    pass
+
+
+class SandboxInterruptError(Exception):
+    """Raised when sandbox interrupt fails."""
+
+    pass
+
+
+@dataclass
+class SandboxInfo:
+    """Information about a running sandbox."""
+
+    name: str
+    thread_id: str
+    created_at: datetime
+    namespace: str = "default"
+
+
+class SandboxManager:
+    """Manage investigation sandboxes in Kubernetes."""
+
+    def __init__(self, namespace: str = "default", image: str = "opensre-agent:latest"):
+        """
+        Initialize sandbox manager.
+
+        Args:
+            namespace: Kubernetes namespace for sandboxes
+            image: Docker image to use for sandboxes (defaults to local image,
+                   use ECR URI for production: xxx.dkr.ecr.region.amazonaws.com/opensre-agent:latest)
+        """
+        self.namespace = namespace
+        self.image = image
+        self._load_k8s_config()
+        self.custom_api = client.CustomObjectsApi()
+        self.core_api = client.CoreV1Api()
+
+    def _protect_pod_from_consolidation(self, pod_name: str) -> None:
+        """Annotate a pod with karpenter.sh/do-not-disrupt to prevent eviction.
+
+        Called after a sandbox is claimed or created so Karpenter won't evict
+        active investigation pods during node consolidation. Non-fatal if it fails.
+        """
+        try:
+            self.core_api.patch_namespaced_pod(
+                name=pod_name,
+                namespace=self.namespace,
+                body={
+                    "metadata": {"annotations": {"karpenter.sh/do-not-disrupt": "true"}}
+                },
+            )
+        except Exception as e:
+            print(f"⚠️ Failed to annotate pod {pod_name} with do-not-disrupt: {e}")
+
+    def _load_k8s_config(self):
+        """Load Kubernetes configuration."""
+        try:
+            # Try in-cluster config first (when running in K8s)
+            k8s_config.load_incluster_config()
+        except Exception:
+            # Fall back to local kubeconfig (development)
+            k8s_config.load_kube_config()
+
+    def _create_envoy_configmap(
+        self,
+        sandbox_name: str,
+        jwt_token: str,
+    ) -> str:
+        """Create a per-sandbox ConfigMap with JWT embedded in Envoy config.
+
+        Each sandbox gets its own ConfigMap with the JWT as a static header.
+        This ensures credential-resolver can cryptographically verify the
+        sandbox identity and prevent credential theft via spoofed headers.
+
+        Args:
+            sandbox_name: Name of the sandbox (used for ConfigMap naming)
+            jwt_token: JWT token to embed in the Envoy config
+
+        Returns:
+            Name of the created ConfigMap
+        """
+        configmap_name = f"envoy-config-{sandbox_name}"
+
+        # Get credential-resolver namespace (where the service runs)
+        cred_resolver_ns = os.getenv("CREDENTIAL_RESOLVER_NAMESPACE", "opensre-prod")
+
+        envoy_config = f"""# Envoy proxy configuration for credential injection
+# Per-sandbox config with embedded JWT for authentication
+# Generated by SandboxManager - DO NOT EDIT
+
+admin:
+  address:
+    socket_address:
+      address: 127.0.0.1
+      port_value: 9901
+
+static_resources:
+  listeners:
+  - name: http_proxy
+    address:
+      socket_address:
+        address: 0.0.0.0
+        port_value: 8001
+    filter_chains:
+    - filters:
+      - name: envoy.filters.network.http_connection_manager
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+          stat_prefix: credential_proxy
+          codec_type: AUTO
+
+          http_protocol_options:
+            allow_absolute_url: true
+
+          route_config:
+            name: proxy_routes
+            virtual_hosts:
+            # Localhost proxy mode (SDK uses BASE_URL=http://localhost:8001)
+            - name: localhost_proxy
+              domains:
+              - "localhost:8001"
+              - "127.0.0.1:8001"
+              - "localhost"
+              routes:
+              # LLM API paths → credential-resolver LLM proxy
+              - match:
+                  prefix: "/v1/"
+                route:
+                  cluster: credential_resolver_llm
+                  timeout: 0s
+                  idle_timeout: 0s
+              - match:
+                  prefix: "/api/event_logging/"
+                route:
+                  cluster: credential_resolver_llm
+                  timeout: 0s
+                  idle_timeout: 0s
+              # Coralogix API paths
+              - match:
+                  prefix: "/api/v1/dataprime/"
+                route:
+                  cluster: coralogix_us2
+                  auto_host_rewrite: true
+              - match:
+                  prefix: "/api/v1/query"
+                route:
+                  cluster: coralogix_us2
+                  auto_host_rewrite: true
+
+            # Direct host routing → LLM proxy (for HTTP_PROXY mode if used)
+            - name: anthropic
+              domains:
+              - "api.anthropic.com"
+              - "api.anthropic.com:443"
+              routes:
+              - match:
+                  prefix: "/"
+                route:
+                  cluster: credential_resolver_llm
+                  timeout: 0s
+                  idle_timeout: 0s
+
+            - name: coralogix_us2
+              domains:
+              - "api.us2.coralogix.com"
+              - "api.us2.coralogix.com:443"
+              routes:
+              - match:
+                  prefix: "/"
+                route:
+                  cluster: coralogix_us2
+                  auto_host_rewrite: true
+
+            # Passthrough for unmapped domains
+            - name: passthrough
+              domains:
+              - "*"
+              routes:
+              - match:
+                  prefix: "/"
+                route:
+                  cluster: passthrough_cluster
+                  auto_host_rewrite: true
+
+          http_filters:
+          # ext_authz filter - calls credential-resolver for auth headers
+          - name: envoy.filters.http.ext_authz
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.ext_authz.v3.ExtAuthz
+              transport_api_version: V3
+              http_service:
+                server_uri:
+                  uri: http://credential-resolver-svc.{cred_resolver_ns}.svc.cluster.local:8002/check
+                  cluster: ext_authz
+                  timeout: 2s
+                # Prepend /extauthz to avoid hitting LLM proxy routes
+                path_prefix: "/extauthz"
+                authorization_request:
+                  # Add JWT and target host as headers to ext_authz
+                  headers_to_add:
+                  - key: "x-sandbox-jwt"
+                    value: "{jwt_token}"
+                  - key: "x-original-host"
+                    value: "%REQ(:authority)%"
+                authorization_response:
+                  # These headers from ext_authz response are added to upstream request
+                  allowed_upstream_headers:
+                    patterns:
+                    - exact: "authorization"
+                    - exact: "x-api-key"
+                    - exact: "x-tenant-id"
+                    - exact: "x-team-id"
+                    - exact: "x-llm-model"
+              failure_mode_allow: false
+
+          - name: envoy.filters.http.router
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+
+  # TLS listener for gh CLI (requires HTTPS)
+  # Terminates TLS locally, forwards to credential-resolver HTTP
+  - name: gh_tls_proxy
+    address:
+      socket_address:
+        address: 0.0.0.0
+        port_value: 8443
+    filter_chains:
+    - filters:
+      - name: envoy.filters.network.http_connection_manager
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+          stat_prefix: gh_tls_proxy
+          codec_type: AUTO
+          route_config:
+            name: gh_routes
+            virtual_hosts:
+            - name: gh_proxy
+              domains: ["*"]
+              routes:
+              - match:
+                  prefix: "/"
+                route:
+                  cluster: credential_resolver_github
+                  timeout: 30s
+          http_filters:
+          - name: envoy.filters.http.ext_authz
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.ext_authz.v3.ExtAuthz
+              transport_api_version: V3
+              http_service:
+                server_uri:
+                  uri: http://credential-resolver-svc.{cred_resolver_ns}.svc.cluster.local:8002/check
+                  cluster: ext_authz
+                  timeout: 2s
+                path_prefix: "/extauthz"
+                authorization_request:
+                  headers_to_add:
+                  - key: "x-sandbox-jwt"
+                    value: "{jwt_token}"
+                  - key: "x-original-host"
+                    value: "github.com"
+                authorization_response:
+                  allowed_upstream_headers:
+                    patterns:
+                    - exact: "authorization"
+                    - exact: "x-api-key"
+              failure_mode_allow: false
+          - name: envoy.filters.http.router
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+      transport_socket:
+        name: envoy.transport_sockets.tls
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext
+          common_tls_context:
+            tls_certificates:
+            - certificate_chain:
+                filename: /etc/envoy/gh-tls/credential-resolver.crt
+              private_key:
+                filename: /etc/envoy/gh-tls/credential-resolver.key
+
+  clusters:
+  # ext_authz cluster (credential-resolver service)
+  - name: ext_authz
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+      cluster_name: ext_authz
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: credential-resolver-svc.{cred_resolver_ns}.svc.cluster.local
+                port_value: 8002
+
+  # LLM proxy - credential-resolver handles translation + routing
+  - name: credential_resolver_llm
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+      cluster_name: credential_resolver_llm
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: credential-resolver-svc.{cred_resolver_ns}.svc.cluster.local
+                port_value: 8002
+
+  # Anthropic API (kept for direct API calls from credential-resolver's pass-through)
+  - name: anthropic
+    type: LOGICAL_DNS
+    dns_lookup_family: V4_ONLY
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+      cluster_name: anthropic
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: api.anthropic.com
+                port_value: 443
+    transport_socket:
+      name: envoy.transport_sockets.tls
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
+        sni: api.anthropic.com
+
+  # Coralogix US2
+  - name: coralogix_us2
+    type: LOGICAL_DNS
+    dns_lookup_family: V4_ONLY
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+      cluster_name: coralogix_us2
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: api.us2.coralogix.com
+                port_value: 443
+    transport_socket:
+      name: envoy.transport_sockets.tls
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
+        sni: api.us2.coralogix.com
+
+  # Passthrough cluster (placeholder)
+  - name: passthrough_cluster
+    type: LOGICAL_DNS
+    dns_lookup_family: V4_ONLY
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+      cluster_name: passthrough_cluster
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: localhost
+                port_value: 9999
+
+  # GitHub API via credential-resolver (for gh CLI TLS proxy)
+  - name: credential_resolver_github
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+      cluster_name: credential_resolver_github
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: credential-resolver-svc.{cred_resolver_ns}.svc.cluster.local
+                port_value: 8002
+"""
+
+        configmap = client.V1ConfigMap(
+            api_version="v1",
+            kind="ConfigMap",
+            metadata=client.V1ObjectMeta(
+                name=configmap_name,
+                namespace=self.namespace,
+                labels={
+                    "app": "opensre",
+                    "component": "envoy-config",
+                    "sandbox": sandbox_name,
+                },
+            ),
+            immutable=True,
+            data={"envoy.yaml": envoy_config},
+        )
+
+        try:
+            self.core_api.create_namespaced_config_map(
+                namespace=self.namespace, body=configmap
+            )
+        except ApiException as e:
+            if e.status == 409:
+                # ConfigMap already exists — delete and recreate (immutable ConfigMaps can't be patched)
+                self.core_api.delete_namespaced_config_map(
+                    name=configmap_name, namespace=self.namespace
+                )
+                self.core_api.create_namespaced_config_map(
+                    namespace=self.namespace, body=configmap
+                )
+            else:
+                raise
+
+        return configmap_name
+
+    def _delete_envoy_configmap(self, sandbox_name: str):
+        """Delete the per-sandbox Envoy ConfigMap."""
+        configmap_name = f"envoy-config-{sandbox_name}"
+        try:
+            self.core_api.delete_namespaced_config_map(
+                name=configmap_name, namespace=self.namespace
+            )
+        except ApiException as e:
+            if e.status != 404:
+                raise
+
+    def create_sandbox(
+        self,
+        thread_id: str,
+        tenant_id: str = "local",
+        team_id: str = "local",
+        ttl_hours: float = 2,
+        jwt_token: Optional[str] = None,
+        team_token: Optional[str] = None,
+    ) -> SandboxInfo:
+        """
+        Create a new sandbox for an investigation.
+
+        The sandbox runs a FastAPI server on port 8888 that accepts /execute requests.
+        Credentials are NOT injected into the sandbox - instead, HTTP requests are
+        routed through an Envoy sidecar that injects auth headers via ext_authz.
+
+        Args:
+            thread_id: Unique identifier for the investigation thread
+            tenant_id: Organization/tenant ID for credential lookup
+            team_id: Team node ID for credential lookup
+            ttl_hours: Hours until automatic cleanup (default: 2, balances resource usage and follow-up window)
+            jwt_token: Pre-generated JWT for session reuse (if None, generates new one)
+            team_token: Team token for config-driven agents (enables loading config from Config Service)
+
+        Returns:
+            SandboxInfo with details about the created sandbox
+        """
+        _validate_thread_id(thread_id)
+        sandbox_name = f"investigation-{thread_id}"
+
+        # Calculate shutdown time (TTL-based cleanup)
+        shutdown_time = (datetime.utcnow() + timedelta(hours=ttl_hours)).strftime(
+            "%Y-%m-%dT%H:%M:%SZ"
+        )
+
+        # Use provided JWT or generate new one
+        if jwt_token is None:
+            jwt_token = generate_sandbox_jwt(
+                tenant_id=tenant_id,
+                team_id=team_id,
+                sandbox_name=sandbox_name,
+                thread_id=thread_id,
+                ttl_hours=ttl_hours + 1,  # JWT valid slightly longer than sandbox TTL
+            )
+
+        # Get credential-resolver namespace (used for both configmap and env vars)
+        cred_resolver_ns = os.getenv("CREDENTIAL_RESOLVER_NAMESPACE", "opensre-prod")
+
+        # Fetch configured integrations (non-sensitive metadata for system prompt)
+        configured_integrations = fetch_configured_integrations(
+            jwt_token, tenant_id, team_id
+        )
+        print(f"📦 Configured integrations for sandbox: {configured_integrations}")
+
+        # Create per-sandbox ConfigMap with JWT embedded in Envoy config
+        envoy_configmap_name = self._create_envoy_configmap(sandbox_name, jwt_token)
+
+        sandbox_manifest = {
+            "apiVersion": "agents.x-k8s.io/v1alpha1",
+            "kind": "Sandbox",
+            "metadata": {
+                "name": sandbox_name,
+                "namespace": self.namespace,
+                "labels": {
+                    "app": "opensre",
+                    "thread-id": thread_id,
+                    "managed-by": "opensre-server",
+                },
+            },
+            "spec": {
+                "podTemplate": {
+                    "metadata": {
+                        "labels": {
+                            "app": "opensre-sandbox",  # Different from opensre-agent to avoid service routing
+                            "opensre.in/isolation": "sandbox",  # NetworkPolicy selector
+                            "thread-id": thread_id,
+                        }
+                    },
+                    "spec": {
+                        # When SANDBOX_DIRECT_K8S=true, mount the SA token so the sandbox
+                        # can access the host cluster's K8s API directly (e.g. flagd
+                        # ConfigMap reads/patches). RBAC is scoped via the sandbox-pod-reader
+                        # ClusterRole. When false, all k8s queries must go through k8s-gateway.
+                        **(
+                            {
+                                "serviceAccountName": os.getenv(
+                                    "SANDBOX_SERVICE_ACCOUNT", ""
+                                ),
+                                "automountServiceAccountToken": True,
+                            }
+                            if os.getenv("SANDBOX_DIRECT_K8S", "").lower() == "true"
+                            else {
+                                "automountServiceAccountToken": False,
+                            }
+                        ),
+                        "containers": [
+                            # Main agent container - NO SECRETS, only proxy config
+                            {
+                                "name": "agent",
+                                "image": self.image,
+                                "imagePullPolicy": (
+                                    "Always"
+                                    if "ecr" in self.image or "gcr" in self.image
+                                    else "IfNotPresent"
+                                ),
+                                # FastAPI server runs automatically via CMD in Dockerfile
+                                "ports": [{"containerPort": 8888, "name": "sandbox"}],
+                                "env": [
+                                    # Tenant context for credential lookup (no secrets!)
+                                    {
+                                        "name": "OPENSRE_TENANT_ID",
+                                        "value": tenant_id,
+                                    },
+                                    {
+                                        "name": "OPENSRE_TEAM_ID",
+                                        "value": team_id,
+                                    },
+                                ]
+                                # Config-driven agents: TEAM_TOKEN enables loading config from Config Service
+                                + (
+                                    [{"name": "TEAM_TOKEN", "value": team_token}]
+                                    if team_token
+                                    else []
+                                )
+                                + [
+                                    # Config Service URL (must use correct namespace)
+                                    {
+                                        "name": "CONFIG_SERVICE_URL",
+                                        "value": f"http://opensre-config-service.{self.namespace}.svc.cluster.local:8080",
+                                    },
+                                    # Claude SDK: route API requests through proxy
+                                    # (proxy injects x-api-key header for Anthropic)
+                                    {
+                                        "name": "ANTHROPIC_BASE_URL",
+                                        "value": "http://localhost:8001",
+                                    },
+                                    # Dummy API key - required by CLI but proxy injects real one
+                                    {
+                                        "name": "ANTHROPIC_API_KEY",
+                                        "value": "sk-ant-placeholder-proxy-will-inject-real-key",
+                                    },
+                                    # NOTE: Gemini and OpenAI API keys are NOT mounted here.
+                                    # They are injected by credential-resolver's LLM proxy
+                                    # (same as Anthropic). Sandboxes never see real LLM keys.
+                                    # Coralogix SDK: route API requests through proxy
+                                    # (proxy injects Authorization header for Coralogix)
+                                    {
+                                        "name": "CORALOGIX_BASE_URL",
+                                        "value": "http://localhost:8001",
+                                    },
+                                    # Confluence SDK: route through credential-resolver's reverse proxy
+                                    # (credential-resolver looks up URL + injects Basic auth)
+                                    # Note: Confluence uses per-customer URLs (e.g., customer.atlassian.net)
+                                    # so we can't use Envoy's static routing like Anthropic/Coralogix
+                                    {
+                                        "name": "CONFLUENCE_BASE_URL",
+                                        "value": f"http://credential-resolver-svc.{cred_resolver_ns}.svc.cluster.local:8002/confluence",
+                                    },
+                                    # Additional integrations with customer-specific URLs
+                                    # These all route through credential-resolver's reverse proxy
+                                    {
+                                        "name": "GRAFANA_BASE_URL",
+                                        "value": f"http://credential-resolver-svc.{cred_resolver_ns}.svc.cluster.local:8002/grafana",
+                                    },
+                                    {
+                                        "name": "ELASTICSEARCH_BASE_URL",
+                                        "value": f"http://credential-resolver-svc.{cred_resolver_ns}.svc.cluster.local:8002/elasticsearch",
+                                    },
+                                    {
+                                        "name": "PROMETHEUS_BASE_URL",
+                                        "value": f"http://credential-resolver-svc.{cred_resolver_ns}.svc.cluster.local:8002/prometheus",
+                                    },
+                                    {
+                                        "name": "JAEGER_BASE_URL",
+                                        "value": f"http://credential-resolver-svc.{cred_resolver_ns}.svc.cluster.local:8002/jaeger",
+                                    },
+                                    {
+                                        "name": "GITHUB_BASE_URL",
+                                        "value": f"http://credential-resolver-svc.{cred_resolver_ns}.svc.cluster.local:8002/github",
+                                    },
+                                    {
+                                        "name": "DATADOG_BASE_URL",
+                                        "value": f"http://credential-resolver-svc.{cred_resolver_ns}.svc.cluster.local:8002/datadog",
+                                    },
+                                    {
+                                        "name": "AMPLITUDE_BASE_URL",
+                                        "value": f"http://credential-resolver-svc.{cred_resolver_ns}.svc.cluster.local:8002/amplitude",
+                                    },
+                                    {
+                                        "name": "SLACK_BASE_URL",
+                                        "value": f"http://credential-resolver-svc.{cred_resolver_ns}.svc.cluster.local:8002/slack",
+                                    },
+                                    # Credential resolver URL for SDK-based integrations (AWS, Azure, GCP)
+                                    # Scripts call /api/credentials/{id} to fetch creds at runtime
+                                    {
+                                        "name": "CREDENTIAL_RESOLVER_URL",
+                                        "value": f"http://credential-resolver-svc.{cred_resolver_ns}.svc.cluster.local:8002",
+                                    },
+                                    # Git URL rewriting: route github.com HTTPS through credential-resolver's
+                                    # /git/ proxy so native git commands work without exposing tokens to sandbox.
+                                    # Uses GIT_CONFIG_* env vars (git 2.31+) to set url.<base>.insteadOf.
+                                    {
+                                        "name": "GIT_CONFIG_COUNT",
+                                        "value": "1",
+                                    },
+                                    {
+                                        "name": "GIT_CONFIG_KEY_0",
+                                        "value": f"url.http://credential-resolver-svc.{cred_resolver_ns}.svc.cluster.local:8002/git/.insteadOf",
+                                    },
+                                    {
+                                        "name": "GIT_CONFIG_VALUE_0",
+                                        "value": "https://github.com/",
+                                    },
+                                    # K8s Gateway: route K8s commands to customer clusters
+                                    # via k8s-agent (deployed in customer clusters via Helm)
+                                    {
+                                        "name": "K8S_GATEWAY_URL",
+                                        "value": f"http://opensre-k8s-gateway.{self.namespace}.svc.cluster.local:8085",
+                                    },
+                                    # gh CLI: route HTTPS API calls through Envoy TLS listener
+                                    {
+                                        "name": "GH_HOST",
+                                        "value": "localhost:8443",
+                                    },
+                                    # gh CLI: placeholder token — ext_authz injects real one
+                                    {
+                                        "name": "GH_ENTERPRISE_TOKEN",
+                                        "value": "placeholder-proxy-will-inject-real-token",
+                                    },
+                                    # Trust the self-signed TLS cert for gh CLI proxy
+                                    {
+                                        "name": "SSL_CERT_FILE",
+                                        "value": "/etc/ssl/gh-proxy/credential-resolver.crt",
+                                    },
+                                    # RAPTOR knowledge base: internal K8s service (no auth needed)
+                                    {
+                                        "name": "RAPTOR_URL",
+                                        "value": f"http://opensre-rag.{self.namespace}.svc.cluster.local:8000",
+                                    },
+                                    # flagd runtime config (for OTel Demo incident scenarios)
+                                    {
+                                        "name": "FLAGD_NAMESPACE",
+                                        "value": os.getenv(
+                                            "FLAGD_NAMESPACE", "otel-demo"
+                                        ),
+                                    },
+                                    {
+                                        "name": "FLAGD_CONFIGMAP",
+                                        "value": os.getenv(
+                                            "FLAGD_CONFIGMAP", "flagd-config"
+                                        ),
+                                    },
+                                    # Configured integrations (non-sensitive metadata)
+                                    # JSON list of {id, url?, domain?, region?} for each integration
+                                    {
+                                        "name": "CONFIGURED_INTEGRATIONS",
+                                        "value": configured_integrations,
+                                    },
+                                    # NOTE: Observability (Laminar/Langfuse) runs on the sre-agent server,
+                                    # not in sandbox pods. No API keys should reach sandboxes.
+                                    # Kubernetes: use in-cluster SA auth (opensre-sandbox-pod)
+                                    # NOT kubeconfig — that resolves to EC2 node IAM identity
+                                    # Dynamic values
+                                    {"name": "THREAD_ID", "value": thread_id},
+                                    {"name": "SANDBOX_NAME", "value": sandbox_name},
+                                    {"name": "NAMESPACE", "value": self.namespace},
+                                    # NOTE: SANDBOX_JWT is NOT set as an env var to avoid
+                                    # exposure via `kubectl get pod -o yaml` or /proc/*/environ.
+                                    # The /claim endpoint writes it to /tmp/sandbox-jwt and
+                                    # sets os.environ["SANDBOX_JWT"] for skill scripts.
+                                ],
+                                "volumeMounts": [
+                                    {
+                                        "name": "gh-tls-cert",
+                                        "mountPath": "/etc/ssl/gh-proxy",
+                                        "readOnly": True,
+                                    },
+                                ],
+                                "resources": {
+                                    "requests": {
+                                        "memory": "512Mi",
+                                        "cpu": "100m",  # Low: agents are I/O-bound (Claude API calls)
+                                        "ephemeral-storage": "2Gi",
+                                    },
+                                    "limits": {
+                                        "memory": "2Gi",
+                                        "cpu": "2000m",  # High: allows bursts for git/file ops
+                                        "ephemeral-storage": "10Gi",  # Large for file attachments
+                                    },
+                                },
+                                "securityContext": {
+                                    "allowPrivilegeEscalation": False,
+                                    "runAsNonRoot": True,
+                                    "runAsUser": 1000,
+                                    "capabilities": {"drop": ["ALL"]},
+                                },
+                                # Startup probe: allows time for FastAPI server initialization
+                                # Prevents traffic routing before server is ready
+                                "startupProbe": {
+                                    "httpGet": {
+                                        "path": "/health",
+                                        "port": 8888,
+                                    },
+                                    "initialDelaySeconds": 2,
+                                    "periodSeconds": 2,
+                                    "timeoutSeconds": 3,
+                                    "failureThreshold": 15,  # 2 + (15 * 2) = 32s max startup
+                                },
+                                # Readiness probe: signals when pod can receive traffic
+                                "readinessProbe": {
+                                    "httpGet": {
+                                        "path": "/health",
+                                        "port": 8888,
+                                    },
+                                    "initialDelaySeconds": 3,
+                                    "periodSeconds": 5,
+                                    "timeoutSeconds": 3,
+                                    "failureThreshold": 2,
+                                },
+                            },
+                            # Envoy sidecar - handles credential injection via ext_authz
+                            {
+                                "name": "envoy",
+                                "image": "envoyproxy/envoy:v1.28.7",
+                                "args": [
+                                    "--config-path",
+                                    "/etc/envoy/envoy.yaml",
+                                    "--log-level",
+                                    "warn",
+                                ],
+                                "ports": [
+                                    {"containerPort": 8001, "name": "proxy"},
+                                    {"containerPort": 8443, "name": "gh-tls"},
+                                ],
+                                "volumeMounts": [
+                                    {
+                                        "name": "envoy-config",
+                                        "mountPath": "/etc/envoy",
+                                        "readOnly": True,
+                                    },
+                                    {
+                                        "name": "gh-tls-cert",
+                                        "mountPath": "/etc/envoy/gh-tls",
+                                        "readOnly": True,
+                                    },
+                                ],
+                                "resources": {
+                                    "requests": {"cpu": "50m", "memory": "64Mi"},
+                                    "limits": {"cpu": "200m", "memory": "128Mi"},
+                                },
+                                "securityContext": {
+                                    "runAsNonRoot": True,
+                                    "runAsUser": 1000,
+                                    "allowPrivilegeEscalation": False,
+                                    "capabilities": {"drop": ["ALL"]},
+                                },
+                            },
+                        ],
+                        "volumes": [
+                            {
+                                "name": "envoy-config",
+                                "configMap": {"name": envoy_configmap_name},
+                            },
+                            {
+                                "name": "gh-tls-cert",
+                                "configMap": {"name": "envoy-gh-tls-cert"},
+                            },
+                        ],
+                    },
+                },
+                # Automatic cleanup: controller deletes sandbox after TTL expires
+                "shutdownPolicy": "Delete",
+                "shutdownTime": shutdown_time,
+                "replicas": 1,
+            },
+        }
+
+        # gVisor runtime is mandatory for sandbox isolation.
+        # Only disable for local dev where gVisor runtime class is unavailable.
+        if os.getenv("DISABLE_GVISOR", "false").lower() != "true":
+            sandbox_manifest["spec"]["podTemplate"]["spec"][
+                "runtimeClassName"
+            ] = "gvisor"
+
+        try:
+            self.custom_api.create_namespaced_custom_object(
+                group="agents.x-k8s.io",
+                version="v1alpha1",
+                namespace=self.namespace,
+                plural="sandboxes",
+                body=sandbox_manifest,
+            )
+
+            return SandboxInfo(
+                name=sandbox_name,
+                thread_id=thread_id,
+                created_at=datetime.utcnow(),
+                namespace=self.namespace,
+            )
+        except ApiException as e:
+            # Clean up the ConfigMap (contains JWT) to prevent orphaning
+            try:
+                self.core_api.delete_namespaced_config_map(
+                    name=envoy_configmap_name, namespace=self.namespace
+                )
+            except Exception:
+                pass  # Best-effort cleanup
+            raise Exception(f"Failed to create sandbox: {e}")
+
+    def get_sandbox(self, thread_id: str) -> Optional[SandboxInfo]:
+        """Get sandbox info for a thread. Returns info if sandbox exists.
+
+        Checks both naming conventions:
+        - investigation-{thread_id} (direct creation)
+        - claim-{thread_id} (warm pool)
+        """
+        for prefix in ("investigation-", "claim-"):
+            sandbox_name = f"{prefix}{thread_id}"
+            try:
+                sandbox = self.custom_api.get_namespaced_custom_object(
+                    group="agents.x-k8s.io",
+                    version="v1alpha1",
+                    namespace=self.namespace,
+                    plural="sandboxes",
+                    name=sandbox_name,
+                )
+
+                created = sandbox.get("metadata", {}).get("creationTimestamp")
+
+                return SandboxInfo(
+                    name=sandbox_name,
+                    thread_id=thread_id,
+                    created_at=(
+                        datetime.fromisoformat(created.replace("Z", "+00:00"))
+                        if created
+                        else datetime.utcnow()
+                    ),
+                    namespace=self.namespace,
+                )
+            except ApiException as e:
+                if e.status == 404:
+                    continue
+                raise
+        return None
+
+    def reset_sandbox_ttl(self, thread_id: str, ttl_hours: float = 2) -> bool:
+        """Reset the TTL (shutdownTime) for an existing sandbox on follow-up activity.
+
+        Extends the sandbox lifetime by a full TTL period from the current time.
+        Handles both naming conventions:
+        - claim-* (warm pool): patches SandboxClaim.spec.lifecycle.shutdownTime
+        - investigation-* (direct): patches Sandbox.spec.shutdownTime
+
+        Non-fatal: logs a warning on failure but doesn't break the follow-up flow.
+        """
+        new_shutdown_time = (datetime.utcnow() + timedelta(hours=ttl_hours)).strftime(
+            "%Y-%m-%dT%H:%M:%SZ"
+        )
+
+        template_namespace = os.getenv("WARMPOOL_TEMPLATE_NAMESPACE", "opensre-prod")
+
+        # Try claim-* (warm pool) first, then investigation-* (direct)
+        patches = [
+            (
+                f"claim-{thread_id}",
+                "extensions.agents.x-k8s.io",
+                "sandboxclaims",
+                template_namespace,
+                {"spec": {"lifecycle": {"shutdownTime": new_shutdown_time}}},
+            ),
+            (
+                f"investigation-{thread_id}",
+                "agents.x-k8s.io",
+                "sandboxes",
+                self.namespace,
+                {"spec": {"shutdownTime": new_shutdown_time}},
+            ),
+        ]
+
+        for name, group, plural, namespace, body in patches:
+            try:
+                self.custom_api.patch_namespaced_custom_object(
+                    group=group,
+                    version="v1alpha1",
+                    namespace=namespace,
+                    plural=plural,
+                    name=name,
+                    body=body,
+                )
+                print(
+                    f"🔄 Reset TTL for {name} → {new_shutdown_time} (+{ttl_hours * 60:.0f}min)"
+                )
+                return True
+            except ApiException as e:
+                if e.status == 404:
+                    continue
+                print(f"⚠️ Failed to reset TTL for {name}: {e}")
+                return False
+
+        print(f"⚠️ No sandbox found to reset TTL for thread {thread_id}")
+        return False
+
+    def delete_sandbox(self, thread_id: str):
+        """Delete a sandbox and clean up associated resources (ConfigMap).
+
+        Handles both naming conventions (investigation-* and claim-*).
+        """
+        for prefix in ("investigation-", "claim-"):
+            sandbox_name = f"{prefix}{thread_id}"
+            try:
+                self.custom_api.delete_namespaced_custom_object(
+                    group="agents.x-k8s.io",
+                    version="v1alpha1",
+                    namespace=self.namespace,
+                    plural="sandboxes",
+                    name=sandbox_name,
+                )
+            except ApiException as e:
+                if e.status != 404:
+                    raise
+
+            # Clean up per-sandbox Envoy ConfigMap
+            self._delete_envoy_configmap(sandbox_name)
+
+    def wait_for_ready(self, thread_id: str, timeout: int = 120) -> bool:
+        """
+        Wait for sandbox pod to be ready and FastAPI server to be responding.
+
+        Args:
+            thread_id: Investigation thread ID
+            timeout: Max wait time in seconds
+
+        Returns:
+            True if ready, False if timeout
+        """
+        start_time = time.time()
+        sandbox_name = f"investigation-{thread_id}"
+
+        while time.time() - start_time < timeout:
+            try:
+                # Get pods for this sandbox
+                pods = self.core_api.list_namespaced_pod(
+                    namespace=self.namespace, label_selector=f"thread-id={thread_id}"
+                )
+
+                if not pods.items:
+                    time.sleep(2)
+                    continue
+
+                pod = pods.items[0]
+
+                # Check if pod is ready
+                if pod.status.phase == "Running":
+                    for condition in pod.status.conditions or []:
+                        if condition.type == "Ready" and condition.status == "True":
+                            # Pod is K8s Ready, now verify FastAPI server is responding
+                            # via the sandbox-router (same path as execute_in_sandbox)
+                            try:
+                                router_url = self.get_router_url()
+                                health_response = requests.get(
+                                    f"{router_url}/health",
+                                    headers={
+                                        "X-Sandbox-ID": sandbox_name,
+                                        "X-Sandbox-Port": "8888",
+                                        "X-Sandbox-Namespace": self.namespace,
+                                    },
+                                    timeout=5,
+                                )
+                                if health_response.status_code == 200:
+                                    print(
+                                        f"✅ Sandbox {sandbox_name} health check passed"
+                                    )
+                                    # Small buffer to let server fully warm up
+                                    time.sleep(0.5)
+                                    return True
+                                else:
+                                    print(
+                                        f"⏳ Sandbox health check returned {health_response.status_code}, retrying..."
+                                    )
+                            except requests.RequestException as e:
+                                print(
+                                    f"⏳ Sandbox health check failed ({e}), retrying..."
+                                )
+
+            except ApiException:
+                pass
+
+            time.sleep(2)
+
+        return False
+
+    def get_router_url(self) -> str:
+        """
+        Get the Router URL for sandbox communication.
+
+        Returns http://sandbox-router-svc.<namespace>.svc.cluster.local:8080 for in-cluster,
+        or http://localhost:8080 if ROUTER_LOCAL_PORT env var is set for development.
+        """
+        local_port = os.getenv("ROUTER_LOCAL_PORT")
+        if local_port:
+            return f"http://localhost:{local_port}"
+        # Router is deployed in opensre-prod namespace, sandboxes in default
+        router_namespace = os.getenv("ROUTER_NAMESPACE", "opensre-prod")
+        return f"http://sandbox-router-svc.{router_namespace}.svc.cluster.local:8080"
+
+    def execute_in_sandbox(
+        self,
+        sandbox_info: SandboxInfo,
+        prompt: str,
+        images: list = None,
+        file_downloads: list = None,
+    ) -> requests.Response:
+        """
+        Execute an investigation in the sandbox via the Sandbox Router (streaming).
+
+        This returns a streaming response that yields chunks as they arrive,
+        enabling real-time display of agent output.
+
+        Args:
+            sandbox_info: Sandbox information
+            prompt: Investigation prompt
+            images: Optional list of image dicts (type, media_type, data, filename)
+            file_downloads: Optional list of file download info for sandbox to fetch via proxy
+                           Each dict has: {token, filename, size, media_type, proxy_url}
+
+        Returns:
+            requests.Response object with stream=True
+
+        Raises:
+            SandboxExecutionError: If the request to the sandbox fails
+        """
+        router_url = self.get_router_url()
+
+        headers = {
+            "X-Sandbox-ID": sandbox_info.name,
+            "X-Sandbox-Port": "8888",
+            "X-Sandbox-Namespace": self.namespace,
+        }
+
+        payload = {"prompt": prompt, "thread_id": sandbox_info.thread_id}
+
+        if images:
+            payload["images"] = images
+
+        if file_downloads:
+            payload["file_downloads"] = file_downloads
+
+        try:
+            # For streaming SSE, use tuple timeout: (connect_timeout, read_timeout)
+            # connect_timeout: 30s to establish connection
+            # read_timeout: 300s - max wait between SSE events (agent thinking time)
+            # Without a read timeout, if the sandbox pod dies mid-execution the
+            # connection hangs forever, blocking the orchestrator and leaving users
+            # stuck at "working on it..." in Teams/Google Chat.
+            response = requests.post(
+                f"{router_url}/execute",
+                headers=headers,
+                json=payload,
+                stream=True,
+                timeout=(30, 300),  # (connect, read) - 5 min read timeout
+            )
+            response.raise_for_status()
+            return response
+        except requests.RequestException as e:
+            raise SandboxExecutionError(
+                f"Failed to execute in sandbox via Router: {e}"
+            ) from e
+
+    def interrupt_sandbox(self, sandbox_info: SandboxInfo) -> requests.Response:
+        """
+        Interrupt the current execution in the sandbox (streaming).
+
+        This allows users to stop a long-running task mid-execution.
+        After interrupt, new messages should be sent via the normal /investigate endpoint.
+
+        The Router uses the same headers as execute_in_sandbox but calls the
+        /interrupt endpoint instead.
+
+        Args:
+            sandbox_info: Sandbox information
+
+        Returns:
+            requests.Response object (streaming)
+
+        Raises:
+            SandboxInterruptError: If the interrupt request fails
+
+        Note: This follows Cursor's UX - interrupt just stops, new messages
+        are queued separately.
+        """
+        router_url = self.get_router_url()
+
+        headers = {
+            "X-Sandbox-ID": sandbox_info.name,
+            "X-Sandbox-Port": "8888",
+            "X-Sandbox-Namespace": self.namespace,
+        }
+
+        payload = {"thread_id": sandbox_info.thread_id}
+
+        try:
+            response = requests.post(
+                f"{router_url}/interrupt",
+                headers=headers,
+                json=payload,
+                stream=True,
+                timeout=(30, 300),  # (connect, read) - 5 min read timeout
+            )
+            response.raise_for_status()
+            return response
+        except requests.RequestException as e:
+            raise SandboxInterruptError(
+                f"Failed to interrupt sandbox via Router: {e}"
+            ) from e
+
+    def send_answer_to_sandbox(self, sandbox_info: SandboxInfo, answers: dict) -> dict:
+        """
+        Send answer to AskUserQuestion to the sandbox via the Router.
+
+        Args:
+            sandbox_info: Sandbox information
+            answers: User's answers to the questions
+
+        Returns:
+            Response from sandbox
+
+        Raises:
+            SandboxExecutionError: If the request fails
+        """
+        router_url = self.get_router_url()
+
+        headers = {
+            "X-Sandbox-ID": sandbox_info.name,
+            "X-Sandbox-Port": "8888",
+            "X-Sandbox-Namespace": self.namespace,
+        }
+
+        payload = {"thread_id": sandbox_info.thread_id, "answers": answers}
+
+        try:
+            response = requests.post(
+                f"{router_url}/answer", headers=headers, json=payload, timeout=10
+            )
+            response.raise_for_status()
+            return response.json()
+        except requests.RequestException as e:
+            raise SandboxExecutionError(
+                f"Failed to send answer to sandbox via Router: {e}"
+            ) from e
+
+    # ==================== Warm Pool Methods ====================
+
+    def count_active_claims(self) -> int:
+        """Count active SandboxClaims in the template namespace."""
+        template_namespace = os.getenv("WARMPOOL_TEMPLATE_NAMESPACE", "opensre-prod")
+        try:
+            claims = self.custom_api.list_namespaced_custom_object(
+                group="extensions.agents.x-k8s.io",
+                version="v1alpha1",
+                namespace=template_namespace,
+                plural="sandboxclaims",
+            )
+            return len(claims.get("items", []))
+        except Exception as e:
+            print(f"⚠️ Failed to count active claims: {e}")
+            return 0
+
+    def create_sandbox_claim(
+        self,
+        thread_id: str,
+        tenant_id: str,
+        team_id: str,
+        ttl_hours: float = 2,
+    ) -> tuple[str, str]:
+        """
+        Create a SandboxClaim to bind to a warm pool pod.
+
+        The claim binds to an available warm pod almost instantly (<1 second).
+        After binding, call inject_jwt() to configure the sandbox.
+
+        Args:
+            thread_id: Unique identifier for the investigation thread
+            tenant_id: Organization/tenant ID for credential lookup
+            team_id: Team node ID for credential lookup
+            ttl_hours: Hours until automatic cleanup (default: 2)
+
+        Returns:
+            Tuple of (claim_name, jwt_token)
+        """
+        _validate_thread_id(thread_id)
+        claim_name = f"claim-{thread_id}"
+        sandbox_name = f"investigation-{thread_id}"
+
+        # Calculate shutdown time (TTL-based cleanup)
+        shutdown_time = (datetime.utcnow() + timedelta(hours=ttl_hours)).strftime(
+            "%Y-%m-%dT%H:%M:%SZ"
+        )
+
+        # Generate JWT for this session
+        jwt_token = generate_sandbox_jwt(
+            tenant_id=tenant_id,
+            team_id=team_id,
+            sandbox_name=sandbox_name,
+            thread_id=thread_id,
+            ttl_hours=ttl_hours + 1,  # JWT valid slightly longer than sandbox TTL
+        )
+
+        # Template namespace (where the SandboxTemplate is deployed)
+        template_namespace = os.getenv("WARMPOOL_TEMPLATE_NAMESPACE", "opensre-prod")
+        template_name = os.getenv("WARMPOOL_TEMPLATE_NAME", "opensre-warmpool-template")
+
+        claim_manifest = {
+            "apiVersion": "extensions.agents.x-k8s.io/v1alpha1",
+            "kind": "SandboxClaim",
+            "metadata": {
+                "name": claim_name,
+                "namespace": template_namespace,  # Claim must be in same ns as template
+                "labels": {
+                    "app": "opensre",
+                    "thread-id": thread_id,
+                    "managed-by": "opensre-server",
+                },
+            },
+            "spec": {
+                "sandboxTemplateRef": {
+                    "name": template_name,
+                },
+                "lifecycle": {
+                    "shutdownPolicy": "Delete",
+                    "shutdownTime": shutdown_time,
+                },
+            },
+        }
+
+        try:
+            self.custom_api.create_namespaced_custom_object(
+                group="extensions.agents.x-k8s.io",
+                version="v1alpha1",
+                namespace=template_namespace,  # Claim in same ns as template
+                plural="sandboxclaims",
+                body=claim_manifest,
+            )
+            print(f"✅ Created SandboxClaim {claim_name} for thread {thread_id}")
+            return claim_name, jwt_token
+        except ApiException as e:
+            raise Exception(f"Failed to create SandboxClaim: {e}")
+
+    def wait_for_claim_bound(self, claim_name: str, timeout: int = 60) -> Optional[str]:
+        """
+        Wait for SandboxClaim to bind to a warm pod.
+
+        Binding is instant if warm pods are available. If the pool is exhausted,
+        waits for replenishment pods to become ready (up to timeout).
+
+        Args:
+            claim_name: Name of the SandboxClaim
+            timeout: Max wait time in seconds (default: 60)
+
+        Returns:
+            Sandbox name if bound, None if timeout
+        """
+        template_namespace = os.getenv("WARMPOOL_TEMPLATE_NAMESPACE", "opensre-prod")
+        start_time = time.time()
+        logged_pending = False
+
+        while time.time() - start_time < timeout:
+            try:
+                claim = self.custom_api.get_namespaced_custom_object(
+                    group="extensions.agents.x-k8s.io",
+                    version="v1alpha1",
+                    namespace=template_namespace,
+                    plural="sandboxclaims",
+                    name=claim_name,
+                )
+
+                status = claim.get("status", {})
+                conditions = status.get("conditions", [])
+                sandbox_info = status.get("sandbox", {})
+                sandbox_name = sandbox_info.get("Name", "")
+
+                # Check if Ready condition is True
+                is_ready = any(
+                    c.get("type") == "Ready" and c.get("status") == "True"
+                    for c in conditions
+                )
+
+                if is_ready and sandbox_name:
+                    elapsed = time.time() - start_time
+                    print(
+                        f"✅ SandboxClaim {claim_name} bound to {sandbox_name} ({elapsed:.1f}s)"
+                    )
+                    return sandbox_name
+
+                # Check failure conditions — most are transient, keep waiting
+                for c in conditions:
+                    if c.get("type") == "Ready" and c.get("status") == "False":
+                        reason = c.get("message", "unknown")
+
+                        # Transient states — pod is being created/scheduled, keep waiting
+                        transient_patterns = [
+                            "Sandbox is not ready",
+                            "Pod exists with phase: Pending",
+                            "please apply your changes",  # controller conflict, retries internally
+                        ]
+                        if any(p in reason for p in transient_patterns):
+                            if not logged_pending:
+                                print(
+                                    f"⏳ SandboxClaim {claim_name} waiting for pod: {reason}"
+                                )
+                                logged_pending = True
+                            break  # Continue polling
+
+                        # Terminal failure — give up
+                        print(f"❌ SandboxClaim {claim_name} failed: {reason}")
+                        return None
+
+            except ApiException as e:
+                if e.status != 404:
+                    raise
+
+            time.sleep(0.5)  # Poll every 500ms
+
+        elapsed = time.time() - start_time
+        print(f"⏰ SandboxClaim {claim_name} binding timed out after {elapsed:.0f}s")
+        return None
+
+    def _get_sandbox_pod_ip(self, sandbox_name: str) -> Optional[str]:
+        """Get the pod IP for a sandbox by looking up its pods via the K8s API."""
+        try:
+            # The sandbox controller labels pods with a name-hash selector
+            sandbox = self.custom_api.get_namespaced_custom_object(
+                group="agents.x-k8s.io",
+                version="v1alpha1",
+                namespace=self.namespace,
+                plural="sandboxes",
+                name=sandbox_name,
+            )
+            # Get pod labels from the sandbox's podTemplate
+            pod_labels = (
+                sandbox.get("spec", {})
+                .get("podTemplate", {})
+                .get("metadata", {})
+                .get("labels", {})
+            )
+            if pod_labels:
+                selector = ",".join(f"{k}={v}" for k, v in pod_labels.items())
+                pods = self.core_api.list_namespaced_pod(
+                    namespace=self.namespace, label_selector=selector
+                )
+                for pod in pods.items:
+                    if pod.status and pod.status.pod_ip:
+                        return pod.status.pod_ip
+        except ApiException as e:
+            print(
+                f"⚠️ K8s API error looking up sandbox {sandbox_name}: {e.status} {e.reason}"
+            )
+
+        # Fallback: try listing pods with the sandbox-name-hash label
+        # (used by the agent-sandbox controller for headless Service selectors)
+        try:
+            pods = self.core_api.list_namespaced_pod(
+                namespace=self.namespace,
+                label_selector=f"agents.x-k8s.io/sandbox-name={sandbox_name}",
+            )
+            for pod in pods.items:
+                if pod.status and pod.status.pod_ip:
+                    return pod.status.pod_ip
+        except ApiException as e:
+            print(
+                f"⚠️ K8s API error listing pods for {sandbox_name}: {e.status} {e.reason}"
+            )
+
+        return None
+
+    def inject_jwt(
+        self,
+        sandbox_name: str,
+        jwt_token: str,
+        thread_id: str,
+        tenant_id: str,
+        team_id: str,
+        team_token: Optional[str] = None,
+        configured_integrations: Optional[str] = None,
+    ) -> bool:
+        """
+        Inject JWT and tenant context into a warm sandbox via /claim endpoint.
+
+        Calls the sandbox pod directly by IP (from K8s API) to avoid DNS
+        propagation delays. Falls back to routing through sandbox-router.
+
+        Args:
+            sandbox_name: Name of the sandbox
+            jwt_token: JWT token for credential authentication
+            thread_id: Investigation thread ID
+            tenant_id: Organization/tenant ID
+            team_id: Team node ID
+            team_token: Config service token for dynamic config loading
+
+        Returns:
+            True if successful, False otherwise
+        """
+        payload = {
+            "jwt_token": jwt_token,
+            "thread_id": thread_id,
+            "tenant_id": tenant_id,
+            "team_id": team_id,
+        }
+        if team_token:
+            payload["team_token"] = team_token
+        if configured_integrations:
+            payload["configured_integrations"] = configured_integrations
+
+        # Build auth headers for /claim endpoint
+        claim_headers = {}
+        auth_token = os.getenv("INVESTIGATE_AUTH_TOKEN", "")
+        if auth_token:
+            claim_headers["Authorization"] = f"Bearer {auth_token}"
+
+        # Try direct pod IP first (avoids DNS propagation delays)
+        for attempt in range(5):
+            pod_ip = self._get_sandbox_pod_ip(sandbox_name)
+            if pod_ip:
+                try:
+                    response = requests.post(
+                        f"http://{pod_ip}:8888/claim",
+                        json=payload,
+                        headers=claim_headers,
+                        timeout=10,
+                    )
+                    response.raise_for_status()
+                    print(
+                        f"✅ Injected JWT into sandbox {sandbox_name} (direct pod IP {pod_ip})"
+                    )
+                    return True
+                except requests.RequestException as e:
+                    if (
+                        isinstance(e, requests.exceptions.HTTPError)
+                        and e.response is not None
+                        and e.response.status_code == 409
+                    ):
+                        print(
+                            f"✅ JWT already injected into {sandbox_name} (409 = success)"
+                        )
+                        return True
+
+                    if attempt < 4:
+                        delay = min(1.0 * (2**attempt), 4.0)
+                        print(
+                            f"⚠️ JWT inject attempt {attempt + 1}/5 failed for {sandbox_name} "
+                            f"(pod IP {pod_ip}), retrying in {delay}s... ({e})"
+                        )
+                        time.sleep(delay)
+                    else:
+                        print(f"❌ Failed to inject JWT into {sandbox_name}: {e}")
+                        return False
+            else:
+                if attempt < 4:
+                    delay = min(1.0 * (2**attempt), 4.0)
+                    print(
+                        f"⚠️ JWT inject attempt {attempt + 1}/5: pod IP not found for "
+                        f"{sandbox_name}, retrying in {delay}s..."
+                    )
+                    time.sleep(delay)
+                else:
+                    print(
+                        f"❌ Failed to inject JWT into {sandbox_name}: pod IP not found"
+                    )
+                    return False
+
+    def delete_sandbox_claim(self, thread_id: str):
+        """Delete a SandboxClaim."""
+        claim_name = f"claim-{thread_id}"
+        template_namespace = os.getenv("WARMPOOL_TEMPLATE_NAMESPACE", "opensre-prod")
+        try:
+            self.custom_api.delete_namespaced_custom_object(
+                group="extensions.agents.x-k8s.io",
+                version="v1alpha1",
+                namespace=template_namespace,
+                plural="sandboxclaims",
+                name=claim_name,
+            )
+        except ApiException as e:
+            if e.status != 404:
+                raise
+
+    def create_sandbox_from_pool(
+        self,
+        thread_id: str,
+        tenant_id: str = "local",
+        team_id: str = "local",
+        ttl_hours: float = 2,
+        jwt_token: Optional[str] = None,
+        team_token: Optional[str] = None,
+    ) -> SandboxInfo:
+        """
+        Create a sandbox from the warm pool with fallback to direct creation.
+
+        This is the high-level method for warm pool provisioning:
+        1. Create SandboxClaim
+        2. Wait for binding (< 1 second if warm pods available)
+        3. Inject JWT via /claim endpoint
+        4. If any step fails, fall back to direct create_sandbox()
+
+        Args:
+            thread_id: Unique identifier for the investigation thread
+            tenant_id: Organization/tenant ID for credential lookup
+            team_id: Team node ID for credential lookup
+            ttl_hours: Hours until automatic cleanup (default: 2)
+            jwt_token: Pre-generated JWT for session reuse (if None, generates new one)
+            team_token: Team token for config-driven agents (may be None)
+
+        Returns:
+            SandboxInfo with details about the sandbox
+        """
+        warmpool_start = time.time()
+
+        try:
+            # Step 1: Create SandboxClaim
+            step1_start = time.time()
+            claim_name, claim_jwt = self.create_sandbox_claim(
+                thread_id=thread_id,
+                tenant_id=tenant_id,
+                team_id=team_id,
+                ttl_hours=ttl_hours,
+            )
+            step1_ms = (time.time() - step1_start) * 1000
+            print(f"⏱️ [WARMPOOL] Step 1 - Create SandboxClaim: {step1_ms:.0f}ms")
+
+            # Use provided JWT or the one generated with the claim
+            jwt_to_inject = jwt_token if jwt_token else claim_jwt
+
+            # Fetch configured integrations (non-sensitive metadata for system prompt)
+            configured_integrations = fetch_configured_integrations(
+                jwt_to_inject, tenant_id, team_id
+            )
+            print(f"📦 Configured integrations for sandbox: {configured_integrations}")
+
+            # Step 2: Wait for binding
+            # Instant if warm pods available; waits for replenishment if pool exhausted
+            step2_start = time.time()
+            bound_sandbox = self.wait_for_claim_bound(claim_name)
+            step2_ms = (time.time() - step2_start) * 1000
+            print(
+                f"⏱️ [WARMPOOL] Step 2 - Wait for binding: {step2_ms:.0f}ms (bound={bound_sandbox})"
+            )
+
+            if not bound_sandbox:
+                total_ms = (time.time() - warmpool_start) * 1000
+                print(
+                    f"⚠️ [WARMPOOL] Binding failed after {total_ms:.0f}ms, falling back to direct creation"
+                )
+                self.delete_sandbox_claim(thread_id)
+                sandbox_info = self.create_sandbox(
+                    thread_id=thread_id,
+                    tenant_id=tenant_id,
+                    team_id=team_id,
+                    ttl_hours=ttl_hours,
+                    jwt_token=jwt_to_inject,
+                    team_token=team_token,
+                )
+                if not self.wait_for_ready(thread_id):
+                    raise Exception(
+                        f"Sandbox {sandbox_info.name} failed to become ready"
+                    )
+                self._protect_pod_from_consolidation(sandbox_info.name)
+                return sandbox_info
+
+            # Step 3: Inject JWT via /claim endpoint
+            # (Pod readiness check skipped — warm pool pods are already running)
+            step3_start = time.time()
+            if not self.inject_jwt(
+                sandbox_name=bound_sandbox,
+                jwt_token=jwt_to_inject,
+                thread_id=thread_id,
+                tenant_id=tenant_id,
+                team_id=team_id,
+                team_token=team_token,
+                configured_integrations=configured_integrations,
+            ):
+                total_ms = (time.time() - warmpool_start) * 1000
+                print(
+                    f"⚠️ [WARMPOOL] JWT injection failed after {total_ms:.0f}ms, falling back to direct creation"
+                )
+                self.delete_sandbox_claim(thread_id)
+                sandbox_info = self.create_sandbox(
+                    thread_id=thread_id,
+                    tenant_id=tenant_id,
+                    team_id=team_id,
+                    ttl_hours=ttl_hours,
+                    jwt_token=jwt_to_inject,
+                    team_token=team_token,
+                )
+                if not self.wait_for_ready(thread_id):
+                    raise Exception(
+                        f"Sandbox {sandbox_info.name} failed to become ready"
+                    )
+                self._protect_pod_from_consolidation(sandbox_info.name)
+                return sandbox_info
+            step3_ms = (time.time() - step3_start) * 1000
+            print(f"⏱️ [WARMPOOL] Step 3 - Inject JWT: {step3_ms:.0f}ms")
+
+            # Step 4: Protect from Karpenter consolidation
+            self._protect_pod_from_consolidation(bound_sandbox)
+
+            total_ms = (time.time() - warmpool_start) * 1000
+            print(
+                f"🚀 [WARMPOOL] Sandbox {bound_sandbox} ready in {total_ms:.0f}ms "
+                f"(claim={step1_ms:.0f}ms, bind={step2_ms:.0f}ms, jwt={step3_ms:.0f}ms)"
+            )
+
+            return SandboxInfo(
+                name=bound_sandbox,
+                thread_id=thread_id,
+                created_at=datetime.utcnow(),
+                namespace=self.namespace,
+            )
+
+        except Exception as e:
+            total_ms = (time.time() - warmpool_start) * 1000
+            print(
+                f"⚠️ [WARMPOOL] Error after {total_ms:.0f}ms ({e}), falling back to direct creation"
+            )
+            # Clean up any partial state
+            try:
+                self.delete_sandbox_claim(thread_id)
+            except Exception:
+                pass
+
+            sandbox_info = self.create_sandbox(
+                thread_id=thread_id,
+                tenant_id=tenant_id,
+                team_id=team_id,
+                ttl_hours=ttl_hours,
+                jwt_token=jwt_token,
+                team_token=team_token,
+            )
+            if not self.wait_for_ready(thread_id):
+                raise Exception(f"Sandbox {sandbox_info.name} failed to become ready")
+            return sandbox_info
+
+    def get_warm_pool_status(self) -> dict:
+        """
+        Get the current status of the warm pool.
+
+        Returns:
+            Dict with pool size, available pods, etc.
+        """
+        try:
+            warmpool_name = os.getenv("WARMPOOL_NAME", "opensre-warmpool")
+            warmpool_namespace = os.getenv("WARMPOOL_NAMESPACE", "opensre-prod")
+
+            pool = self.custom_api.get_namespaced_custom_object(
+                group="extensions.agents.x-k8s.io",
+                version="v1alpha1",
+                namespace=warmpool_namespace,
+                plural="sandboxwarmpools",
+                name=warmpool_name,
+            )
+
+            status = pool.get("status", {})
+            return {
+                "name": warmpool_name,
+                "namespace": warmpool_namespace,
+                "desired_replicas": pool.get("spec", {}).get("replicas", 0),
+                "available": status.get("availableReplicas", 0),
+                "ready": status.get("readyReplicas", 0),
+                "phase": status.get("phase", "Unknown"),
+            }
+        except ApiException as e:
+            if e.status == 404:
+                return {"error": "Warm pool not found"}
+            raise

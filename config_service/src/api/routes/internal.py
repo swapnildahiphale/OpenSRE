@@ -80,7 +80,7 @@ class AgentRunCreateRequest(BaseModel):
 
 
 class AgentRunCompleteRequest(BaseModel):
-    status: str  # completed, failed, timeout
+    status: str  # completed, failed, timeout, interrupted
     duration_seconds: float
     output_summary: Optional[str] = None
     output_json: Optional[dict] = None
@@ -88,6 +88,7 @@ class AgentRunCompleteRequest(BaseModel):
     tool_calls_count: int = 0
     confidence: Optional[float] = None
     thoughts: Optional[list] = None  # [{text, ts, seq}, ...]
+    sdk_session_id: Optional[str] = None
 
 
 class AgentRunResponse(BaseModel):
@@ -163,6 +164,7 @@ def complete_agent_run(
         error_message=request.error_message,
         confidence=request.confidence,
         thoughts=request.thoughts,
+        sdk_session_id=request.sdk_session_id,
     )
 
     if not run:
@@ -402,6 +404,13 @@ class ToolCallItem(BaseModel):
     tool_name: str
     agent_name: Optional[str] = None
     parent_agent: Optional[str] = None
+    # agent_id/parent_agent_id are the STABLE invocation identity (the tool_use_id of
+    # the Task/Agent dispatch that spawned this agent), not the SDK's own agent_id.
+    # The SDK reuses its agent_id across unrelated dispatches within one run, so it
+    # cannot be used as a tree key. depth is the nesting depth (0 == root).
+    agent_id: Optional[str] = None
+    parent_agent_id: Optional[str] = None
+    depth: int = 0
     tool_input: Optional[Dict[str, Any]] = None
     tool_output: Optional[str] = None
     started_at: Optional[datetime] = None
@@ -426,6 +435,9 @@ class ToolCallResponse(BaseModel):
     tool_name: str
     agent_name: Optional[str] = None
     parent_agent: Optional[str] = None
+    agent_id: Optional[str] = None
+    parent_agent_id: Optional[str] = None
+    depth: int = 0
     tool_input: Optional[Dict[str, Any]] = None
     tool_output: Optional[str] = None
     started_at: datetime
@@ -467,6 +479,9 @@ def record_tool_calls(
             "tool_name": tc.tool_name,
             "agent_name": tc.agent_name,
             "parent_agent": tc.parent_agent,
+            "agent_id": tc.agent_id,
+            "parent_agent_id": tc.parent_agent_id,
+            "depth": tc.depth,
             "tool_input": tc.tool_input,
             "tool_output": tc.tool_output,
             "started_at": tc.started_at,
@@ -496,6 +511,9 @@ def record_tool_calls(
                 tool_name=tc.tool_name,
                 agent_name=tc.agent_name,
                 parent_agent=tc.parent_agent,
+                agent_id=tc.agent_id,
+                parent_agent_id=tc.parent_agent_id,
+                depth=tc.depth,
                 tool_input=tc.tool_input,
                 tool_output=tc.tool_output,
                 started_at=tc.started_at,
@@ -529,6 +547,11 @@ def get_tool_calls(
                 id=tc.id,
                 run_id=tc.run_id,
                 tool_name=tc.tool_name,
+                agent_name=tc.agent_name,
+                parent_agent=tc.parent_agent,
+                agent_id=tc.agent_id,
+                parent_agent_id=tc.parent_agent_id,
+                depth=tc.depth,
                 tool_input=tc.tool_input,
                 tool_output=tc.tool_output,
                 started_at=tc.started_at,
@@ -597,6 +620,11 @@ def query_tool_calls(
                 id=tc.id,
                 run_id=tc.run_id,
                 tool_name=tc.tool_name,
+                agent_name=tc.agent_name,
+                parent_agent=tc.parent_agent,
+                agent_id=tc.agent_id,
+                parent_agent_id=tc.parent_agent_id,
+                depth=tc.depth,
                 tool_input=tc.tool_input,
                 tool_output=tc.tool_output,
                 started_at=tc.started_at,
@@ -2949,203 +2977,3 @@ def cleanup_session_cache(
     deleted = repository.cleanup_expired_sessions(session, max_age_hours=max_age_hours)
     session.commit()
     return {"deleted": deleted}
-
-
-# --- Investigation Episodes & Strategies ---
-
-
-class EpisodeCreateRequest(BaseModel):
-    id: Optional[str] = None
-    agent_run_id: Optional[str] = None
-    org_id: str
-    team_node_id: Optional[str] = None
-    alert_type: Optional[str] = None
-    alert_description: Optional[str] = None
-    severity: Optional[str] = None
-    services: Optional[List[str]] = None
-    agents_used: Optional[List[str]] = None
-    skills_used: Optional[List[str]] = None
-    key_findings: Optional[List[dict]] = None
-    resolved: bool = False
-    root_cause: Optional[str] = None
-    summary: Optional[str] = None
-    effectiveness_score: Optional[float] = None
-    confidence: Optional[float] = None
-    duration_seconds: Optional[float] = None
-
-
-class EpisodeResponse(BaseModel):
-    id: str
-    agent_run_id: Optional[str] = None
-    org_id: str
-    team_node_id: Optional[str] = None
-    alert_type: Optional[str] = None
-    alert_description: Optional[str] = None
-    severity: Optional[str] = None
-    services: List[str] = []
-    agents_used: List[str] = []
-    skills_used: List[str] = []
-    key_findings: List[dict] = []
-    resolved: bool = False
-    root_cause: Optional[str] = None
-    summary: Optional[str] = None
-    effectiveness_score: Optional[float] = None
-    confidence: Optional[float] = None
-    duration_seconds: Optional[float] = None
-    created_at: Optional[str] = None
-
-
-class EpisodeSearchRequest(BaseModel):
-    org_id: str
-    alert_type: Optional[str] = None
-    service_name: Optional[str] = None
-    limit: int = 5
-
-
-class StrategyUpsertRequest(BaseModel):
-    org_id: str
-    team_node_id: Optional[str] = None
-    alert_type: Optional[str] = None
-    service_name: Optional[str] = None
-    strategy_text: str
-    source_episode_ids: Optional[List[str]] = None
-    episode_count: Optional[int] = None
-
-
-class StrategyResponse(BaseModel):
-    id: str
-    org_id: str
-    team_node_id: Optional[str] = None
-    alert_type: Optional[str] = None
-    service_name: Optional[str] = None
-    strategy_text: str
-    source_episode_ids: List[str] = []
-    episode_count: Optional[int] = None
-    generated_at: Optional[str] = None
-
-
-@router.post("/episodes", response_model=EpisodeResponse)
-def create_episode_endpoint(
-    request: EpisodeCreateRequest,
-    session: Session = Depends(get_db),
-    service: str = Depends(require_internal_service),
-):
-    """Create a new investigation episode."""
-    result = repository.create_episode(session, data=request.model_dump())
-    session.commit()
-    return result
-
-
-@router.get("/episodes")
-def list_episodes_endpoint(
-    org_id: str,
-    team_node_id: Optional[str] = None,
-    alert_type: Optional[str] = None,
-    service: Optional[str] = None,
-    limit: int = 50,
-    offset: int = 0,
-    session: Session = Depends(get_db),
-    service_header: str = Depends(require_internal_service),
-):
-    """List episodes with optional filters."""
-    episodes = repository.list_episodes(
-        session,
-        org_id=org_id,
-        team_node_id=team_node_id,
-        alert_type=alert_type,
-        service=service,
-        limit=limit,
-        offset=offset,
-    )
-    return {"episodes": episodes, "total": len(episodes)}
-
-
-@router.get("/episodes/stats")
-def episode_stats_endpoint(
-    org_id: str,
-    team_node_id: Optional[str] = None,
-    session: Session = Depends(get_db),
-    service_header: str = Depends(require_internal_service),
-):
-    """Get episode statistics."""
-    return repository.get_episode_stats(
-        session, org_id=org_id, team_node_id=team_node_id
-    )
-
-
-@router.get("/episodes/{episode_id}", response_model=EpisodeResponse)
-def get_episode_endpoint(
-    episode_id: str,
-    session: Session = Depends(get_db),
-    service_header: str = Depends(require_internal_service),
-):
-    """Get a single episode."""
-    ep = repository.get_episode(session, episode_id=episode_id)
-    if not ep:
-        raise HTTPException(status_code=404, detail="Episode not found")
-    return ep
-
-
-@router.post("/episodes/search")
-def search_episodes_endpoint(
-    request: EpisodeSearchRequest,
-    session: Session = Depends(get_db),
-    service_header: str = Depends(require_internal_service),
-):
-    """Search for similar episodes."""
-    results = repository.search_similar_episodes(
-        session,
-        org_id=request.org_id,
-        alert_type=request.alert_type,
-        service_name=request.service_name,
-        limit=request.limit,
-    )
-    return {"episodes": results}
-
-
-@router.put("/strategies")
-def upsert_strategy_endpoint(
-    request: StrategyUpsertRequest,
-    session: Session = Depends(get_db),
-    service_header: str = Depends(require_internal_service),
-):
-    """Create or update an investigation strategy."""
-    result = repository.upsert_strategy(session, data=request.model_dump())
-    session.commit()
-    return result
-
-
-@router.get("/strategies")
-def get_strategy_endpoint(
-    org_id: str,
-    alert_type: Optional[str] = None,
-    service_name: Optional[str] = None,
-    team_node_id: Optional[str] = None,
-    session: Session = Depends(get_db),
-    service_header: str = Depends(require_internal_service),
-):
-    """Get a specific strategy."""
-    result = repository.get_strategy(
-        session,
-        org_id=org_id,
-        team_node_id=team_node_id,
-        alert_type=alert_type,
-        service_name=service_name,
-    )
-    if not result:
-        return {"strategy_text": None, "message": "No strategy found"}
-    return result
-
-
-@router.get("/strategies/list")
-def list_strategies_endpoint(
-    org_id: str,
-    team_node_id: Optional[str] = None,
-    session: Session = Depends(get_db),
-    service_header: str = Depends(require_internal_service),
-):
-    """List all strategies."""
-    results = repository.list_strategies(
-        session, org_id=org_id, team_node_id=team_node_id
-    )
-    return {"strategies": results}

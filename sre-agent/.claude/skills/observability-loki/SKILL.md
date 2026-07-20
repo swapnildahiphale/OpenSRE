@@ -1,5 +1,5 @@
 ---
-description: Query and analyze logs from Grafana Loki using LogQL
+description: Grafana Loki log analysis using LogQL. Use when querying or aggregating logs stored in Loki.
 allowed-tools:
   - Bash
 ---

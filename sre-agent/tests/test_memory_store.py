@@ -1,152 +1,81 @@
-"""Tests for the memory_store node."""
-
 import os
-import sys
-
-sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
-
-from unittest.mock import patch
+import uuid
 
 import pytest
 
+pytest.importorskip("neo4j")
+pytestmark = pytest.mark.skipif(not os.getenv("NEO4J_URI"), reason="needs Neo4j")
+
 
 @pytest.fixture
-def base_state():
-    return {
-        "alert": {
-            "name": "HighLatency",
-            "service": "cart-service",
-            "description": "P99 > 5s",
-        },
-        "conclusion": "Root cause identified: OOM kills on cart-service pods due to memory leak. "
-        * 5,
-        "thread_id": "thread-123",
-        "investigation_id": "inv-456",
-        "status": "completed",
-        "agent_states": {
-            "kubernetes": {
-                "evidence": [
-                    {"tool": "run_script", "args": {"command": "kubectl get pods"}},
-                    {"tool": "load_skill", "args": {"name": "k8s-debug"}},
-                ],
-            },
-            "metrics": {
-                "evidence": [
-                    {"tool": "run_script", "args": {"command": "promql query"}},
-                ],
-            },
-        },
-    }
+def clean_store():
+    from memory.neo4j_conn import NEO4J_DATABASE, get_driver
+    from memory.store import EpisodeStore
+
+    drv = get_driver()
+    with drv.session(database=NEO4J_DATABASE) as s:
+        s.run("MATCH (e:Episode) DETACH DELETE e")
+        s.run("MATCH (st:Strategy) DETACH DELETE st")
+        s.run("MERGE (:Service {name: 'checkout'})")
+    store = EpisodeStore()
+    store.ensure_schema()
+    return store
 
 
-class TestMemoryStore:
-    """Tests for nodes.memory_store.memory_store."""
+def _episode(correlation_id, root_cause, resolved, score):
+    from memory.models import Component, Episode
 
-    @patch("nodes.memory_store.store_investigation_result")
-    def test_stores_episode_when_conclusion_long_enough(self, mock_store, base_state):
-        """Stores episode when conclusion exceeds 50 chars."""
-        from nodes.memory_store import memory_store
+    return Episode(
+        episode_id=str(uuid.uuid4()),
+        correlation_id=correlation_id,
+        org_id="acme",
+        team_node_id="team1",
+        issue_type="latency-spike",
+        issue_description="checkout slow",
+        components=[Component(type="service", name="checkout")],
+        resolved=resolved,
+        root_cause=root_cause,
+        summary="s",
+        effectiveness_score=score,
+        created_at="2026-07-04T00:00:00Z",
+        updated_at="2026-07-04T00:00:00Z",
+        embedding=[0.01] * 384,
+    )
 
-        result = memory_store(base_state)
 
-        mock_store.assert_called_once()
-        call_kwargs = mock_store.call_args
-        # Verify key arguments
-        assert (
-            call_kwargs.kwargs.get("thread_id")
-            or call_kwargs[1].get("thread_id")
-            or (len(call_kwargs[0]) > 0 if call_kwargs[0] else False)
-            or "thread_id" in str(call_kwargs)
-        )
+def test_upsert_creates_one_episode_and_links_service(clean_store):
+    from memory.neo4j_conn import NEO4J_DATABASE, get_driver
 
-        # Check it was called with right params
-        args, kwargs = mock_store.call_args
-        assert kwargs["thread_id"] == "thread-123"
-        assert kwargs["result_text"] == base_state["conclusion"]
-        assert kwargs["success"] is True
-        assert kwargs["agent_run_id"] == "inv-456"
+    clean_store.upsert_episode(_episode("c1", "redis", False, 0.4))
+    with get_driver().session(database=NEO4J_DATABASE) as s:
+        n = s.run(
+            "MATCH (e:Episode {correlation_id:'c1'}) RETURN count(e) AS n"
+        ).single()["n"]
+        linked = s.run(
+            "MATCH (:Episode {correlation_id:'c1'})-[:AFFECTED]->(x:Service {name:'checkout'}) "
+            "RETURN count(x) AS n"
+        ).single()["n"]
+    assert n == 1 and linked == 1
 
-    @patch("nodes.memory_store.store_investigation_result")
-    def test_skips_storage_when_conclusion_too_short(self, mock_store):
-        """Skips episode storage when conclusion is under 50 chars."""
-        state = {
-            "alert": {"name": "test"},
-            "conclusion": "Short.",
-            "thread_id": "t1",
-            "investigation_id": "i1",
-            "agent_states": {},
-        }
 
-        from nodes.memory_store import memory_store
+def test_upsert_same_correlation_overwrites_not_appends(clean_store):
+    from memory.neo4j_conn import NEO4J_DATABASE, get_driver
 
-        result = memory_store(state)
+    clean_store.upsert_episode(_episode("c1", "redis", False, 0.4))
+    clean_store.upsert_episode(_episode("c1", "missing DB index", True, 0.8))
+    with get_driver().session(database=NEO4J_DATABASE) as s:
+        rows = s.run(
+            "MATCH (e:Episode {correlation_id:'c1'}) RETURN e.root_cause AS rc, e.resolved AS r"
+        ).data()
+    assert len(rows) == 1
+    assert rows[0]["rc"] == "missing DB index" and rows[0]["r"] is True
 
-        mock_store.assert_not_called()
-        assert result == {}
 
-    @patch("nodes.memory_store.store_investigation_result")
-    def test_skips_storage_when_conclusion_empty(self, mock_store):
-        """Skips storage when conclusion is empty string."""
-        state = {
-            "alert": {"name": "test"},
-            "conclusion": "",
-            "thread_id": "t1",
-            "investigation_id": "i1",
-            "agent_states": {},
-        }
-
-        from nodes.memory_store import memory_store
-
-        result = memory_store(state)
-
-        mock_store.assert_not_called()
-
-    @patch("nodes.memory_store.store_investigation_result")
-    def test_handles_storage_failure_gracefully(self, mock_store, base_state):
-        """When store_investigation_result raises, node returns empty dict without crashing."""
-        mock_store.side_effect = RuntimeError("Config service down")
-
-        from nodes.memory_store import memory_store
-
-        result = memory_store(base_state)
-
-        # Should not raise, just returns empty dict
-        assert result == {}
-
-    @patch("nodes.memory_store.store_investigation_result")
-    def test_builds_tool_calls_data_from_agent_states(self, mock_store, base_state):
-        """Tool calls data is built from evidence entries in agent_states."""
-        from nodes.memory_store import memory_store
-
-        memory_store(base_state)
-
-        args, kwargs = mock_store.call_args
-        tool_calls = kwargs["tool_calls_data"]
-
-        # Should have 3 tool calls (2 from kubernetes + 1 from metrics)
-        assert len(tool_calls) == 3
-        assert tool_calls[0]["tool_name"] == "run_script"
-        assert tool_calls[1]["tool_name"] == "load_skill"
-        assert tool_calls[2]["tool_name"] == "run_script"
-
-    @patch("nodes.memory_store.store_investigation_result")
-    def test_builds_prompt_from_alert(self, mock_store, base_state):
-        """Prompt passed to store is built from alert name and description."""
-        from nodes.memory_store import memory_store
-
-        memory_store(base_state)
-
-        args, kwargs = mock_store.call_args
-        assert "HighLatency" in kwargs["prompt"]
-        assert "P99 > 5s" in kwargs["prompt"]
-
-    @patch("nodes.memory_store.store_investigation_result")
-    def test_passes_service_and_alert_type(self, mock_store, base_state):
-        """service_name and alert_type are passed from alert dict."""
-        from nodes.memory_store import memory_store
-
-        memory_store(base_state)
-
-        args, kwargs = mock_store.call_args
-        assert kwargs["service_name"] == "cart-service"
-        assert kwargs["alert_type"] == "HighLatency"
+def test_get_by_correlation_roundtrip(clean_store):
+    clean_store.upsert_episode(_episode("c9", "dns", True, 0.8))
+    got = clean_store.get_by_correlation("c9")
+    assert (
+        got is not None
+        and got.root_cause == "dns"
+        and got.issue_type == "latency-spike"
+    )

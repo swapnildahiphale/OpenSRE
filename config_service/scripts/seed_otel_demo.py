@@ -680,9 +680,8 @@ def main() -> None:
 
         s.flush()
 
-        # 3. Build business context
-        business_context = _build_business_context()
-        full_prompt = PLANNER_PROMPT + "\n" + business_context
+        # 3. Build team context sections
+        service_catalog_content = _build_business_context()
 
         config_json = {
             "team_name": TEAM_NAME,
@@ -693,7 +692,15 @@ def main() -> None:
                 "pagerduty_service_ids": [],
                 "services": list(SERVICES.keys()),
             },
-            "business_context": business_context,
+            "team_context": {
+                "sections": [
+                    {
+                        "id": "service_catalog",
+                        "title": "Service catalog",
+                        "content": service_catalog_content,
+                    }
+                ]
+            },
             "service_catalog": SERVICES,
             "dependency_chains": DEPENDENCY_CHAINS,
             "failure_impact": FAILURE_IMPACT,
@@ -704,7 +711,7 @@ def main() -> None:
                     "enabled": True,
                     "model": {"name": "gpt-5.2", "temperature": 0.3},
                     "prompt": {
-                        "system": full_prompt,
+                        "system": PLANNER_PROMPT,
                         "prefix": "",
                         "suffix": "",
                     },

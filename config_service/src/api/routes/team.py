@@ -597,22 +597,30 @@ async def approve_pending_change(
             }
 
     elif change.change_type == "prompt":
-        # Update team's prompt config
-        node = (
-            db.query(OrgNode)
-            .filter(
-                OrgNode.org_id == team.org_id,
-                OrgNode.node_id == team.team_node_id,
-            )
-            .first()
+        # Apply approved prompt edits to the canonical nested agents shape in the
+        # node_configurations store (agents.{id}.prompt.system) — the only store the
+        # SDK runtime reads. (OrgNode has no config_overrides column; writing there
+        # never persisted.)
+        from ...db.config_repository import (
+            build_agent_prompt_patch,
+            update_node_configuration,
         )
-        if node:
-            prompts = (node.config_overrides or {}).get("agent_prompts", {})
-            prompts.update(proposed)
-            node.config_overrides = {
-                **(node.config_overrides or {}),
-                "agent_prompts": prompts,
-            }
+
+        patch = build_agent_prompt_patch(proposed)
+        if patch["agents"]:
+            try:
+                update_node_configuration(
+                    db,
+                    org_id=team.org_id,
+                    node_id=team.team_node_id,
+                    config_patch=patch,
+                    updated_by=(team.subject or "user"),
+                )
+            except ValueError as e:
+                # No node_configurations row for this node, or dependency
+                # validation failed — surface as 400 and leave the change pending
+                # (status is only flipped to approved below, after a clean write).
+                raise HTTPException(status_code=400, detail=str(e))
 
     elif change.change_type == "integration_recommendation":
         # Don't auto-apply — user still needs to provide credentials.
@@ -624,6 +632,12 @@ async def approve_pending_change(
     change.reviewed_by = team.subject or "user"
 
     db.commit()
+
+    # Keep cached effective configs from serving the pre-approval prompt. No-op
+    # unless CONFIG_CACHE_BACKEND is enabled; mirrors the admin write paths.
+    cache = get_config_cache()
+    if cache is not None:
+        cache.bump_org_epoch(team.org_id)
 
     if change.change_type == "integration_recommendation":
         integration_id = proposed.get("integration_id", "")
@@ -693,6 +707,7 @@ class AgentRunResponse(BaseModel):
     outputJson: Optional[dict] = None
     errorMessage: Optional[str] = None
     confidence: Optional[int] = None
+    sdkSessionId: Optional[str] = None
 
 
 @router.get("/agent-runs", response_model=List[AgentRunResponse])
@@ -738,6 +753,7 @@ async def list_agent_runs(
                 outputJson=run.output_json,
                 errorMessage=run.error_message,
                 confidence=run.confidence,
+                sdkSessionId=run.sdk_session_id,
             )
         )
 
@@ -784,6 +800,7 @@ async def get_agent_run(
         outputJson=run.output_json,
         errorMessage=run.error_message,
         confidence=run.confidence,
+        sdkSessionId=run.sdk_session_id,
     )
 
 
@@ -799,6 +816,10 @@ class ToolCallTraceItem(BaseModel):
     toolName: str
     agentName: Optional[str] = None
     parentAgent: Optional[str] = None
+    # Nested-agent attribution (agent_id/depth on agent_tool_calls).
+    depth: int = 0
+    agentId: Optional[str] = None
+    parentAgentId: Optional[str] = None
     toolInput: Optional[Dict[str, Any]] = None
     toolOutput: Optional[str] = None
     startedAt: str
@@ -815,6 +836,9 @@ class ThoughtTraceItem(BaseModel):
     ts: str
     seq: int
     agent: Optional[str] = None
+    depth: int = 0
+    agentId: Optional[str] = None
+    parentAgentId: Optional[str] = None
 
 
 class AgentRunTraceResponse(BaseModel):
@@ -874,6 +898,9 @@ async def get_agent_run_trace(
                 ts=t.get("ts", ""),
                 seq=t.get("seq", 0),
                 agent=t.get("agent"),
+                depth=t.get("depth", 0),
+                agentId=t.get("agentId"),
+                parentAgentId=t.get("parentAgentId"),
             )
             for t in run.thoughts
             if isinstance(t, dict) and t.get("text")
@@ -887,6 +914,9 @@ async def get_agent_run_trace(
                 toolName=tc.tool_name,
                 agentName=tc.agent_name,
                 parentAgent=tc.parent_agent,
+                depth=tc.depth,
+                agentId=tc.agent_id,
+                parentAgentId=tc.parent_agent_id,
                 toolInput=tc.tool_input,
                 toolOutput=tc.tool_output[:5000] if tc.tool_output else None,
                 startedAt=tc.started_at.isoformat() if tc.started_at else "",
@@ -899,87 +929,6 @@ async def get_agent_run_trace(
         ],
         thoughts=thoughts,
         total=len(tool_calls),
-    )
-
-
-# =============================================================================
-# Tools Catalog
-# =============================================================================
-
-
-class ToolsCatalogResponse(BaseModel):
-    """Response model for tools catalog."""
-
-    tools: List[Dict[str, Any]]
-    count: int
-
-    class Config:
-        from_attributes = True
-
-
-@router.get("/tools/catalog", response_model=ToolsCatalogResponse)
-async def get_tools_catalog(
-    db: Session = Depends(get_db),
-    team: TeamPrincipal = Depends(require_team_auth),
-):
-    """
-    Get complete tools catalog for the team.
-
-    Returns all available tools (built-in + MCP) that can be configured for agents.
-    This is configuration data only - no health checks are performed.
-
-    Response includes:
-    - Built-in tools (always available)
-    - MCP tools (from team's MCP configuration)
-
-    Each tool includes:
-    - id: Tool identifier
-    - name: Human-readable name
-    - description: Tool description
-    - category: Tool category (kubernetes, aws, github, etc.)
-    - source: "built-in" or "mcp"
-    - mcp_server: MCP server ID (only for MCP tools)
-    """
-    from ...core.tools_catalog import get_tools_catalog
-    from ...db.config_repository import get_effective_config
-
-    # Get team's effective configuration
-    effective_config = get_effective_config(
-        session=db,
-        org_id=team.org_id,
-        node_id=team.team_node_id,
-    )
-
-    # Extract MCP configurations (new flat structure)
-    team_mcps = []
-
-    # Get MCP servers from new dict-based structure
-    # New schema: mcp_servers is a dict keyed by MCP ID
-    mcp_servers_dict = effective_config.get("mcp_servers", {})
-
-    # Convert dict to list for catalog (only enabled MCPs)
-    for mcp_id, mcp_config in mcp_servers_dict.items():
-        if not isinstance(mcp_config, dict):
-            continue
-
-        # Only include enabled MCPs
-        if not mcp_config.get("enabled", True):
-            continue
-
-        # Add ID to config for catalog
-        mcp_with_id = {"id": mcp_id, **mcp_config}
-
-        mcp_type = mcp_config.get("type", "mcp_server")
-        # Only include MCP servers (not integrations)
-        if mcp_type in ["mcp_server", "tool"]:
-            team_mcps.append(mcp_with_id)
-
-    # Get catalog
-    catalog = get_tools_catalog(team_mcps)
-
-    return ToolsCatalogResponse(
-        tools=catalog["tools"],
-        count=catalog["count"],
     )
 
 
@@ -1024,8 +973,11 @@ async def get_skills_catalog_endpoint(
 
     # Annotate each skill with enabled status based on team's effective config
     try:
-        config_service = ConfigServiceRDS(db, get_token_pepper())
-        effective = config_service.get_effective_config(team.org_id, team.team_node_id)
+        from ...db.config_repository import get_effective_config
+
+        effective = get_effective_config(
+            session=db, org_id=team.org_id, node_id=team.team_node_id
+        )
         skills_cfg = effective.get("skills", {})
         enabled_list = skills_cfg.get("enabled", ["*"])
         disabled_list = skills_cfg.get("disabled", [])
@@ -1037,8 +989,9 @@ async def get_skills_catalog_endpoint(
                 skill["enabled"] = skill_id not in disabled_list
             else:
                 skill["enabled"] = skill_id in enabled_list
-    except Exception:
-        # If config lookup fails, default to all enabled
+    except Exception as e:
+        # If config lookup fails, log and default to all enabled
+        logger.warning("skills catalog enabled-annotation failed: %s", e)
         for skill in catalog["skills"]:
             skill["enabled"] = True
 

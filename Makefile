@@ -2,7 +2,7 @@
 #
 # Run 'make help' to see all available targets.
 
-.PHONY: help dev dev-slack stop logs logs-agent logs-config logs-web status clean db-shell \
+.PHONY: help setup-llm dev dev-slack dev-teams stop logs logs-agent logs-config logs-web status clean db-shell \
         kind-create kind-delete otel-install otel-images otel-wait e2e-verify \
         e2e-setup e2e-teardown e2e-agent e2e-status e2e-token \
         e2e-setup-eks e2e-teardown-eks eks-port-forward eks-port-forward-stop \
@@ -28,14 +28,30 @@ KUBECONFIG_DOCKER:= test-infra/kind/kubeconfig-docker.yaml
 EKS_CLUSTER      ?= $(error EKS_CLUSTER is required — set via env or make EKS_CLUSTER=your-cluster)
 EKS_REGION       ?= $(error EKS_REGION is required — set via env or make EKS_REGION=us-west-2)
 
-# Ports (must match docker-compose.yml and kind-config.yaml)
-CONFIG_PORT      := 8081
-AGENT_PORT       := 8001
-WEB_UI_PORT      := 3002
-PROMETHEUS_PORT  := 9090
-GRAFANA_PORT     := 3001
-JAEGER_PORT      := 16686
-FRONTEND_PORT    := 8090
+# ═══════════════════════════════════════════════════════════════════════
+# Input Parameters
+# ═══════════════════════════════════════════════════════════════════════
+# These can be overridden via command line:
+#   make e2e-token CONFIG_PORT=8381 WEB_UI_PORT=3302
+#   make e2e-setup-eks CONFIG_PORT=8381 WEB_UI_PORT=3302
+#
+CONFIG_PORT      ?= 8081
+AGENT_PORT       ?= 8001
+WEB_UI_PORT      ?= 3002
+PROMETHEUS_PORT  ?= 9090
+GRAFANA_PORT     ?= 3001
+JAEGER_PORT      ?= 16686
+FRONTEND_PORT    ?= 8090
+
+# ═══════════════════════════════════════════════════════════════════════
+# Internal Configuration
+# ═══════════════════════════════════════════════════════════════════════
+
+# Compose file sets — dev uses base only so a local docker-compose.override.yml
+# (E2E fast-fail: AGENT_TIMEOUT_SECONDS=600, kind networking)
+# is NOT auto-merged into everyday `make dev`. E2E targets opt in explicitly.
+COMPOSE_DEV      = docker compose -f docker-compose.yml
+COMPOSE_E2E      = docker compose -f docker-compose.yml -f docker-compose.override.yml
 
 # ═══════════════════════════════════════════════════════════════════════
 # Banner
@@ -64,8 +80,9 @@ help:
 	@echo "OpenSRE — AI SRE Platform"
 	@echo ""
 	@echo "Local Development:"
-	@echo "  make dev                Start all services (postgres, config, litellm, agent, web-ui)"
+	@echo "  make dev                Start all services (postgres, config, neo4j, agent, web-ui)"
 	@echo "  make dev-slack          Start all services + Slack bot"
+	@echo "  make dev-teams          Start all services + Teams bot"
 	@echo "  make stop               Stop all services"
 	@echo "  make logs               Follow all service logs"
 	@echo "  make logs-agent         Follow sre-agent logs"
@@ -104,41 +121,54 @@ help:
 	@echo "  make otel-install       Install otel-demo helm chart (kind)"
 	@echo "  make otel-wait          Wait for all otel-demo pods to be ready"
 	@echo ""
+	@echo "Input Parameters (override defaults):"
+	@echo "  CONFIG_PORT=8381        Config service port (default: 8081)"
+	@echo "  WEB_UI_PORT=3302        Web UI port (default: 3002)"
+	@echo ""
+	@echo "Examples:"
+	@echo "  make e2e-token CONFIG_PORT=8381 WEB_UI_PORT=3302"
+	@echo "  make dev CONFIG_PORT=8381 WEB_UI_PORT=3302"
+	@echo ""
 
 # ═══════════════════════════════════════════════════════════════════════
 # Local Development
 # ═══════════════════════════════════════════════════════════════════════
 
-dev:
+setup-llm:
 	@bash scripts/generate-litellm-config.sh
-	docker compose up -d --build
+
+dev: setup-llm
+	$(COMPOSE_DEV) up -d --build
 	@bash scripts/post-startup-banner.sh
 
-dev-slack:
-	@bash scripts/generate-litellm-config.sh
-	docker compose --profile slack up -d --build
+dev-slack: setup-llm
+	$(COMPOSE_DEV) --profile slack up -d --build
+	@bash scripts/post-startup-banner.sh
+
+dev-teams: setup-llm
+	$(COMPOSE_DEV) --profile teams up -d --build
 	@bash scripts/post-startup-banner.sh
 
 stop:
-	docker compose down
+	$(COMPOSE_DEV) down
 
 logs:
-	docker compose logs -f
+	$(COMPOSE_DEV) logs -f
 
 logs-agent:
-	docker compose logs -f sre-agent
+	$(COMPOSE_DEV) logs -f sre-agent
 
 logs-config:
-	docker compose logs -f config-service
+	$(COMPOSE_DEV) logs -f config-service
 
 logs-web:
-	docker compose logs -f web-ui
+	$(COMPOSE_DEV) logs -f web-ui
 
 status:
 	$(print-banner)
 	@echo ""
 	@echo " Service Status"
-	@docker compose ps --format "table {{.Name}}\t{{.Status}}\t{{.Ports}}" 2>/dev/null || true
+	@$(COMPOSE_DEV) ps --format "table {{.Name}}\t{{.Status}}\t{{.Ports}}" 2>/dev/null || true
 	@echo ""
 	@curl -sf http://localhost:$(CONFIG_PORT)/health > /dev/null 2>&1 \
 		&& echo "  config-service: ✅ healthy (port $(CONFIG_PORT))" \
@@ -151,10 +181,10 @@ status:
 		|| echo "  web-ui:         ❌ down"
 
 clean:
-	docker compose down -v --remove-orphans
+	$(COMPOSE_DEV) down -v --remove-orphans
 
 db-shell:
-	docker compose exec postgres psql -U opensre -d opensre
+	$(COMPOSE_DEV) exec postgres psql -U opensre -d opensre
 
 # ═══════════════════════════════════════════════════════════════════════
 # E2E Testing — Full Setup

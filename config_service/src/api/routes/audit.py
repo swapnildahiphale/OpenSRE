@@ -75,7 +75,7 @@ class AgentRunCompleteRequest(BaseModel):
     """Request to mark an agent run as complete."""
 
     run_id: str
-    status: str = Field(..., pattern="^(completed|failed|timeout)$")
+    status: str = Field(..., pattern="^(completed|failed|timeout|interrupted)$")
     tool_calls_count: Optional[int] = None
     output_summary: Optional[str] = None
     output_json: Optional[Dict[str, Any]] = None

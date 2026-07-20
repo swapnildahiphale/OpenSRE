@@ -116,8 +116,17 @@ def main():
             active = "*" if ctx["active"] else ""
             print(f"{ctx['name']:<40} {ctx['cluster']:<30} {active}")
         print()
-        print("Use these contexts with: kubectl --context <CONTEXT_NAME>")
-        print("Or run scripts without --cluster-id to use the active context.")
+        if not gateway_clusters and not os.environ.get("K8S_GATEWAY_URL"):
+            print(
+                "K8S_GATEWAY_URL is not set: gateway mode is unavailable, so "
+                "--cluster-id will be silently ignored by every script (they all "
+                "fall back to the context marked * above). Do NOT pass --cluster-id "
+                "or try multiple contexts — run scripts with just -n <namespace>; "
+                "you will always hit the active context above."
+            )
+        else:
+            print("Use these contexts with: kubectl --context <CONTEXT_NAME>")
+            print("Or run scripts without --cluster-id to use the active context.")
 
     if not gateway_clusters and not kubeconfig_contexts:
         print("No K8s clusters found.")

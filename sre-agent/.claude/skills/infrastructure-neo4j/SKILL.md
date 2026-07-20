@@ -1,46 +1,63 @@
-# Infrastructure Knowledge Graph (Neo4j)
+---
+name: infrastructure-neo4j
+description: Query the OpenSRE knowledge graph for service topology, dependencies, and blast radius. Use after you identify an affected service or deployment — not on vague initial alerts alone.
+allowed-tools: Bash(python *)
+---
+
+# infrastructure-neo4j
+
+Query the OpenSRE knowledge graph (Neo4j) for service topology, dependencies, and blast radius.
 
 ## When to use
-- Before starting an investigation, to understand the service topology
-- When you need to know what depends on a service (blast radius analysis)
-- When you need Kubernetes status of a service (pods, deployments, replicas)
-- When you need to understand the relationship between services
 
-## How to use
+Use **after** you know which service or deployment is affected:
 
-### Get service topology
+- Alert or ticket names a service (checkout, payments, surveys build target)
+- Logs or metrics identify a failing deployment
+- You need blast radius — what depends on this service, what it depends on
+
+**Do not** query on vague tickets alone (e.g. "build pipeline failing" with no service). Gather evidence first, then query with the service name.
+
+## Usage
+
 ```bash
-python /app/tools/neo4j_semantic_layer.py --action service-info --service <service-name>
+python .claude/skills/infrastructure-neo4j/scripts/topology_search.py \
+  --service checkout
 ```
 
-### Get Kubernetes status
-```bash
-python /app/tools/neo4j_semantic_layer.py --action k8s-status --service <service-name>
+## JSON output
+
+```json
+{
+  "success": true,
+  "result": {
+    "service": "checkout",
+    "resolved_name": "otel-demo-checkoutservice",
+    "deployment": { "namespace": "...", "replicas": 1 },
+    "upstream_dependents": [{ "service": "...", "via": "..." }],
+    "downstream_dependencies": [{ "service": "...", "via": "..." }],
+    "blast_radius": {
+      "upstream_count": 2,
+      "downstream_count": 3,
+      "affected_services": ["frontend", "loadgenerator"]
+    }
+  }
+}
 ```
 
-### Get service relationships
-```bash
-python /app/tools/neo4j_semantic_layer.py --action relationships --service <service-name>
-```
-
-### Run custom Cypher query
-```bash
-python /app/tools/neo4j_semantic_layer.py --action cypher --query "MATCH (s:Service) RETURN s.name LIMIT 10"
-```
+On failure, `success` is `false` and `error` describes the problem. Failures are non-blocking — continue the investigation.
 
 ## Methodology
 
-1. **Pre-investigation context**: Before analyzing logs or metrics, query the KG to understand:
-   - What the service does
-   - What depends on it (downstream impact)
-   - What it depends on (upstream causes)
-   - Current K8s health status
+1. **After scoping** — once you have a service name, query topology before deep log dives when dependencies matter.
+2. **Blast radius** — check `upstream_dependents` and `affected_services` when assessing impact.
+3. **Root cause correlation** — shared upstream dependencies across multiple affected services suggest a common cause.
 
-2. **Blast radius analysis**: When a service is affected:
-   - Query all downstream dependencies
-   - Check if downstream services also show errors
-   - Report the full blast radius
+## Advanced (direct CLI)
 
-3. **Root cause correlation**: When multiple services are affected:
-   - Query the topology to find common upstream dependencies
-   - The shared dependency is likely the root cause
+For K8s status or custom Cypher when the script is insufficient:
+
+```bash
+python tools/neo4j_semantic_layer.py --action k8s-status --service <name>
+python tools/neo4j_semantic_layer.py --action cypher --query "MATCH (s:Service) RETURN s.name LIMIT 10"
+```

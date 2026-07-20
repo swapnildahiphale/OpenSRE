@@ -2,8 +2,10 @@
 # ═══════════════════════════════════════════════════════════════════════
 # Generate litellm_config.yaml from .env
 # ═══════════════════════════════════════════════════════════════════════
-# Called automatically by `make dev`. Reads LLM_PROVIDER and LLM_MODEL
-# from .env and writes the LiteLLM proxy config.
+# Called automatically by `make setup-llm` (via dev/dev-slack targets).
+# Reads LLM_PROVIDER and LLM_MODEL from .env and writes the LiteLLM
+# proxy config when LLM_PROVIDER is nvidia or openrouter.
+# Skips generation for direct Anthropic (default) or unset LLM_PROVIDER.
 
 set -euo pipefail
 
@@ -35,10 +37,11 @@ set +a
 LLM_PROVIDER="${LLM_PROVIDER:-}"
 LLM_MODEL="${LLM_MODEL:-}"
 
-if [[ -z "$LLM_PROVIDER" ]]; then
-  echo "ERROR: LLM_PROVIDER is not set in .env"
-  echo "  Supported providers: nvidia, openrouter"
-  exit 1
+# Direct Anthropic (default) does not use the LiteLLM proxy.
+# Only generate config when explicitly opting into nvidia/openrouter.
+if [[ -z "$LLM_PROVIDER" || "$LLM_PROVIDER" == "anthropic" ]]; then
+  echo "Skipping litellm_config.yaml generation (direct Anthropic — set LLM_PROVIDER=openrouter|nvidia to use LiteLLM proxy)"
+  exit 0
 fi
 
 if [[ -z "$LLM_MODEL" ]]; then

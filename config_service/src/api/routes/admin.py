@@ -670,53 +670,75 @@ def admin_patch_node_config(
         bypass = x_bypass_approval.lower() == "true"
 
         if not bypass:
-            # Check for prompt changes requiring approval
-            if "custom_prompt" in body.patch or "system_prompt" in body.patch:
-                if requires_approval(session, org_id=org_id, change_type="prompt"):
-                    # Get current value
-                    node_config = get_node_configuration(
-                        session, org_id=org_id, node_id=node_id
+            # Check for agent prompt changes requiring approval. The console writes
+            # the canonical nested shape agents.{id}.prompt.system, so detect edits
+            # there. (The old flat custom_prompt/system_prompt keys are never written
+            # by any client and the runtime never reads them — checking only those
+            # let every prompt edit bypass the approval gate.)
+            agents_patch = (
+                body.patch.get("agents") if isinstance(body.patch, dict) else None
+            )
+            prompt_edits = {}
+            if isinstance(agents_patch, dict):
+                for agent_id, agent_cfg in agents_patch.items():
+                    prompt_cfg = (
+                        agent_cfg.get("prompt") if isinstance(agent_cfg, dict) else None
                     )
-                    current_config = node_config.config_json if node_config else {}
-                    change_path = (
-                        "custom_prompt"
-                        if "custom_prompt" in body.patch
-                        else "system_prompt"
-                    )
+                    if isinstance(prompt_cfg, dict) and "system" in prompt_cfg:
+                        prompt_edits[agent_id] = prompt_cfg["system"]
 
+            if prompt_edits and requires_approval(
+                session, org_id=org_id, change_type="prompt"
+            ):
+                node_config = get_node_configuration(
+                    session, org_id=org_id, node_id=node_id
+                )
+                current_agents = (
+                    (node_config.config_json or {}).get("agents", {})
+                    if node_config
+                    else {}
+                )
+                pending_ids = []
+                for agent_id, new_text in prompt_edits.items():
+                    prev_agent = current_agents.get(agent_id) or {}
+                    prev_text = (prev_agent.get("prompt") or {}).get("system")
                     pending = create_pending_change(
                         session,
                         org_id=org_id,
                         node_id=node_id,
                         change_type="prompt",
-                        change_path=change_path,
-                        proposed_value=body.patch.get(change_path),
-                        previous_value=current_config.get(change_path),
+                        change_path=f"agents.{agent_id}.prompt.system",
+                        proposed_value={"agent": agent_id, "prompt": new_text},
+                        previous_value={"agent": agent_id, "prompt": prev_text},
                         requested_by=x_admin_actor,
                     )
-                    session.commit()
+                    pending_ids.append(pending.id)
+                session.commit()
 
-                    # Send email notification to admins
-                    dashboard_url = (
-                        os.getenv("WEB_UI_URL", "http://localhost:3000")
-                        + "/admin/pending-changes"
+                # Send email notification to admins
+                dashboard_url = (
+                    os.getenv("WEB_UI_URL", "http://localhost:3000")
+                    + "/admin/pending-changes"
+                )
+                admin_email = os.getenv("ADMIN_NOTIFICATION_EMAIL")
+                if admin_email:
+                    send_pending_approval_notification(
+                        to_emails=[admin_email],
+                        change_type="Prompt",
+                        team_name=node_id,
+                        requested_by=x_admin_actor,
+                        change_summary="Change to "
+                        + ", ".join(sorted(prompt_edits.keys()))
+                        + " prompt(s)",
+                        dashboard_url=dashboard_url,
                     )
-                    admin_email = os.getenv("ADMIN_NOTIFICATION_EMAIL")
-                    if admin_email:
-                        send_pending_approval_notification(
-                            to_emails=[admin_email],
-                            change_type="Prompt",
-                            team_name=node_id,
-                            requested_by=x_admin_actor,
-                            change_summary=f"Change to {change_path}",
-                            dashboard_url=dashboard_url,
-                        )
 
-                    return {
-                        "status": "pending_approval",
-                        "message": "Prompt changes require approval",
-                        "pending_change_id": pending.id,
-                    }
+                return {
+                    "status": "pending_approval",
+                    "message": "Prompt changes require approval",
+                    "pending_change_id": pending_ids[0],
+                    "pending_change_ids": pending_ids,
+                }
 
             # Check for tool changes requiring approval
             if "enabled_tools" in body.patch:
@@ -1537,7 +1559,12 @@ def admin_get_org_activity(
     )
 
     for run in runs:
-        status_map = {"completed": "success", "failed": "failed", "running": "pending"}
+        status_map = {
+            "completed": "success",
+            "failed": "failed",
+            "interrupted": "info",
+            "running": "pending",
+        }
         activities.append(
             {
                 "id": run.id,

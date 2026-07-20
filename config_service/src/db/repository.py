@@ -17,6 +17,7 @@ from src.db.models import (
     ImpersonationJTI,
     K8sCluster,
     K8sClusterStatus,
+    NodeType,
     OrgAdminToken,
     OrgNode,
     PendingConfigChange,
@@ -497,6 +498,69 @@ def list_org_config_audit(
     return session.execute(stmt).scalars().all()
 
 
+def ensure_org_root_node(
+    session: Session,
+    *,
+    org_id: str,
+    root_id: str = "root",
+    name: str = "Root Org",
+) -> OrgNode:
+    """Ensure the org has a root node (node_id=root, parent_id=None). Idempotent."""
+    root = session.execute(
+        select(OrgNode).where(OrgNode.org_id == org_id, OrgNode.node_id == root_id)
+    ).scalar_one_or_none()
+    if root is not None:
+        return root
+
+    root = OrgNode(
+        org_id=org_id,
+        node_id=root_id,
+        parent_id=None,
+        node_type=NodeType.org,
+        name=name,
+    )
+    session.add(root)
+    session.flush()
+
+    from .config_repository import get_or_create_node_configuration
+
+    get_or_create_node_configuration(session, org_id, root_id, NodeType.org.value)
+    return root
+
+
+def _resolve_team_parent_id(
+    session: Session,
+    *,
+    org_id: str,
+    parent_id: Optional[str],
+    node_type: Any,
+) -> Optional[str]:
+    """Normalize parent_id for create_org_node.
+
+    - parent_id='root' with no root row yet: auto-create root (self-hosted installs).
+    - team with no parent on an empty tree: parent under root after ensure.
+    """
+    resolved = parent_id
+    is_team = node_type == NodeType.team or node_type == NodeType.team.value
+
+    if resolved == "root":
+        ensure_org_root_node(session, org_id=org_id, root_id="root")
+        return "root"
+
+    if resolved is None and is_team:
+        root = ensure_org_root_node(session, org_id=org_id, root_id="root")
+        return root.node_id
+
+    if resolved is not None:
+        parent = session.execute(
+            select(OrgNode).where(OrgNode.org_id == org_id, OrgNode.node_id == resolved)
+        ).scalar_one_or_none()
+        if parent is None:
+            raise ValueError(f"Parent not found: {resolved}")
+
+    return resolved
+
+
 def create_org_node(
     session: Session,
     *,
@@ -511,14 +575,9 @@ def create_org_node(
     ).scalar_one_or_none()
     if existing is not None:
         raise ValueError(f"Node already exists: {node_id}")
-    if parent_id is not None:
-        parent = session.execute(
-            select(OrgNode).where(
-                OrgNode.org_id == org_id, OrgNode.node_id == parent_id
-            )
-        ).scalar_one_or_none()
-        if parent is None:
-            raise ValueError(f"Parent not found: {parent_id}")
+    parent_id = _resolve_team_parent_id(
+        session, org_id=org_id, parent_id=parent_id, node_type=node_type
+    )
     node = OrgNode(
         org_id=org_id,
         node_id=node_id,
@@ -1074,6 +1133,7 @@ def complete_agent_run(
     error_message: Optional[str] = None,
     confidence: Optional[int] = None,
     thoughts: Optional[list] = None,
+    sdk_session_id: Optional[str] = None,
 ) -> Optional[AgentRun]:
     """Mark an agent run as completed/failed/timeout."""
     run = session.execute(
@@ -1084,7 +1144,11 @@ def complete_agent_run(
         return None
 
     run.status = status
-    run.thoughts = thoughts
+    # Thoughts are persisted incrementally during the run (PUT .../thoughts); a
+    # completion call that carries no thoughts (None) must NOT wipe them. Only
+    # overwrite when the caller actually supplies a thoughts list.
+    if thoughts is not None:
+        run.thoughts = thoughts
     from datetime import timezone
 
     run.completed_at = datetime.now(timezone.utc)
@@ -1093,6 +1157,8 @@ def complete_agent_run(
     run.output_json = output_json
     run.error_message = error_message
     run.confidence = confidence
+    if sdk_session_id is not None:
+        run.sdk_session_id = sdk_session_id
 
     if run.started_at:
         # Handle timezone-aware vs naive datetime comparison
@@ -1330,6 +1396,11 @@ def bulk_create_tool_calls(
             "run_id": run_id,
             "agent_name": tc.get("agent_name"),
             "parent_agent": tc.get("parent_agent"),
+            # Nested-agent attribution (hook-based); default to None/0 so older
+            # callers that don't send these still persist cleanly.
+            "agent_id": tc.get("agent_id"),
+            "parent_agent_id": tc.get("parent_agent_id"),
+            "depth": tc.get("depth", 0),
             "tool_name": tc.get("tool_name", "unknown"),
             "tool_input": tc.get("tool_input"),
             "tool_output": output[:5000] if output else None,
@@ -2026,14 +2097,25 @@ def approve_pending_change(
     change.review_comment = review_comment
 
     if apply_change:
-        # Apply the change to the node config
-        # Build a patch from the change
-        if change.change_path:
-            # Nested path - build nested dict
+        # Build a config patch from the change, then deep-merge it into node config.
+        from src.db.config_repository import (  # lazy import: circular dependency
+            build_agent_prompt_patch,
+            update_node_configuration,
+        )
+
+        if change.change_type == "prompt":
+            # Canonical prompt change: proposed_value = {"agent", "prompt", ...}.
+            # Route through the shared builder so every approve path writes the
+            # same nested agents.{id}.prompt.system shape the runtime reads.
+            patch = build_agent_prompt_patch(change.proposed_value)
+            if not patch.get("agents"):
+                patch = {}
+        elif change.change_path:
+            # Nested path - build nested dict with proposed_value at the leaf
             keys = change.change_path.split(".")
             patch = {}
             current = patch
-            for i, key in enumerate(keys[:-1]):
+            for key in keys[:-1]:
                 current[key] = {}
                 current = current[key]
             current[keys[-1]] = change.proposed_value
@@ -2044,9 +2126,6 @@ def approve_pending_change(
             )
 
         if patch:
-            # Lazy import to avoid circular dependency
-            from src.db.config_repository import update_node_configuration
-
             update_node_configuration(
                 session,
                 org_id=change.org_id,
@@ -2485,306 +2564,3 @@ def mark_stale_clusters_disconnected(
 
     session.flush()
     return len(stale_clusters)
-
-
-# =============================================================================
-# Investigation Episodes
-# =============================================================================
-
-
-def create_episode(session: Session, *, data: Dict[str, Any]) -> Dict[str, Any]:
-    """Create a new investigation episode."""
-    from src.db.models import InvestigationEpisode
-
-    episode = InvestigationEpisode(
-        id=data.get("id", str(uuid4())),
-        agent_run_id=data.get("agent_run_id"),
-        org_id=data["org_id"],
-        team_node_id=data.get("team_node_id"),
-        alert_type=data.get("alert_type"),
-        alert_description=data.get("alert_description"),
-        severity=data.get("severity"),
-        services=data.get("services"),
-        agents_used=data.get("agents_used"),
-        skills_used=data.get("skills_used"),
-        key_findings=data.get("key_findings"),
-        resolved=data.get("resolved", False),
-        root_cause=data.get("root_cause"),
-        summary=data.get("summary"),
-        effectiveness_score=data.get("effectiveness_score"),
-        confidence=data.get("confidence"),
-        duration_seconds=data.get("duration_seconds"),
-    )
-    session.add(episode)
-    session.flush()
-    return _episode_to_dict(episode)
-
-
-def get_episode(session: Session, *, episode_id: str) -> Optional[Dict[str, Any]]:
-    """Get a single episode by ID."""
-    from src.db.models import InvestigationEpisode
-
-    ep = session.execute(
-        select(InvestigationEpisode).where(InvestigationEpisode.id == episode_id)
-    ).scalar_one_or_none()
-    return _episode_to_dict(ep) if ep else None
-
-
-def list_episodes(
-    session: Session,
-    *,
-    org_id: str,
-    team_node_id: Optional[str] = None,
-    alert_type: Optional[str] = None,
-    service: Optional[str] = None,
-    limit: int = 50,
-    offset: int = 0,
-) -> List[Dict[str, Any]]:
-    """List episodes with optional filters."""
-    from src.db.models import InvestigationEpisode
-
-    stmt = select(InvestigationEpisode).where(InvestigationEpisode.org_id == org_id)
-    if team_node_id:
-        stmt = stmt.where(InvestigationEpisode.team_node_id == team_node_id)
-    if alert_type:
-        stmt = stmt.where(InvestigationEpisode.alert_type == alert_type)
-    if service:
-        # JSONB contains check for service name in services array
-        stmt = stmt.where(InvestigationEpisode.services.op("@>")(f'["{service}"]'))
-    stmt = (
-        stmt.order_by(InvestigationEpisode.created_at.desc())
-        .limit(limit)
-        .offset(offset)
-    )
-    results = session.execute(stmt).scalars().all()
-    return [_episode_to_dict(ep) for ep in results]
-
-
-def search_similar_episodes(
-    session: Session,
-    *,
-    org_id: str,
-    alert_type: Optional[str] = None,
-    service_name: Optional[str] = None,
-    limit: int = 5,
-) -> List[Dict[str, Any]]:
-    """Find similar episodes using weighted scoring."""
-    import sqlalchemy as sa
-
-    from src.db.models import InvestigationEpisode
-
-    # Build weighted score expression
-    score_parts = []
-    if alert_type:
-        score_parts.append(
-            sa.case((InvestigationEpisode.alert_type == alert_type, 0.5), else_=0.0)
-        )
-    if service_name:
-        score_parts.append(
-            sa.case(
-                (InvestigationEpisode.services.op("@>")(f'["{service_name}"]'), 0.3),
-                else_=0.0,
-            )
-        )
-    score_parts.append(sa.case((InvestigationEpisode.resolved == True, 0.2), else_=0.0))
-
-    score_expr = sum(score_parts) if score_parts else sa.literal(0.0)
-
-    stmt = (
-        select(InvestigationEpisode, score_expr.label("score"))
-        .where(InvestigationEpisode.org_id == org_id)
-        .where(score_expr > 0.0)
-        .order_by(sa.desc("score"), InvestigationEpisode.created_at.desc())
-        .limit(limit)
-    )
-
-    results = session.execute(stmt).all()
-    episodes = []
-    for row in results:
-        ep_dict = _episode_to_dict(row[0])
-        ep_dict["similarity_score"] = float(row[1])
-        episodes.append(ep_dict)
-    return episodes
-
-
-def get_episode_stats(
-    session: Session,
-    *,
-    org_id: str,
-    team_node_id: Optional[str] = None,
-) -> Dict[str, Any]:
-    """Get episode statistics."""
-    from src.db.models import InvestigationEpisode
-
-    base = (
-        select(func.count())
-        .select_from(InvestigationEpisode)
-        .where(InvestigationEpisode.org_id == org_id)
-    )
-    if team_node_id:
-        base = base.where(InvestigationEpisode.team_node_id == team_node_id)
-
-    total = session.execute(base).scalar() or 0
-
-    # Build a fresh statement for resolved count
-    resolved_stmt = (
-        select(func.count())
-        .select_from(InvestigationEpisode)
-        .where(
-            InvestigationEpisode.org_id == org_id,
-            InvestigationEpisode.resolved == True,
-        )
-    )
-    if team_node_id:
-        resolved_stmt = resolved_stmt.where(
-            InvestigationEpisode.team_node_id == team_node_id
-        )
-    resolved = session.execute(resolved_stmt).scalar() or 0
-    unresolved = total - resolved
-
-    # Count strategies
-    from src.db.models import InvestigationStrategy
-
-    strat_base = (
-        select(func.count())
-        .select_from(InvestigationStrategy)
-        .where(InvestigationStrategy.org_id == org_id)
-    )
-    if team_node_id:
-        strat_base = strat_base.where(
-            InvestigationStrategy.team_node_id == team_node_id
-        )
-    strategies_count = session.execute(strat_base).scalar() or 0
-
-    return {
-        "total_episodes": total,
-        "resolved_episodes": resolved,
-        "unresolved_episodes": unresolved,
-        "strategies_count": strategies_count,
-    }
-
-
-def _episode_to_dict(ep) -> Dict[str, Any]:
-    """Convert episode model to dict."""
-    return {
-        "id": ep.id,
-        "agent_run_id": ep.agent_run_id,
-        "org_id": ep.org_id,
-        "team_node_id": ep.team_node_id,
-        "alert_type": ep.alert_type,
-        "alert_description": ep.alert_description,
-        "severity": ep.severity,
-        "services": ep.services or [],
-        "agents_used": ep.agents_used or [],
-        "skills_used": ep.skills_used or [],
-        "key_findings": ep.key_findings or [],
-        "resolved": ep.resolved,
-        "root_cause": ep.root_cause,
-        "summary": ep.summary,
-        "effectiveness_score": ep.effectiveness_score,
-        "confidence": ep.confidence,
-        "duration_seconds": ep.duration_seconds,
-        "created_at": ep.created_at.isoformat() if ep.created_at else None,
-    }
-
-
-# =============================================================================
-# Investigation Strategies
-# =============================================================================
-
-
-def upsert_strategy(session: Session, *, data: Dict[str, Any]) -> Dict[str, Any]:
-    """Create or update an investigation strategy."""
-    from src.db.models import InvestigationStrategy
-
-    # Try to find existing
-    stmt = select(InvestigationStrategy).where(
-        InvestigationStrategy.org_id == data["org_id"],
-        InvestigationStrategy.alert_type == data.get("alert_type"),
-        InvestigationStrategy.service_name == data.get("service_name"),
-    )
-    if data.get("team_node_id"):
-        stmt = stmt.where(InvestigationStrategy.team_node_id == data["team_node_id"])
-    else:
-        stmt = stmt.where(InvestigationStrategy.team_node_id.is_(None))
-
-    existing = session.execute(stmt).scalar_one_or_none()
-
-    if existing:
-        existing.strategy_text = data["strategy_text"]
-        existing.source_episode_ids = data.get("source_episode_ids")
-        existing.episode_count = data.get("episode_count")
-        existing.generated_at = datetime.utcnow()
-        session.flush()
-        return _strategy_to_dict(existing)
-
-    strategy = InvestigationStrategy(
-        id=data.get("id", str(uuid4())),
-        org_id=data["org_id"],
-        team_node_id=data.get("team_node_id"),
-        alert_type=data.get("alert_type"),
-        service_name=data.get("service_name"),
-        strategy_text=data["strategy_text"],
-        source_episode_ids=data.get("source_episode_ids"),
-        episode_count=data.get("episode_count"),
-    )
-    session.add(strategy)
-    session.flush()
-    return _strategy_to_dict(strategy)
-
-
-def get_strategy(
-    session: Session,
-    *,
-    org_id: str,
-    team_node_id: Optional[str] = None,
-    alert_type: Optional[str] = None,
-    service_name: Optional[str] = None,
-) -> Optional[Dict[str, Any]]:
-    """Get a specific strategy."""
-    from src.db.models import InvestigationStrategy
-
-    stmt = select(InvestigationStrategy).where(
-        InvestigationStrategy.org_id == org_id,
-        InvestigationStrategy.alert_type == alert_type,
-        InvestigationStrategy.service_name == service_name,
-    )
-    if team_node_id:
-        stmt = stmt.where(InvestigationStrategy.team_node_id == team_node_id)
-    else:
-        stmt = stmt.where(InvestigationStrategy.team_node_id.is_(None))
-
-    s = session.execute(stmt).scalar_one_or_none()
-    return _strategy_to_dict(s) if s else None
-
-
-def list_strategies(
-    session: Session,
-    *,
-    org_id: str,
-    team_node_id: Optional[str] = None,
-) -> List[Dict[str, Any]]:
-    """List all strategies for an org/team."""
-    from src.db.models import InvestigationStrategy
-
-    stmt = select(InvestigationStrategy).where(InvestigationStrategy.org_id == org_id)
-    if team_node_id:
-        stmt = stmt.where(InvestigationStrategy.team_node_id == team_node_id)
-    stmt = stmt.order_by(InvestigationStrategy.generated_at.desc())
-    results = session.execute(stmt).scalars().all()
-    return [_strategy_to_dict(s) for s in results]
-
-
-def _strategy_to_dict(s) -> Dict[str, Any]:
-    """Convert strategy model to dict."""
-    return {
-        "id": s.id,
-        "org_id": s.org_id,
-        "team_node_id": s.team_node_id,
-        "alert_type": s.alert_type,
-        "service_name": s.service_name,
-        "strategy_text": s.strategy_text,
-        "source_episode_ids": s.source_episode_ids or [],
-        "episode_count": s.episode_count,
-        "generated_at": s.generated_at.isoformat() if s.generated_at else None,
-    }

@@ -66,13 +66,31 @@ def tool_start_event(
     tool_input: Optional[dict] = None,
     tool_use_id: Optional[str] = None,
     parent_tool_use_id: Optional[str] = None,
+    agent_id: Optional[str] = None,
+    agent_type: Optional[str] = None,
+    parent_agent_id: Optional[str] = None,
+    parent_agent_type: Optional[str] = None,
+    depth: int = 0,
 ) -> StreamEvent:
-    """Create a tool start event."""
+    """Create a tool start event.
+
+    Attribution fields (agent_id/agent_type/parent_agent_id/parent_agent_type/
+    depth) come from the SDK PreToolUse hook's agent_id resolution in
+    InteractiveAgentSession (agent.py). They are emitted unconditionally so the
+    web UI / persistence layer can rely on them always being present, even for
+    root-level calls (None / 0).
+    """
     data = {"name": name}
     if tool_use_id:
         data["tool_use_id"] = tool_use_id
     if parent_tool_use_id:
         data["parent_tool_use_id"] = parent_tool_use_id
+    # Nested-agent attribution (always present; root calls carry None/0).
+    data["agent_id"] = agent_id
+    data["agent_type"] = agent_type
+    data["parent_agent_id"] = parent_agent_id
+    data["parent_agent_type"] = parent_agent_type
+    data["depth"] = depth
     if tool_input:
         # Extract relevant info based on tool type
         if name == "Bash" and "command" in tool_input:
@@ -83,8 +101,9 @@ def tool_start_event(
             data["pattern"] = tool_input["pattern"]
         elif name == "Grep" and "pattern" in tool_input:
             data["pattern"] = tool_input["pattern"]
-        elif name == "Task":
-            # Subagent invocation - capture description and subagent type
+        elif name in ("Task", "Agent"):
+            # "Agent" is the tool name used by newer Claude Agent SDK builds for
+            # subagent dispatch; "Task" is kept for older builds / historical data.
             if "description" in tool_input:
                 data["description"] = tool_input["description"]
             if "subagent_type" in tool_input:
@@ -112,11 +131,28 @@ def tool_end_event(
     output: Optional[str] = None,
     tool_use_id: Optional[str] = None,
     parent_tool_use_id: Optional[str] = None,
+    agent_id: Optional[str] = None,
+    agent_type: Optional[str] = None,
+    parent_agent_id: Optional[str] = None,
+    parent_agent_type: Optional[str] = None,
+    depth: int = 0,
 ) -> StreamEvent:
-    """Create a tool completion event."""
+    """Create a tool completion event.
+
+    Attribution fields mirror tool_start_event so tool_end carries the same
+    agent context (sourced from the PostToolUse hook). Always present, even for
+    root-level calls (None / 0), so the SSE consumer can attribute the end
+    event without cross-referencing the matching start.
+    """
     data = {
         "name": name,
         "success": success,
+        # Nested-agent attribution (always present; root calls carry None/0).
+        "agent_id": agent_id,
+        "agent_type": agent_type,
+        "parent_agent_id": parent_agent_id,
+        "parent_agent_type": parent_agent_type,
+        "depth": depth,
     }
     if tool_use_id:
         data["tool_use_id"] = tool_use_id
@@ -229,6 +265,79 @@ def question_timeout_event(
         type="question_timeout",
         data={
             "message": "Agent waited 60 seconds and decided to continue without your response."
+        },
+        thread_id=thread_id,
+    )
+
+
+def message_queued_event(thread_id: str, *, pending_count: int) -> StreamEvent:
+    """Notify clients that a user message was queued mid-investigation."""
+    return StreamEvent(
+        type="message_queued",
+        data={"pending_count": pending_count},
+        thread_id=thread_id,
+    )
+
+
+def task_started_event(
+    thread_id: str,
+    *,
+    task_id: str,
+    description: str,
+    tool_use_id: Optional[str] = None,
+    task_type: Optional[str] = None,
+) -> StreamEvent:
+    """Notify clients that a background SDK task has started."""
+    data = {
+        "task_id": task_id,
+        "description": description,
+    }
+    if tool_use_id is not None:
+        data["tool_use_id"] = tool_use_id
+    if task_type is not None:
+        data["task_type"] = task_type
+    return StreamEvent(
+        type="task_started",
+        data=data,
+        thread_id=thread_id,
+    )
+
+
+def background_waiting_event(
+    thread_id: str,
+    *,
+    pending_count: int,
+    pending_task_ids: list[str],
+    label: Optional[str] = None,
+) -> StreamEvent:
+    """Notify clients that the agent is waiting on background tasks."""
+    if label is None:
+        label = f"Waiting on {pending_count} background agent(s)…"
+    return StreamEvent(
+        type="background_waiting",
+        data={
+            "pending_count": pending_count,
+            "pending_task_ids": pending_task_ids,
+            "label": label,
+        },
+        thread_id=thread_id,
+    )
+
+
+def task_notification_event(
+    thread_id: str,
+    *,
+    task_id: str,
+    status: str,
+    summary: str,
+) -> StreamEvent:
+    """Notify clients that a background SDK task has completed or failed."""
+    return StreamEvent(
+        type="task_notification",
+        data={
+            "task_id": task_id,
+            "status": status,
+            "summary": summary,
         },
         thread_id=thread_id,
     )

@@ -65,7 +65,7 @@ export default function HomePage() {
             View effective config + lineage and manage team overrides.
           </p>
           <Link
-            href="/configuration"
+            href="/team/agents"
             className="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium bg-forest text-white hover:bg-forest-dark transition-colors"
           >
             Open Team Configuration

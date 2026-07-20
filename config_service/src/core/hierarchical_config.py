@@ -420,7 +420,7 @@ def get_default_agent_config() -> Dict[str, Any]:
                 "enabled": True,
                 "name": "Planner",
                 "description": "Top-level orchestrator that delegates to 3 specialized agents",
-                "model": {"name": "gpt-5.2", "temperature": 0.3, "max_tokens": 16000},
+                "model": {"name": "inherit", "temperature": 0.3, "max_tokens": 16000},
                 "prompt": {
                     "system": DEFAULT_PROMPTS.get("planner", ""),
                     "prefix": "",
@@ -444,7 +444,7 @@ def get_default_agent_config() -> Dict[str, Any]:
                 "enabled": True,
                 "name": "Investigation Agent",
                 "description": "Sub-orchestrator for incident investigation with 5 specialized sub-agents",
-                "model": {"name": "gpt-5.2", "temperature": 0.4, "max_tokens": 16000},
+                "model": {"name": "inherit", "temperature": 0.4, "max_tokens": 16000},
                 "prompt": {
                     "system": DEFAULT_PROMPTS.get("investigation", ""),
                     "prefix": "",
@@ -470,7 +470,7 @@ def get_default_agent_config() -> Dict[str, Any]:
                 "enabled": True,
                 "name": "Coding Agent",
                 "description": "Code analysis, debugging, and fixes",
-                "model": {"name": "gpt-5.2", "temperature": 0.4, "max_tokens": 16000},
+                "model": {"name": "inherit", "temperature": 0.4, "max_tokens": 16000},
                 "prompt": {
                     "system": DEFAULT_PROMPTS.get("coding", ""),
                     "prefix": "",
@@ -502,7 +502,7 @@ def get_default_agent_config() -> Dict[str, Any]:
                 "enabled": True,
                 "name": "Writeup Agent",
                 "description": "Blameless postmortem and incident documentation",
-                "model": {"name": "gpt-5.2", "temperature": 0.5, "max_tokens": 16000},
+                "model": {"name": "inherit", "temperature": 0.5, "max_tokens": 16000},
                 "prompt": {
                     "system": DEFAULT_PROMPTS.get("writeup", ""),
                     "prefix": "",
@@ -520,7 +520,7 @@ def get_default_agent_config() -> Dict[str, Any]:
                 "enabled": True,
                 "name": "GitHub Agent",
                 "description": "GitHub repository analysis for change correlation",
-                "model": {"name": "gpt-5.2", "temperature": 0.3, "max_tokens": 16000},
+                "model": {"name": "inherit", "temperature": 0.3, "max_tokens": 16000},
                 "prompt": {
                     "system": DEFAULT_PROMPTS.get("github", ""),
                     "prefix": "",
@@ -545,7 +545,7 @@ def get_default_agent_config() -> Dict[str, Any]:
                 "enabled": True,
                 "name": "Kubernetes Agent",
                 "description": "Kubernetes troubleshooting and operations",
-                "model": {"name": "gpt-5.2", "temperature": 0.3, "max_tokens": 16000},
+                "model": {"name": "inherit", "temperature": 0.3, "max_tokens": 16000},
                 "prompt": {
                     "system": DEFAULT_PROMPTS.get("k8s", ""),
                     "prefix": "",
@@ -577,7 +577,7 @@ def get_default_agent_config() -> Dict[str, Any]:
                 "enabled": True,
                 "name": "AWS Agent",
                 "description": "AWS resource management and debugging",
-                "model": {"name": "gpt-5.2", "temperature": 0.3, "max_tokens": 16000},
+                "model": {"name": "inherit", "temperature": 0.3, "max_tokens": 16000},
                 "prompt": {
                     "system": DEFAULT_PROMPTS.get("aws", ""),
                     "prefix": "",
@@ -603,7 +603,7 @@ def get_default_agent_config() -> Dict[str, Any]:
                 "enabled": True,
                 "name": "Metrics Agent",
                 "description": "Metrics analysis and anomaly detection",
-                "model": {"name": "gpt-5.2", "temperature": 0.2, "max_tokens": 16000},
+                "model": {"name": "inherit", "temperature": 0.2, "max_tokens": 16000},
                 "prompt": {
                     "system": DEFAULT_PROMPTS.get("metrics", ""),
                     "prefix": "",
@@ -635,7 +635,7 @@ def get_default_agent_config() -> Dict[str, Any]:
                 "enabled": True,
                 "name": "Log Analysis Agent",
                 "description": "Partition-first log investigation specialist",
-                "model": {"name": "gpt-5.2", "temperature": 0.2, "max_tokens": 16000},
+                "model": {"name": "inherit", "temperature": 0.2, "max_tokens": 16000},
                 "prompt": {
                     "system": DEFAULT_PROMPTS.get("log_analysis", ""),
                     "prefix": "",

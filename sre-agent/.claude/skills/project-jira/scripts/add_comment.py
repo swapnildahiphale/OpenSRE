@@ -9,7 +9,7 @@ import argparse
 import json
 import sys
 
-from jira_client import jira_request, make_adf_text
+from jira_client import jira_request, make_text_body
 
 
 def main():
@@ -23,7 +23,8 @@ def main():
         data = jira_request(
             "POST",
             f"/issue/{args.issue_key}/comment",
-            json_body={"body": make_adf_text(args.comment)},
+            # make_text_body picks ADF (Cloud v3) or Wiki Markup string (DC v2).
+            json_body={"body": make_text_body(args.comment)},
         )
         author = data.get("author", {})
         result = {

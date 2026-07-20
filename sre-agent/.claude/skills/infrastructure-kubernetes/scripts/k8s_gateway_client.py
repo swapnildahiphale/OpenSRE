@@ -24,6 +24,13 @@ import httpx
 
 def is_gateway_mode(cluster_id: str | None) -> bool:
     """Check if we should route through the k8s-gateway."""
+    if cluster_id and not os.getenv("K8S_GATEWAY_URL"):
+        print(
+            f"[k8s-gateway] --cluster-id={cluster_id!r} ignored: K8S_GATEWAY_URL is not "
+            "configured, falling back to the local kubeconfig/in-cluster context. "
+            "Every --cluster-id value will hit the same context until K8S_GATEWAY_URL is set.",
+            file=sys.stderr,
+        )
     return bool(cluster_id and os.getenv("K8S_GATEWAY_URL"))
 
 

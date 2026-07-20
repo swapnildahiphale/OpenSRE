@@ -1,6 +1,6 @@
 # OpenSRE - AI SRE Agent
 
-AI-powered SRE agent for automated incident investigation using LangGraph-based orchestration.
+AI-powered SRE agent for automated incident investigation using the Claude Agent SDK.
 
 ## Quick Start
 
@@ -9,14 +9,21 @@ cd sre-agent
 
 # Setup
 uv venv && source .venv/bin/activate
-uv pip install langgraph langchain langchain-core langchain-openai python-dotenv fastapi uvicorn
+uv pip install -e .
 
 # Configure
 cp env.example .env
-# Add your OPENROUTER_API_KEY (or ANTHROPIC_API_KEY) to .env
+# Set ANTHROPIC_API_KEY in .env — no LiteLLM or OpenRouter required
 
-# Run server
-python server.py
+# Run server (simple mode — Claude Agent SDK engine)
+python server_simple.py
+```
+
+### Docker Compose (POC bring-up)
+
+```bash
+# From repo root
+docker compose -f docker-compose.yml -f docker-compose.override.yml up sre-agent
 ```
 
 ## Agent Configuration
@@ -83,24 +90,19 @@ Each agent in your team config supports:
 
 ### Model Settings
 
-Model settings are applied **globally** to the graph execution:
+Model settings control the Claude Agent SDK session:
 
-- Settings from the **planner config** apply to all subagents unless overridden
-- LiteLLM proxy forwards these to the configured LLM provider
-- Supported by most models (temperature, max_tokens, top_p)
+- `temperature`, `max_tokens`, `top_p` supported
+- Applied per-session from team config or defaults
+- Calls go directly to Anthropic — no proxy layer
 
 ### Execution Limits
 
-- **`max_turns`**: Prevents infinite loops by limiting ReAct iterations
-- Applied per-subagent (each subagent has its own ReAct loop cap)
+- **`max_turns`**: Prevents runaway sessions by capping tool-use turns (each thought+tool pair = 1 turn)
 - When exceeded, investigation returns partial results with status="incomplete"
-- `AGENT_MAX_TURNS` env var overrides config-service value (default: 25)
-
-### Subagent Delegation
-
-The planner node selects which subagents to dispatch based on the alert context and hypotheses. Selected subagents execute in parallel via LangGraph's `Send()` fan-out. Each subagent has its own ReAct loop with scoped tools and system prompt from team config.
-
-Subagents are configurable from team config — not hardcoded.
+- Set per root agent in **Admin → Configuration → Agents** (config-service hierarchical merge; planner default is 50)
+- **Not** an `.env` variable — `sre-agent` reads `max_turns` only from team config
+- Wall-clock timeout: `AGENT_TIMEOUT_SECONDS` in `docker-compose.yml` (default 600)
 
 ## API
 
@@ -119,12 +121,13 @@ Returns SSE stream of agent output.
 
 ### Local Development
 ```
-Request → server.py:8001 → graph.py (LangGraph) → Stream Results
-                ↓                    ↓
-          LiteLLM:4001    planner → subagents → synthesizer → writeup
+Request → server_simple.py:8001 → agent.py (Claude Agent SDK) → Stream Results
+                                        ↓
+                               InteractiveAgentSession
+                               (direct Anthropic API, ANTHROPIC_API_KEY)
 ```
 
-The agent runs in-process using LangGraph graph orchestration. All LLM calls go through the LiteLLM proxy.
+The agent runs in-process via the Claude Agent SDK (`claude-agent-sdk`). LLM calls go directly to Anthropic — no LiteLLM proxy, no OpenRouter required.
 
 ## Integrations
 
@@ -195,8 +198,9 @@ Every investigation is recorded with full tool call traces:
 
 ## Key Files
 
-- **graph.py** — master LangGraph graph definition with nodes, edges, and Send() fan-out
-- **server.py** — FastAPI server (port 8001), SSE streaming, investigation management
+- **agent.py** — `InteractiveAgentSession` — Claude Agent SDK engine
+- **server_simple.py** — FastAPI server (port 8001), SSE streaming, simple mode entry point
+- **server.py** — full server (multi-tenant, config-service integration)
 - **config.py** — config-service client, skills filtering logic
 - **memory/** — episodic memory system (integration, strategy generator, models)
 - **memory_service.py** — HTTP client for config-service memory/episode API
@@ -207,12 +211,10 @@ Every investigation is recorded with full tool call traces:
 
 ## Features
 
-- **LangGraph Orchestration** — graph-based agent topology with parallel subagent fan-out
+- **Claude Agent SDK** — direct Anthropic API, no proxy layer required
 - **Skills + Scripts Architecture** — context-efficient integrations via Python scripts
 - **Episodic Memory** — learn from past investigations, strategy generation
 - **Skills Filtering** — per-agent skill access control
 - **Agent Run Recording** — full tool call traces for observability
-- **Multi-provider LLM** — via LiteLLM proxy (OpenRouter, Anthropic, etc.)
 - **Neo4j Knowledge Graph** — service topology and blast radius analysis
-- **Configurable Subagents** — from team config, not hardcoded
 - **Laminar Tracing** — full observability and debugging

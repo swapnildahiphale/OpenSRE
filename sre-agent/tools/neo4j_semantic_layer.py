@@ -7,21 +7,16 @@ to provide structured tools for interacting with the graph database.
 """
 
 import logging
-import os
 from typing import Any, Dict, Optional
 
-from dotenv import load_dotenv
 from langchain_neo4j import Neo4jGraph
-from neo4j import GraphDatabase
-
-# Load environment variables
-load_dotenv()
-
-# Get Neo4j connection parameters from environment variables
-NEO4J_URI = os.getenv("NEO4J_URI", "bolt://localhost:7687")
-NEO4J_USERNAME = os.getenv("NEO4J_USERNAME", "")
-NEO4J_PASSWORD = os.getenv("NEO4J_PASSWORD", "")
-NEO4J_DATABASE = os.getenv("NEO4J_DATABASE", "neo4j")
+from memory.neo4j_conn import (
+    NEO4J_DATABASE,
+    NEO4J_PASSWORD,
+    NEO4J_URI,
+    NEO4J_USERNAME,
+    get_driver,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -66,10 +61,8 @@ class KubernetesGraphTools:
                     refresh_schema=False,
                 )
 
-            # Also initialize a Neo4j driver for direct query execution
-            self.driver = GraphDatabase.driver(
-                NEO4J_URI, auth=(NEO4J_USERNAME, NEO4J_PASSWORD)
-            )
+            # Shared singleton driver (same credentials as episodic memory)
+            self.driver = get_driver()
 
             # Test the connection with a simple query
             try:

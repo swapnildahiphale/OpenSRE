@@ -254,7 +254,7 @@ def main() -> None:
                 "planner": {
                     "enabled": True,
                     "model": {
-                        "name": "anthropic/claude-sonnet-4-20250514",
+                        "name": "anthropic/claude-sonnet-4-6",
                         "temperature": 0.3,
                     },
                     "prompt": {

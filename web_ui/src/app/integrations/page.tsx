@@ -9,7 +9,7 @@ export default function IntegrationsPage() {
         service endpoints.
       </p>
       <p className="text-sm text-stone-500">
-        For now, configure your agent behavior via <Link className="underline" href="/configuration">Team Configuration</Link>.
+        For now, configure your agent behavior via <Link className="underline" href="/team/agents">Team Configuration</Link>.
       </p>
     </div>
   );

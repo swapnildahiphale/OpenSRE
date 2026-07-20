@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useIdentity } from '@/lib/useIdentity';
 import { apiFetch } from '@/lib/apiClient';
+import { isPromptSet, agentPromptPatch } from '@/lib/agentPrompts';
 import {
   MessageSquareText,
   Save,
@@ -39,38 +40,6 @@ interface ProposedPromptChange {
   status: 'pending' | 'approved' | 'rejected';
 }
 
-const AGENT_CONFIGS: Record<string, { displayName: string; description: string; color: string }> = {
-  planner: {
-    displayName: 'Planner Agent',
-    description: 'Orchestrates complex tasks across multiple agents',
-    color: 'bg-stone-100 dark:bg-stone-700 text-stone-600',
-  },
-  investigation_agent: {
-    displayName: 'Investigation Agent',
-    description: 'Full troubleshooting toolkit for incident investigation',
-    color: 'bg-stone-100 dark:bg-stone-700 text-stone-600',
-  },
-  k8s_agent: {
-    displayName: 'Kubernetes Agent',
-    description: 'Kubernetes troubleshooting and diagnostics',
-    color: 'bg-stone-100 dark:bg-stone-700 text-stone-600',
-  },
-  aws_agent: {
-    displayName: 'AWS Agent',
-    description: 'AWS resource debugging and monitoring',
-    color: 'bg-stone-100 dark:bg-stone-700 text-stone-600',
-  },
-  coding_agent: {
-    displayName: 'Coding Agent',
-    description: 'Code analysis and fix suggestions',
-    color: 'bg-stone-100 dark:bg-stone-700 text-stone-600',
-  },
-  metrics_agent: {
-    displayName: 'Metrics Agent',
-    description: 'Anomaly detection and metrics analysis',
-    color: 'bg-stone-100 dark:bg-stone-700 text-stone-600',
-  },
-};
 
 export default function TeamPromptsPage() {
   const { identity } = useIdentity();
@@ -96,46 +65,45 @@ export default function TeamPromptsPage() {
         apiFetch('/api/config/me/raw'),
       ]);
       
-      let effectivePrompts: Record<string, string> = {};
-      let teamPrompts: Record<string, string> = {};
-      let orgPrompts: Record<string, string> = {};
-      
+      let effectiveAgents: Record<string, any> = {};
+      let teamAgents: Record<string, any> = {};
+      let orgAgents: Record<string, any> = {};
+
       if (effectiveRes.ok) {
         const config = await effectiveRes.json();
-        effectivePrompts = config.agent_prompts || {};
+        effectiveAgents = config.agents || {};
       }
-      
+
       if (rawRes.ok) {
         const rawData = await rawRes.json();
         // Extract team-level overrides and org-level defaults from raw config
         const configs = rawData.configs || {};
         const lineage = rawData.lineage || [];
-        
-        // Find org node (first in lineage, type 'org')
-        const orgNode = lineage.find((n: any) => n.node_type === 'org');
-        const teamNode = lineage.find((n: any) => n.node_type === 'team');
-        
-        if (orgNode && configs[orgNode.node_id]) {
-          orgPrompts = configs[orgNode.node_id].agent_prompts || {};
-        }
-        if (teamNode && configs[teamNode.node_id]) {
-          teamPrompts = configs[teamNode.node_id].agent_prompts || {};
-        }
+
+        // /api/config/me/raw returns `lineage` as an ordered array of node-id
+        // strings (org/root first → team/self last) and `configs` keyed by node id.
+        const teamNodeId: string | undefined = lineage[lineage.length - 1];
+        const orgNodeId: string | undefined = lineage[0];
+
+        if (teamNodeId && configs[teamNodeId]) teamAgents = configs[teamNodeId].agents || {};
+        if (orgNodeId && orgNodeId !== teamNodeId && configs[orgNodeId]) orgAgents = configs[orgNodeId].agents || {};
       }
-      
-      // Build prompts list with inheritance info
-      const promptsList: AgentPrompt[] = Object.keys(AGENT_CONFIGS).map((agent) => {
-        const hasTeamOverride = !!teamPrompts[agent];
-        const hasOrgDefault = !!orgPrompts[agent];
-        
+
+      // Build prompts list from live config agents
+      const agentIds = Object.keys(effectiveAgents);
+      const promptsList: AgentPrompt[] = agentIds.map((agent) => {
+        const teamSystem = teamAgents[agent]?.prompt?.system;
+        const orgSystem = orgAgents[agent]?.prompt?.system;
+        const hasTeamOverride = isPromptSet(teamSystem);
+        const hasOrgDefault = isPromptSet(orgSystem);
         return {
           agent,
-          displayName: AGENT_CONFIGS[agent].displayName,
-          description: AGENT_CONFIGS[agent].description,
-          systemPrompt: effectivePrompts[agent] || '',
+          displayName: effectiveAgents[agent]?.display_name || agent,
+          description: effectiveAgents[agent]?.description || '',
+          systemPrompt: effectiveAgents[agent]?.prompt?.system || '',
           isCustom: hasTeamOverride,
           inheritedFrom: !hasTeamOverride && hasOrgDefault ? 'org' : undefined,
-          orgDefault: orgPrompts[agent],
+          orgDefault: orgSystem,
         };
       });
       setPrompts(promptsList);
@@ -182,23 +150,13 @@ export default function TeamPromptsPage() {
       const res = await apiFetch('/api/config/me', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          custom_prompts: {
-            [agent]: editedPrompt,
-          },
-        }),
+        body: JSON.stringify(agentPromptPatch(agent, editedPrompt)),
       });
 
       if (res.ok) {
-        setPrompts((prev) =>
-          prev.map((p) =>
-            p.agent === agent
-              ? { ...p, systemPrompt: editedPrompt, isCustom: true }
-              : p
-          )
-        );
         setEditingAgent(null);
         setMessage({ type: 'success', text: 'Prompt saved!' });
+        loadData(); // Refetch so the Customized badge / inheritance reflect server truth
       } else {
         const err = await res.json();
         setMessage({ type: 'error', text: err.detail || 'Failed to save' });
@@ -217,23 +175,12 @@ export default function TeamPromptsPage() {
       const res = await apiFetch('/api/config/me', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          custom_prompts: {
-            [agent]: null, // null to remove override
-          },
-        }),
+        body: JSON.stringify(agentPromptPatch(agent, null)),
       });
 
       if (res.ok) {
-        const prompt = prompts.find((p) => p.agent === agent);
-        setPrompts((prev) =>
-          prev.map((p) =>
-            p.agent === agent
-              ? { ...p, systemPrompt: '', isCustom: false }
-              : p
-          )
-        );
         setMessage({ type: 'success', text: 'Prompt reset to default' });
+        loadData(); // Refetch so the inherited/default value is shown correctly
       } else {
         const err = await res.json();
         setMessage({ type: 'error', text: err.detail || 'Failed to reset' });
@@ -351,7 +298,6 @@ export default function TeamPromptsPage() {
       {activeTab === 'prompts' && (
         <div className="space-y-4">
           {prompts.map((prompt) => {
-            const config = AGENT_CONFIGS[prompt.agent];
             const isExpanded = expandedAgent === prompt.agent;
             const isEditing = editingAgent === prompt.agent;
 
@@ -366,7 +312,7 @@ export default function TeamPromptsPage() {
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                      <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${config?.color || 'bg-stone-100 dark:bg-stone-700 text-stone-600'}`}>
+                      <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-stone-100 dark:bg-stone-700 text-stone-600">
                         <Bot className="w-5 h-5" />
                       </div>
                       <div>
@@ -416,6 +362,9 @@ export default function TeamPromptsPage() {
                             className="w-full px-3 py-2 rounded-lg border border-stone-200 dark:border-stone-600 bg-white dark:bg-stone-800 font-mono text-sm"
                             placeholder="Enter custom system prompt..."
                           />
+                          <p className="text-xs text-stone-500 mt-1">
+                            This text is appended to Claude Code&apos;s built-in instructions, not replacing them.
+                          </p>
                         </div>
                         <div className="flex items-center justify-between">
                           <button
@@ -500,7 +449,6 @@ export default function TeamPromptsPage() {
             </div>
           ) : (
             proposedChanges.map((change) => {
-              const config = AGENT_CONFIGS[change.agent];
               return (
                 <div
                   key={change.id}
@@ -508,7 +456,7 @@ export default function TeamPromptsPage() {
                 >
                   <div className="flex items-start justify-between mb-4">
                     <div className="flex items-center gap-3">
-                      <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${config?.color || 'bg-stone-100 dark:bg-stone-700 text-stone-600'}`}>
+                      <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-stone-100 dark:bg-stone-700 text-stone-600">
                         <Sparkles className="w-5 h-5" />
                       </div>
                       <div>
@@ -517,7 +465,7 @@ export default function TeamPromptsPage() {
                             Prompt Update
                           </span>
                           <span className="font-medium text-stone-900 dark:text-white">
-                            {config?.displayName || change.agent}
+                            {change.agent}
                           </span>
                         </div>
                         <p className="text-sm text-stone-600 dark:text-stone-400">{change.reason}</p>

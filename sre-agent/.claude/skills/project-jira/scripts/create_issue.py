@@ -10,7 +10,12 @@ import argparse
 import json
 import sys
 
-from jira_client import get_browse_url, jira_request, make_adf_text
+from jira_client import (
+    get_browse_url,
+    jira_request,
+    make_assignee_field,
+    make_text_body,
+)
 
 
 def main():
@@ -23,7 +28,11 @@ def main():
     )
     parser.add_argument("--priority", default="", help="Priority (High, Medium, Low)")
     parser.add_argument("--labels", default="", help="Comma-separated labels")
-    parser.add_argument("--assignee", default="", help="Assignee account ID")
+    parser.add_argument(
+        "--assignee",
+        default="",
+        help="Assignee: Atlassian account ID (Cloud) or username (Data Center)",
+    )
     parser.add_argument("--json", action="store_true", help="Output as JSON")
     args = parser.parse_args()
 
@@ -34,7 +43,8 @@ def main():
             "issuetype": {"name": args.type},
         }
         if args.description:
-            fields["description"] = make_adf_text(args.description)
+            # make_text_body picks ADF (Cloud v3) or Wiki Markup string (DC v2).
+            fields["description"] = make_text_body(args.description)
         if args.priority:
             fields["priority"] = {"name": args.priority}
         if args.labels:
@@ -45,10 +55,12 @@ def main():
 
         if args.assignee:
             try:
+                # Assignee field shape differs by API version: Cloud v3 uses
+                # accountId, Data Center v2 uses name. make_assignee_field picks.
                 jira_request(
                     "PUT",
                     f"/issue/{issue_key}/assignee",
-                    json_body={"accountId": args.assignee},
+                    json_body=make_assignee_field(args.assignee),
                 )
             except Exception:
                 pass

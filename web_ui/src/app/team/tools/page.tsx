@@ -15,16 +15,7 @@ import {
   X,
   ToggleLeft,
   ToggleRight,
-  Box,
-  Cloud,
-  BarChart3,
-  Code,
-  GitBranch,
-  FileSearch,
-  MessageSquare,
-  FileText,
-  Container,
-  Brain,
+  MinusSquare,
   ChevronDown,
   ChevronRight,
   Settings,
@@ -65,13 +56,6 @@ interface ToolItem {
   enabled_tools?: string[];  // NEW: Tool filtering for MCPs
 }
 
-interface CatalogTool {
-  id: string;
-  name: string;
-  description: string;
-  category: string;
-}
-
 interface ToolMetadata {
   id: string;
   name: string;
@@ -80,41 +64,19 @@ interface ToolMetadata {
   required_integrations: string[];
 }
 
-const CATEGORY_ICONS: Record<string, React.ReactNode> = {
-  kubernetes: <Box className="w-4 h-4" />,
-  aws: <Cloud className="w-4 h-4" />,
-  analytics: <BarChart3 className="w-4 h-4" />,
-  observability: <BarChart3 className="w-4 h-4" />,
-  code: <Code className="w-4 h-4" />,
-  github: <GitBranch className="w-4 h-4" />,
-  logs: <FileSearch className="w-4 h-4" />,
-  communication: <MessageSquare className="w-4 h-4" />,
-  documentation: <FileText className="w-4 h-4" />,
-  docker: <Container className="w-4 h-4" />,
-  agent: <Brain className="w-4 h-4" />,
-  data: <BarChart3 className="w-4 h-4" />,
-  cicd: <GitBranch className="w-4 h-4" />,
-};
-
-const CATEGORY_LABELS: Record<string, string> = {
-  kubernetes: 'Kubernetes',
-  aws: 'AWS',
-  analytics: 'Analytics',
-  observability: 'Observability',
-  code: 'Code & Git',
-  github: 'GitHub',
-  logs: 'Logs',
-  communication: 'Communication',
-  documentation: 'Documentation',
-  docker: 'Docker',
-  agent: 'Agent Core',
-  data: 'Data Warehouse',
-  cicd: 'CI/CD',
-};
-
-// Suppress unused variable warning for categories
-void CATEGORY_ICONS;
-void CATEGORY_LABELS;
+const SKILL_CATEGORY_ORDER = [
+  'Core Methodology',
+  'Memory',
+  'Observability',
+  'Infrastructure & Cloud',
+  'Databases',
+  'Incident Management',
+  'Alerting & On-call',
+  'Ticketing & Project',
+  'Code & Version Control',
+  'Docs & Knowledge',
+  'Other Integrations',
+];
 
 interface IntegrationSchemaResponse {
   id: string;
@@ -126,7 +88,6 @@ interface IntegrationSchemaResponse {
 export default function TeamToolsPage() {
   const { identity } = useIdentity();
   const [items, setItems] = useState<ToolItem[]>([]);
-  const [toolsCatalog, setToolsCatalog] = useState<CatalogTool[]>([]);
   const [toolMetadata, setToolMetadata] = useState<ToolMetadata[]>([]);
   const [integrationSchemas, setIntegrationSchemas] = useState<IntegrationSchemaResponse[]>([]);
   const [loading, setLoading] = useState(true);
@@ -166,7 +127,11 @@ export default function TeamToolsPage() {
     description: string;
     category: string;
     required_integrations: string[];
+    enabled: boolean;
   }>>([]);
+
+  // Team-level skills config (wildcard-minus-disabled model)
+  const [teamSkillsConfig, setTeamSkillsConfig] = useState<{ enabled?: string[]; disabled?: string[] } | null>(null);
 
   // NEW: Tool filtering modal state
   const [filteringMcp, setFilteringMcp] = useState<ToolItem | null>(null);
@@ -179,27 +144,27 @@ export default function TeamToolsPage() {
     setLoading(true);
 
     try {
-      // Fetch both config, tools catalog, and raw config (to detect team vs org)
-      const [configRes, toolsRes, rawConfigRes] = await Promise.all([
+      // Fetch config and raw config (to detect team vs org)
+      const [configRes, rawConfigRes] = await Promise.all([
         fetch('/api/team/config'),
-        fetch('/api/team/tools'),
         fetch('/api/config/me/raw'),
       ]);
 
-      if (!configRes.ok || !toolsRes.ok) {
-        throw new Error('Failed to load configuration or tools catalog');
+      if (!configRes.ok) {
+        throw new Error('Failed to load configuration');
       }
 
       const data = await configRes.json();
-      const toolsData = await toolsRes.json();
       const rawConfigData = rawConfigRes.ok ? await rawConfigRes.json() : null;
 
       // Extract configuration
       const integrations = data.integrations || {};
       const mcpServersDict = data.mcp_servers || {};
-      const builtInTools = toolsData.tools || [];
       // Canonical format: tools is a dict {tool_id: boolean}
       const toolsDict = (data.tools || {}) as Record<string, boolean>;
+
+      // Populate team skills config for the wildcard-minus-disabled toggle model
+      setTeamSkillsConfig(data.skills || null);
 
       // Detect team-level MCP servers (exist in raw team config)
       const teamMcpIds = new Set<string>();
@@ -240,7 +205,7 @@ export default function TeamToolsPage() {
           id,
           name: config.name || id,
           description: '', // Will be populated from schema in next step
-          type: 'integration',
+          type: 'integration' as const,
           enabled: true,  // Integrations are always "available", tools use them
           config_schema: mergedSchema,
           config_values: extractedValues,
@@ -270,14 +235,8 @@ export default function TeamToolsPage() {
         });
       });
 
-      // Built-in tools
-      const toolItems = builtInTools.map((item: ToolItem) => ({
-        ...item,
-        source: 'org' as const,
-      }));
-
       // Combine all items and apply enabled/disabled logic
-      const allItems = [...integrationItems, ...mcpServerItems, ...toolItems].map((item: ToolItem) => {
+      const allItems = [...integrationItems, ...mcpServerItems].map((item: ToolItem) => {
         // Integrations are always "available"
         if (item.type === 'integration') {
           return item;
@@ -291,7 +250,6 @@ export default function TeamToolsPage() {
       });
 
       setItems(allItems);
-      setToolsCatalog(builtInTools);
 
       // Load tool metadata (integration dependencies)
       try {
@@ -358,14 +316,10 @@ export default function TeamToolsPage() {
     if (searchQuery) {
       const sectionsWithMatches = new Set<string>();
 
-      // Build catalog lookup
-      const catalogLookup = new Map(toolsCatalog.map(t => [t.id, t]));
-
       // Check integrations for matches
       const integrationItems = items.filter(i => {
         const hasRequiredConfig = Object.values(i.config_schema || {}).some(f => f.required);
-        const catalogEntry = catalogLookup.get(i.id);
-        return hasRequiredConfig && !catalogEntry;
+        return hasRequiredConfig;
       });
 
       integrationItems.forEach(item => {
@@ -384,25 +338,12 @@ export default function TeamToolsPage() {
         }
       });
 
-      // Check built-in tools by category for matches
-      const toolItems = items.filter(i => i.type === 'tool' || (!Object.values(i.config_schema || {}).some(f => f.required) && i.type !== 'mcp_server'));
-      toolItems.forEach(item => {
-        const catalogEntry = catalogLookup.get(item.id);
-        const category = catalogEntry?.category || item.category || 'other';
-        if (item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            item.description?.toLowerCase().includes(searchQuery.toLowerCase())) {
-          sectionsWithMatches.add(category);
-        }
-      });
-
-      // Also check catalog tools that aren't in items yet
-      const seenIds = new Set(items.map(i => i.id));
-      toolsCatalog.forEach(catalogTool => {
-        if (!seenIds.has(catalogTool.id)) {
-          if (catalogTool.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-              catalogTool.description?.toLowerCase().includes(searchQuery.toLowerCase())) {
-            sectionsWithMatches.add(catalogTool.category);
-          }
+      // Check skills for matches — expand matching skill categories
+      skillsCatalog.forEach(skill => {
+        if (skill.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            skill.description?.toLowerCase().includes(searchQuery.toLowerCase())) {
+          sectionsWithMatches.add('skills');
+          sectionsWithMatches.add(`skill-cat-${skill.category}`);
         }
       });
 
@@ -412,7 +353,8 @@ export default function TeamToolsPage() {
       // When search is cleared, collapse all sections
       setExpandedCategories(new Set());
     }
-  }, [searchQuery, items, toolsCatalog]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchQuery]);
 
   const getMissingRequiredFields = (item: ToolItem): string[] => {
     const missing: string[] = [];
@@ -501,6 +443,48 @@ export default function TeamToolsPage() {
       console.error('Failed to toggle:', e);
     } finally {
       setSaving(false);
+    }
+  };
+
+  const toggleSkill = async (skillId: string, currentlyEnabled: boolean) => {
+    // Read current team skills config from the loaded config, default to wildcard.
+    const current = (teamSkillsConfig?.disabled ?? []) as string[];
+    const disabled = currentlyEnabled
+      ? Array.from(new Set([...current, skillId]))
+      : current.filter((s) => s !== skillId);
+    const res = await fetch('/api/team/config', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ skills: { enabled: ['*'], disabled } }),
+    });
+    if (res.ok) {
+      // Update the local state to reflect the new disabled list
+      setTeamSkillsConfig({ enabled: ['*'], disabled });
+      // Refetch the catalog so enabled flags reflect the new config.
+      const sr = await fetch('/api/team/skills');
+      if (sr.ok) setSkillsCatalog((await sr.json()).skills || []);
+    }
+  };
+
+  const toggleCategory = async (
+    _category: string,
+    skillsInCat: Array<{ id: string }>,
+    enableAll: boolean,
+  ) => {
+    const catIds = skillsInCat.map((s) => s.id);
+    const current = (teamSkillsConfig?.disabled ?? []) as string[];
+    const disabled = enableAll
+      ? current.filter((s) => !catIds.includes(s))
+      : Array.from(new Set([...current, ...catIds]));
+    const res = await fetch('/api/team/config', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ skills: { enabled: ['*'], disabled } }),
+    });
+    if (res.ok) {
+      setTeamSkillsConfig({ enabled: ['*'], disabled });
+      const sr = await fetch('/api/team/skills');
+      if (sr.ok) setSkillsCatalog((await sr.json()).skills || []);
     }
   };
 
@@ -802,85 +786,49 @@ export default function TeamToolsPage() {
     );
   }
 
-  // Build category lookup from catalog
-  const catalogById = new Map(toolsCatalog.map(t => [t.id, t]));
-
   // Build integration schema lookup (for descriptions)
   const integrationSchemaById = new Map(integrationSchemas.map(s => [s.id, s]));
 
   // Separate integrations (configurable items like Grafana, Kubernetes) from tools
   const integrations: ToolItem[] = [];
   const customServers: ToolItem[] = [];
-  const toolsFromConfig: ToolItem[] = [];
 
   for (const item of items) {
     // Items with config_schema and required fields are "integrations"
     const hasRequiredConfig = Object.values(item.config_schema || {}).some(f => f.required);
-    const catalogEntry = catalogById.get(item.id);
     const integrationSchema = integrationSchemaById.get(item.id);
 
-    // Skip orphaned items (no description, not in catalog, not a real integration)
-    // These are likely legacy/junk data from old config structure
-    if (!item.description && !catalogEntry && !hasRequiredConfig && item.type !== 'mcp_server') {
+    // Skip orphaned items (no description, not a real integration, not an MCP)
+    if (!item.description && !hasRequiredConfig && item.type !== 'mcp_server') {
       console.warn(`Skipping orphaned item with no description: ${item.id}`);
       continue;
     }
 
     if (item.type === 'mcp_server') {
       customServers.push({ ...item, category: 'mcp' });
-    } else if (hasRequiredConfig && !catalogEntry) {
+    } else if (hasRequiredConfig) {
       // Configurable integration (Grafana, Kubernetes, Datadog, etc.)
-      // Merge description from schema if available
       integrations.push({
         ...item,
         description: integrationSchema?.description || item.description,
         type: 'integration',
         category: 'integration'
       });
-    } else {
-      // Tool from config (with optional category from catalog)
-      toolsFromConfig.push({ ...item, category: catalogEntry?.category || 'other' });
     }
   }
 
-  // Add catalog tools that aren't already in config
-  const seenIds = new Set(items.map(i => i.id));
-  const catalogTools: ToolItem[] = [];
-  
-  for (const catalogTool of toolsCatalog) {
-    if (!seenIds.has(catalogTool.id)) {
-      catalogTools.push({
-        id: catalogTool.id,
-        name: catalogTool.name,
-        description: catalogTool.description,
-        type: 'tool',
-        enabled: true,
-        config_schema: {},
-        config_values: {},
-        source: 'org',
-        category: catalogTool.category,
-      });
-    }
-  }
-  
-  // Combine all tools
-  const allBuiltInTools = [...toolsFromConfig, ...catalogTools];
-  
-  // Group tools by category
-  const toolsByCategory = allBuiltInTools.reduce((acc, tool) => {
-    const cat = tool.category || 'other';
-    if (!acc[cat]) acc[cat] = [];
-    acc[cat].push(tool);
-    return acc;
-  }, {} as Record<string, ToolItem[]>);
-
-  // Separate enabled/disabled for custom servers (integrations don't have enabled/disabled)
+  // Separate enabled/disabled for custom servers
   const enabledServers = customServers.filter(i => i.enabled);
   const disabledServers = customServers.filter(i => !i.enabled);
-  
-  // Count enabled/disabled tools
-  const enabledToolCount = allBuiltInTools.filter(t => t.enabled).length;
-  const disabledToolCount = allBuiltInTools.filter(t => !t.enabled).length;
+
+  // Group skills by category in fixed display order
+  const skillsByCategory: Record<string, typeof skillsCatalog> = {};
+  skillsCatalog.forEach(skill => {
+    const cat = skill.category || 'Other Integrations';
+    if (!skillsByCategory[cat]) skillsByCategory[cat] = [];
+    skillsByCategory[cat].push(skill);
+  });
+  const orderedSkillCategories = SKILL_CATEGORY_ORDER.filter(cat => skillsByCategory[cat]?.length > 0);
 
   const renderCard = (item: ToolItem) => {
     const missingFields = getMissingRequiredFields(item);
@@ -1056,8 +1004,8 @@ export default function TeamToolsPage() {
               <Wrench className="w-5 h-5 text-white" />
             </div>
             <div>
-              <h1 className="text-xl font-semibold text-stone-900 dark:text-white">Tools & Skills</h1>
-              <p className="text-sm text-stone-500">Integrations, tools, and skills available to your AI agents</p>
+              <h1 className="text-xl font-semibold text-stone-900 dark:text-white">Skills & MCPs</h1>
+              <p className="text-sm text-stone-500">Integrations, MCP servers, and skills available to your AI agents</p>
             </div>
           </div>
           <button
@@ -1181,66 +1129,114 @@ export default function TeamToolsPage() {
           );
         })()}
 
-        {/* Skills Section */}
+        {/* Skills Section — categorized tree */}
         {skillsCatalog.length > 0 && (() => {
-          const filteredSkills = skillsCatalog.filter(skill =>
-            skill.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            skill.description?.toLowerCase().includes(searchQuery.toLowerCase())
-          );
-          const skillsByCategory: Record<string, typeof skillsCatalog> = {};
-          filteredSkills.forEach(skill => {
-            const cat = skill.category || 'other';
-            if (!skillsByCategory[cat]) skillsByCategory[cat] = [];
-            skillsByCategory[cat].push(skill);
+          const enabledSkillCount = skillsCatalog.filter(s => s.enabled).length;
+          const filteredSkillsByCategory: Record<string, typeof skillsCatalog> = {};
+          skillsCatalog.forEach(skill => {
+            if (
+              !searchQuery ||
+              skill.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+              skill.description?.toLowerCase().includes(searchQuery.toLowerCase())
+            ) {
+              const cat = skill.category || 'Other Integrations';
+              if (!filteredSkillsByCategory[cat]) filteredSkillsByCategory[cat] = [];
+              filteredSkillsByCategory[cat].push(skill);
+            }
           });
-          const SKILL_CATEGORY_LABELS: Record<string, string> = {
-            methodology: 'Methodology',
-            observability: 'Observability',
-            infrastructure: 'Infrastructure',
-            incident: 'Incident Management',
-            communication: 'Communication',
-            code: 'Code & Deployment',
-            documentation: 'Documentation',
-            'project-management': 'Project Management',
-            other: 'Other',
-          };
+          const filteredCount = Object.values(filteredSkillsByCategory).reduce((n, arr) => n + arr.length, 0);
           return (
-              <section className="border border-stone-200 dark:border-stone-700 border-l-4 border-l-violet-500 rounded-lg overflow-hidden">
-                <button
-                  onClick={() => {
-                    const next = new Set(expandedCategories);
-                    next.has('skills') ? next.delete('skills') : next.add('skills');
-                    setExpandedCategories(next);
-                  }}
-                  className="w-full flex items-center gap-3 px-4 py-3 bg-stone-50 dark:bg-stone-700/50 hover:bg-stone-100 dark:hover:bg-stone-800"
-                >
-                  {expandedCategories.has('skills') ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-                  <BookOpen className="w-4 h-4 text-violet-500" />
-                  <div className="flex-1 text-left">
-                    <span className="font-medium text-stone-900 dark:text-white">Skills</span>
-                    <span className="text-xs text-stone-500 ml-2">
-                      {searchQuery ? `${filteredSkills.length} of ${skillsCatalog.length}` : `${skillsCatalog.length} available`}
-                    </span>
-                    <p className="text-xs text-stone-400 dark:text-stone-500">Knowledge documents loaded into agent context on-demand (query syntax, methodologies, runbooks)</p>
-                  </div>
-                </button>
-                {expandedCategories.has('skills') && (
-                  <div className="p-4 space-y-4">
-                    {Object.entries(skillsByCategory)
-                      .sort(([a], [b]) => a.localeCompare(b))
-                      .map(([category, skills]) => (
-                        <div key={category}>
-                          <h4 className="text-xs font-medium text-stone-500 dark:text-stone-400 uppercase tracking-wide mb-2">
-                            {SKILL_CATEGORY_LABELS[category] || category}
-                          </h4>
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                            {skills.map(skill => (
+            <section className="border border-stone-200 dark:border-stone-700 border-l-4 border-l-violet-500 rounded-lg overflow-hidden">
+              {/* Top-level Skills header */}
+              <button
+                onClick={() => {
+                  const next = new Set(expandedCategories);
+                  next.has('skills') ? next.delete('skills') : next.add('skills');
+                  setExpandedCategories(next);
+                }}
+                className="w-full flex items-center gap-3 px-4 py-3 bg-stone-50 dark:bg-stone-700/50 hover:bg-stone-100 dark:hover:bg-stone-800"
+              >
+                {expandedCategories.has('skills') ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                <BookOpen className="w-4 h-4 text-violet-500" />
+                <div className="flex-1 text-left">
+                  <span className="font-medium text-stone-900 dark:text-white">Skills</span>
+                  <span className="text-xs text-stone-500 ml-2">
+                    {searchQuery
+                      ? `${filteredCount} of ${skillsCatalog.length}`
+                      : `${enabledSkillCount} enabled / ${skillsCatalog.length}`}
+                  </span>
+                  <p className="text-xs text-stone-400 dark:text-stone-500">
+                    Knowledge loaded into agent context on-demand (methodologies, runbooks, query syntax)
+                  </p>
+                </div>
+              </button>
+
+              {expandedCategories.has('skills') && (
+                <div className="divide-y divide-stone-100 dark:divide-stone-700/50">
+                  {orderedSkillCategories.map(category => {
+                    const catSkills = filteredSkillsByCategory[category];
+                    if (!catSkills || catSkills.length === 0) return null;
+                    const allSkillsInCat = skillsByCategory[category] || [];
+                    const catEnabledCount = catSkills.filter(s => s.enabled).length;
+                    const catTotal = catSkills.length;
+                    const allEnabled = catEnabledCount === catTotal;
+                    const noneEnabled = catEnabledCount === 0;
+                    // tri-state: all / none / partial
+                    const catKey = `skill-cat-${category}`;
+                    const isCatExpanded = expandedCategories.has(catKey);
+
+                    return (
+                      <div key={category}>
+                        {/* Category row */}
+                        <div className="flex items-center gap-2 px-4 py-2.5 bg-stone-50/60 dark:bg-stone-800/40">
+                          <button
+                            onClick={() => {
+                              const next = new Set(expandedCategories);
+                              next.has(catKey) ? next.delete(catKey) : next.add(catKey);
+                              setExpandedCategories(next);
+                            }}
+                            className="flex items-center gap-2 flex-1 text-left min-w-0"
+                          >
+                            {isCatExpanded ? <ChevronDown className="w-3.5 h-3.5 text-stone-400 flex-shrink-0" /> : <ChevronRight className="w-3.5 h-3.5 text-stone-400 flex-shrink-0" />}
+                            <span className="text-xs font-semibold text-stone-700 dark:text-stone-300 uppercase tracking-wide">
+                              {category}
+                            </span>
+                            <span className="text-[10px] text-stone-400 ml-1">
+                              {catEnabledCount} / {catTotal}
+                            </span>
+                          </button>
+                          {/* Category toggle: tri-state */}
+                          <button
+                            onClick={() => toggleCategory(category, allSkillsInCat, !allEnabled)}
+                            className={`p-1 rounded transition-colors flex-shrink-0 ${
+                              allEnabled
+                                ? 'text-green-600 hover:text-green-700'
+                                : noneEnabled
+                                ? 'text-stone-400 hover:text-stone-500'
+                                : 'text-amber-500 hover:text-amber-600'
+                            }`}
+                            title={allEnabled ? 'Disable all in category' : noneEnabled ? 'Enable all in category' : 'Some enabled — enable all in category'}
+                          >
+                            {allEnabled ? (
+                              <ToggleRight className="w-6 h-6" />
+                            ) : noneEnabled ? (
+                              <ToggleLeft className="w-6 h-6" />
+                            ) : (
+                              <MinusSquare className="w-6 h-6" />
+                            )}
+                          </button>
+                        </div>
+
+                        {/* Skill rows */}
+                        {isCatExpanded && (
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 p-4">
+                            {catSkills.map(skill => (
                               <div
                                 key={skill.id}
                                 className="flex items-start gap-3 p-3 rounded-lg border border-stone-200 dark:border-stone-600 bg-white dark:bg-stone-700"
                               >
                                 <BookOpen className="w-4 h-4 text-violet-500 mt-0.5 flex-shrink-0" />
-                                <div className="min-w-0">
+                                <div className="min-w-0 flex-1">
                                   <div className="font-medium text-sm text-stone-900 dark:text-white">{skill.name}</div>
                                   <div className="text-xs text-stone-500 dark:text-stone-400 mt-0.5">{skill.description}</div>
                                   {skill.required_integrations?.length > 0 && (
@@ -1253,66 +1249,35 @@ export default function TeamToolsPage() {
                                     </div>
                                   )}
                                 </div>
+                                <button
+                                  onClick={() => toggleSkill(skill.id, skill.enabled)}
+                                  className={`p-1 rounded transition-colors flex-shrink-0 ${
+                                    skill.enabled
+                                      ? 'text-green-600 hover:text-green-700'
+                                      : 'text-stone-400 hover:text-stone-500'
+                                  }`}
+                                  title={skill.enabled ? 'Disable' : 'Enable'}
+                                >
+                                  {skill.enabled ? (
+                                    <ToggleRight className="w-6 h-6" />
+                                  ) : (
+                                    <ToggleLeft className="w-6 h-6" />
+                                  )}
+                                </button>
                               </div>
                             ))}
                           </div>
-                        </div>
-                      ))}
-                  </div>
-                )}
-              </section>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </section>
           );
         })()}
 
-        {/* Built-in Tools by Category */}
-        <div className="space-y-3">
-          <div className="flex items-center gap-2 pt-2">
-            <Wrench className="w-4 h-4 text-green-500" />
-            <h2 className="text-sm font-medium text-stone-600 dark:text-stone-400">
-              Built-in Tools
-            </h2>
-            <span className="text-xs text-stone-400">
-              {enabledToolCount} enabled{disabledToolCount > 0 ? `, ${disabledToolCount} disabled` : ''} — Executable actions the agent can perform
-            </span>
-          </div>
-          {Object.entries(toolsByCategory)
-            .sort(([a], [b]) => a.localeCompare(b))
-            .map(([category, tools]) => {
-              const enabled = tools.filter(t => t.enabled);
-              const disabled = tools.filter(t => !t.enabled);
-              const isExpanded = expandedCategories.has(category);
-
-              return (
-                <section key={category} className="border border-stone-200 dark:border-stone-700 border-l-4 border-l-green-500 rounded-lg overflow-hidden">
-                  <button
-                    onClick={() => {
-                      const next = new Set(expandedCategories);
-                      next.has(category) ? next.delete(category) : next.add(category);
-                      setExpandedCategories(next);
-                    }}
-                    className="w-full flex items-center gap-3 px-4 py-3 bg-stone-50 dark:bg-stone-700/50 hover:bg-stone-100 dark:hover:bg-stone-800"
-                  >
-                    {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-                    <span className="text-green-500">{CATEGORY_ICONS[category] || <Wrench className="w-4 h-4" />}</span>
-                    <span className="font-medium text-stone-900 dark:text-white">{CATEGORY_LABELS[category] || category}</span>
-                    <span className="text-xs text-stone-500">
-                      {enabled.length} enabled{disabled.length > 0 ? `, ${disabled.length} disabled` : ''}
-                    </span>
-                  </button>
-                  {isExpanded && (
-                    <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {[...enabled, ...disabled].filter(item =>
-                        item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                        item.description?.toLowerCase().includes(searchQuery.toLowerCase())
-                      ).map(renderCard)}
-                    </div>
-                  )}
-                </section>
-              );
-            })}
-        </div>
-
-        {items.length === 0 && toolsCatalog.length === 0 && (
+        {items.length === 0 && skillsCatalog.length === 0 && (
           <div className="text-center py-12">
             <Server className="w-12 h-12 text-stone-300 mx-auto mb-4" />
             <p className="text-stone-500">No tools configured yet.</p>

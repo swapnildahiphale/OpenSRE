@@ -8,7 +8,7 @@ export default function IncidentReviewDemoRemoved() {
         The previous content here was a static demo post‑mortem. It has been removed as part of the enterprise refactor.
       </p>
       <p className="text-sm text-stone-500">
-        Configure your agents via <Link className="underline" href="/configuration">Team Configuration</Link>.
+        Configure your agents via <Link className="underline" href="/team/agents">Team Configuration</Link>.
       </p>
         </div>
     );

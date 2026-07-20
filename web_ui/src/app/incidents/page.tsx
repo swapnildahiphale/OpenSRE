@@ -9,7 +9,7 @@ export default function IncidentsPage() {
         incident source (PagerDuty/Jira/ServiceNow/etc) and audit-grade storage.
       </p>
       <p className="text-sm text-stone-500">
-        For now, manage live agent config via <Link className="underline" href="/configuration">Team Configuration</Link>.
+        For now, manage live agent config via <Link className="underline" href="/team/agents">Team Configuration</Link>.
       </p>
     </div>
   );

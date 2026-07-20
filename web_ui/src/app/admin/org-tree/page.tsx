@@ -175,7 +175,8 @@ export default function OrgTreePage() {
   // Tokens state
   const [tokens, setTokens] = useState<{ token_id: string; revoked_at?: string }[]>([]);
 
-  const orgId = identity?.org_id || (identity?.role === 'admin' ? 'local' : undefined);
+  // Admin shared token has no org in the token; config-service sets org_id from DEFAULT_ORG_ID.
+  const orgId = identity?.org_id || undefined;
 
   const loadNodes = useCallback(async () => {
     if (!orgId) return; // Wait for identity to load
@@ -378,7 +379,7 @@ export default function OrgTreePage() {
           </div>
           <div className="flex items-center gap-2">
             <button
-              onClick={() => { setNewNodeParent('root'); setAddNodeOpen(true); }}
+              onClick={() => { setNewNodeParent(''); setAddNodeOpen(true); }}
               className="flex items-center gap-2 px-3 py-2 text-sm font-medium bg-forest text-white rounded-lg hover:bg-forest-dark"
             >
               <Plus className="w-4 h-4" /> Add Node
@@ -529,7 +530,7 @@ export default function OrgTreePage() {
                 onChange={(e) => setNewNodeParent(e.target.value)}
                 className="w-full px-3 py-2 rounded-lg border border-stone-200 dark:border-stone-600 bg-white dark:bg-stone-700"
               >
-                <option value="">(Select parent)</option>
+                <option value="">(root — auto, or top-level)</option>
                 {nodes.map((n) => (
                   <option key={n.node_id} value={n.node_id}>
                     {n.node_id} ({n.node_type})

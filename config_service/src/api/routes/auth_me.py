@@ -16,6 +16,15 @@ from src.services.config_service_rds import ConfigServiceRDS
 router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
 
 
+def _default_org_id() -> Optional[str]:
+    """Default org for shared admin token (self-hosted / single-tenant)."""
+    for key in ("DEFAULT_ORG_ID", "ORG_ID"):
+        value = (os.getenv(key) or "").strip()
+        if value:
+            return value
+    return None
+
+
 class AuthMeResponse(BaseModel):
     role: Literal["admin", "team"]
     auth_kind: Literal["admin_token", "team_token", "oidc", "impersonation", "visitor"]
@@ -86,6 +95,7 @@ def auth_me_impl(
         return AuthMeResponse(
             role="admin",
             auth_kind=principal.auth_kind,  # admin_token | oidc
+            org_id=_default_org_id(),
             subject=principal.subject,
             email=principal.email,
             can_write=True,

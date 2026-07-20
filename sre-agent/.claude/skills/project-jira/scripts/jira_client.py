@@ -1,8 +1,12 @@
 #!/usr/bin/env python3
 """Shared Jira API client with proxy support.
 
-Uses Jira Cloud REST API v3 (Atlassian Document Format for descriptions).
-Credentials are injected transparently by the proxy layer.
+Supports two Jira flavors in direct mode:
+- Jira Cloud: REST API v3, Basic auth (email:api-token), ADF bodies.
+- Jira Data Center (self-hosted): REST API v2, Bearer auth (PAT), Wiki Markup bodies.
+
+API version and auth scheme are controlled via env vars (see get_headers / get_base_url).
+In proxy mode (production), credentials are injected transparently by the proxy layer.
 """
 
 import base64
@@ -26,7 +30,8 @@ def get_base_url() -> str:
 
     Supports two modes:
     1. Proxy mode (production): Uses JIRA_BASE_URL
-    2. Direct mode (testing): Uses JIRA_URL + /rest/api/3
+    2. Direct mode (testing/local): Uses JIRA_URL + /rest/api/<JIRA_API_VERSION>
+       - JIRA_API_VERSION defaults to "3" (Cloud); set to "2" for Jira Data Center.
     """
     proxy_url = os.getenv("JIRA_BASE_URL")
     if proxy_url:
@@ -34,7 +39,10 @@ def get_base_url() -> str:
 
     jira_url = os.getenv("JIRA_URL")
     if jira_url:
-        return f"{jira_url.rstrip('/')}/rest/api/3"
+        # Cloud defaults to v3 (ADF); Data Center needs v2 (Wiki Markup).
+        # JIRA_API_VERSION lets the caller switch between them without code changes.
+        api_version = os.getenv("JIRA_API_VERSION", "3")
+        return f"{jira_url.rstrip('/')}/rest/api/{api_version}"
 
     raise RuntimeError(
         "Either JIRA_BASE_URL (proxy mode) or JIRA_URL (direct mode) must be set."
@@ -44,8 +52,14 @@ def get_base_url() -> str:
 def get_headers() -> dict[str, str]:
     """Get Jira API headers.
 
-    In proxy mode: includes tenant context for credential lookup.
-    In direct mode: includes Basic auth with email + API token.
+    Auth precedence (direct mode):
+    1. Bearer auth (Jira Data Center PAT): used when JIRA_AUTH_SCHEME=bearer OR
+       when JIRA_API_TOKEN is set and JIRA_EMAIL is unset. Sends `Authorization: Bearer <token>`.
+    2. Basic auth (Jira Cloud): used when both JIRA_EMAIL and JIRA_API_TOKEN are set.
+       Sends `Authorization: Basic base64(email:token)`.
+
+    Proxy mode: when no direct creds are present, sends tenant/team context headers
+    (or the X-Sandbox-JWT) so the proxy layer can inject credentials.
     """
     config = get_config()
     headers = {
@@ -55,10 +69,26 @@ def get_headers() -> dict[str, str]:
 
     email = os.getenv("JIRA_EMAIL")
     api_token = os.getenv("JIRA_API_TOKEN")
-    if email and api_token:
+    auth_scheme = os.getenv("JIRA_AUTH_SCHEME", "").lower()
+    # Explicit bearer scheme, or token-without-email implies Jira Data Center PAT auth.
+    use_bearer = auth_scheme == "bearer" or (api_token is not None and not email)
+
+    if auth_scheme == "bearer" and not api_token:
+        # Direct DC mode misconfig: bearer requested but no PAT — fail loud instead of
+        # silently falling through to proxy/tenant headers (which yields confusing 401s).
+        raise RuntimeError(
+            "JIRA_AUTH_SCHEME=bearer requires JIRA_API_TOKEN (Data Center PAT)."
+        )
+
+    if use_bearer and api_token:
+        # Jira Data Center: PAT sent as Bearer token.
+        headers["Authorization"] = f"Bearer {api_token}"
+    elif email and api_token:
+        # Jira Cloud: email + API token sent as Basic auth.
         credentials = base64.b64encode(f"{email}:{api_token}".encode()).decode()
         headers["Authorization"] = f"Basic {credentials}"
     else:
+        # Proxy mode: tenant context for credential lookup by the proxy.
         sandbox_jwt = os.getenv("SANDBOX_JWT")
         if sandbox_jwt:
             headers["X-Sandbox-JWT"] = sandbox_jwt
@@ -108,6 +138,42 @@ def make_adf_text(text: str) -> dict:
         "version": 1,
         "content": [{"type": "paragraph", "content": [{"type": "text", "text": text}]}],
     }
+
+
+def make_text_body(text: str) -> dict | str:
+    """Build a write body for description/comment fields, picking the right format
+    for the configured Jira API version.
+
+    - Jira Cloud (JIRA_API_VERSION=3, default): returns an ADF document (JSON).
+    - Jira Data Center (JIRA_API_VERSION=2): returns the plain `text` string,
+      interpreted by Jira DC as Wiki Markup. Wiki Markup supports rich formatting
+      (`*bold*`, `_italic_`, `||...||` tables, `{code}...{code}`, headings, lists),
+      so no formatting capability is lost vs the ADF path (which only wraps the
+      input in a single plain paragraph anyway).
+
+    The caller should assign the return value directly to the `description` /
+    `body` field of the Jira REST payload — do not wrap it further.
+    """
+    api_version = os.getenv("JIRA_API_VERSION", "3")
+    if api_version == "2":
+        # v2 wire format: plain string (Jira Wiki Markup), not ADF JSON.
+        return text
+    return make_adf_text(text)
+
+
+def make_assignee_field(assignee: str) -> dict:
+    """Build the assignee payload field for the configured Jira API version.
+
+    - Jira Cloud (v3): uses `accountId` (the Atlassian account ID).
+    - Jira Data Center (v2): uses `name` (the DC username, e.g. "jane.doe").
+
+    Callers should pass the same identifier they received from the user; the
+    correct key is chosen based on JIRA_API_VERSION.
+    """
+    api_version = os.getenv("JIRA_API_VERSION", "3")
+    if api_version == "2":
+        return {"name": assignee}
+    return {"accountId": assignee}
 
 
 def extract_adf_text(adf: Any) -> str:

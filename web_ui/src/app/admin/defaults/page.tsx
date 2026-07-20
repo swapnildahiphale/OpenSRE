@@ -4,8 +4,8 @@ import { useEffect, useState, useCallback } from 'react';
 import { RequireRole } from '@/components/RequireRole';
 import { apiFetch } from '@/lib/apiClient';
 import { useIdentity } from '@/lib/useIdentity';
+import { isPromptSet, agentPromptPatch, buildAgentList } from '@/lib/agentPrompts';
 import {
-  Settings2,
   MessageSquareText,
   Server,
   Save,
@@ -21,40 +21,6 @@ import {
   AlertTriangle,
   Building,
 } from 'lucide-react';
-
-// Agent configurations
-const AGENT_CONFIGS: Record<string, { displayName: string; description: string; color: string }> = {
-  planner: {
-    displayName: 'Planner Agent',
-    description: 'Orchestrates complex tasks across multiple agents',
-    color: 'bg-stone-100 dark:bg-stone-700 text-stone-600',
-  },
-  investigation_agent: {
-    displayName: 'Investigation Agent',
-    description: 'Full troubleshooting toolkit for incident investigation',
-    color: 'bg-stone-100 dark:bg-stone-700 text-stone-600',
-  },
-  k8s_agent: {
-    displayName: 'Kubernetes Agent',
-    description: 'Kubernetes troubleshooting and diagnostics',
-    color: 'bg-stone-100 dark:bg-stone-700 text-stone-600',
-  },
-  aws_agent: {
-    displayName: 'AWS Agent',
-    description: 'AWS resource debugging and monitoring',
-    color: 'bg-stone-100 dark:bg-stone-700 text-stone-600',
-  },
-  coding_agent: {
-    displayName: 'Coding Agent',
-    description: 'Code analysis and fix suggestions',
-    color: 'bg-stone-100 dark:bg-stone-700 text-stone-600',
-  },
-  metrics_agent: {
-    displayName: 'Metrics Agent',
-    description: 'Anomaly detection and metrics analysis',
-    color: 'bg-stone-100 dark:bg-stone-700 text-stone-600',
-  },
-};
 
 interface MCPServer {
   name: string;
@@ -80,6 +46,8 @@ export default function OrgDefaultsPage() {
 
   // Prompts state
   const [prompts, setPrompts] = useState<Record<string, string>>({});
+  const [agentList, setAgentList] = useState<{ agent: string; displayName: string; description: string }[]>([]);
+  const [configured, setConfigured] = useState<Record<string, boolean>>({});
   const [expandedAgent, setExpandedAgent] = useState<string | null>(null);
   const [editingAgent, setEditingAgent] = useState<string | null>(null);
   const [editedPrompt, setEditedPrompt] = useState('');
@@ -100,12 +68,35 @@ export default function OrgDefaultsPage() {
   const loadOrgConfig = useCallback(async () => {
     setLoading(true);
     try {
-      // Get the org root node's config
-      const res = await apiFetch(`/api/admin/orgs/${orgId}/nodes/${orgId}/config`);
-      if (res.ok) {
-        const config = await res.json();
-        setPrompts(config.agent_prompts || {});
-        setMcpServers(config.mcp_servers || []);
+      const [effectiveRes, rawRes] = await Promise.all([
+        apiFetch(`/api/admin/orgs/${orgId}/config/${orgId}/effective`),
+        apiFetch(`/api/admin/orgs/${orgId}/nodes/${orgId}/config`),
+      ]);
+
+      if (effectiveRes.ok) {
+        const effective = await effectiveRes.json();
+        const agents = effective.agents || {};
+
+        setAgentList(buildAgentList(agents));
+
+        const flat: Record<string, string> = {};
+        for (const id of Object.keys(agents)) {
+          const sys = agents[id]?.prompt?.system;
+          if (typeof sys === 'string') flat[id] = sys;
+        }
+        setPrompts(flat);
+      }
+
+      if (rawRes.ok) {
+        const json = await rawRes.json();
+        const raw = json.config || {};
+        const rawAgents = raw.agents || {};
+        const configuredMap: Record<string, boolean> = {};
+        for (const id of Object.keys(rawAgents)) {
+          configuredMap[id] = isPromptSet(rawAgents[id]?.prompt?.system);
+        }
+        setConfigured(configuredMap);
+        setMcpServers(raw.mcp_servers || []);
       }
     } catch (e) {
       console.error('Failed to load org config', e);
@@ -123,17 +114,24 @@ export default function OrgDefaultsPage() {
     setSaving(true);
     setMessage(null);
     try {
-      const updatedPrompts = { ...prompts, [agent]: editedPrompt };
       const res = await apiFetch(`/api/admin/orgs/${orgId}/nodes/${orgId}/config`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ agent_prompts: updatedPrompts }),
+        body: JSON.stringify({ patch: agentPromptPatch(agent, editedPrompt) }),
       });
 
       if (res.ok) {
-        setPrompts(updatedPrompts);
+        const data = await res.json().catch(() => ({}));
+        const name = agentList.find((a) => a.agent === agent)?.displayName || agent;
         setEditingAgent(null);
-        setMessage({ type: 'success', text: `${AGENT_CONFIGS[agent]?.displayName || agent} prompt saved!` });
+        if (data?.status === 'pending_approval') {
+          // Org policy requires approval — the change is queued, not applied.
+          setMessage({ type: 'success', text: `${name} prompt change submitted for approval.` });
+        } else {
+          setPrompts((prev) => ({ ...prev, [agent]: editedPrompt }));
+          setConfigured((prev) => ({ ...prev, [agent]: isPromptSet(editedPrompt) }));
+          setMessage({ type: 'success', text: `${name} prompt saved!` });
+        }
       } else {
         const err = await res.json();
         setMessage({ type: 'error', text: err.detail || 'Failed to save' });
@@ -147,22 +145,29 @@ export default function OrgDefaultsPage() {
 
   // Delete prompt (reset to empty)
   const handleDeletePrompt = async (agent: string) => {
-    if (!confirm(`Remove default prompt for ${AGENT_CONFIGS[agent]?.displayName || agent}?`)) return;
-    
+    if (!confirm(`Remove default prompt for ${agentList.find((a) => a.agent === agent)?.displayName || agent}?`)) return;
+
     setSaving(true);
     try {
-      const updatedPrompts = { ...prompts };
-      delete updatedPrompts[agent];
-
       const res = await apiFetch(`/api/admin/orgs/${orgId}/nodes/${orgId}/config`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ agent_prompts: updatedPrompts }),
+        body: JSON.stringify({ patch: agentPromptPatch(agent, null) }),
       });
 
       if (res.ok) {
-        setPrompts(updatedPrompts);
-        setMessage({ type: 'success', text: 'Prompt removed' });
+        const data = await res.json().catch(() => ({}));
+        if (data?.status === 'pending_approval') {
+          setMessage({ type: 'success', text: 'Prompt removal submitted for approval.' });
+        } else {
+          setPrompts((prev) => {
+            const next = { ...prev };
+            delete next[agent];
+            return next;
+          });
+          setConfigured((prev) => ({ ...prev, [agent]: false }));
+          setMessage({ type: 'success', text: 'Prompt removed' });
+        }
       }
     } catch (e: any) {
       setMessage({ type: 'error', text: e?.message || 'Failed to remove' });
@@ -299,7 +304,7 @@ export default function OrgDefaultsPage() {
             }`}
           >
             <MessageSquareText className="w-4 h-4" />
-            Default Prompts ({Object.keys(prompts).length})
+            Default Prompts ({agentList.length})
           </button>
           <button
             onClick={() => setActiveTab('mcps')}
@@ -317,9 +322,8 @@ export default function OrgDefaultsPage() {
         {/* Prompts Tab */}
         {activeTab === 'prompts' && (
           <div className="space-y-4">
-            {Object.keys(AGENT_CONFIGS).map((agent) => {
-              const config = AGENT_CONFIGS[agent];
-              const hasPrompt = !!prompts[agent];
+            {agentList.map(({ agent, displayName, description }) => {
+              const isConfigured = configured[agent];
               const isExpanded = expandedAgent === agent;
               const isEditing = editingAgent === agent;
 
@@ -334,17 +338,21 @@ export default function OrgDefaultsPage() {
                   >
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
-                        <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${config.color}`}>
+                        <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-stone-100 dark:bg-stone-700 text-stone-600">
                           <Bot className="w-5 h-5" />
                         </div>
                         <div>
                           <div className="flex items-center gap-2">
                             <span className="font-medium text-stone-900 dark:text-white">
-                              {config.displayName}
+                              {displayName}
                             </span>
-                            {hasPrompt ? (
+                            {isConfigured ? (
                               <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400">
                                 Configured
+                              </span>
+                            ) : prompts[agent] ? (
+                              <span className="text-xs px-2 py-0.5 rounded-full bg-stone-100 dark:bg-stone-700 text-stone-500">
+                                System Default
                               </span>
                             ) : (
                               <span className="text-xs px-2 py-0.5 rounded-full bg-stone-100 dark:bg-stone-700 text-stone-500">
@@ -352,7 +360,7 @@ export default function OrgDefaultsPage() {
                               </span>
                             )}
                           </div>
-                          <p className="text-sm text-stone-500">{config.description}</p>
+                          <p className="text-sm text-stone-500">{description}</p>
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
@@ -406,7 +414,7 @@ export default function OrgDefaultsPage() {
                                 Default System Prompt
                               </label>
                               <div className="flex items-center gap-2">
-                                {hasPrompt && (
+                                {isConfigured && (
                                   <button
                                     onClick={() => handleDeletePrompt(agent)}
                                     className="flex items-center gap-1 px-3 py-1 text-xs text-clay hover:text-clay-dark"
@@ -423,7 +431,7 @@ export default function OrgDefaultsPage() {
                                   className="flex items-center gap-1 px-3 py-1 text-xs bg-stone-100 dark:bg-stone-700 rounded-lg hover:bg-stone-200 dark:hover:bg-stone-700"
                                 >
                                   <Edit3 className="w-3 h-3" />
-                                  {hasPrompt ? 'Edit' : 'Add'}
+                                  {isConfigured ? 'Edit' : 'Add'}
                                 </button>
                               </div>
                             </div>
@@ -607,8 +615,8 @@ export default function OrgDefaultsPage() {
                 About Organization Defaults
               </p>
               <p className="text-sm text-stone-600 dark:text-stone-300 mt-1">
-                These are org-wide defaults that all teams inherit automatically. Teams can override 
-                these in their own settings. Changes here will propagate to teams that haven&apos;t 
+                These are org-wide defaults that all teams inherit automatically. Teams can override
+                these in their own settings. Changes here will propagate to teams that haven&apos;t
                 customized their own values.
               </p>
             </div>
@@ -618,4 +626,3 @@ export default function OrgDefaultsPage() {
     </RequireRole>
   );
 }
-

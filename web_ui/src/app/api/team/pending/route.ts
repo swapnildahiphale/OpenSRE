@@ -17,8 +17,11 @@ export async function GET(request: NextRequest) {
       }
     );
 
-    const data = await res.json();
-    return NextResponse.json(data, { status: res.status });
+    const text = await res.text();
+    let data: any;
+    try { data = text ? JSON.parse(text) : null; }
+    catch { data = { error: text || 'Upstream error' }; }
+    return NextResponse.json(data ?? {}, { status: res.status });
   } catch (e: any) {
     return NextResponse.json({ error: e?.message || 'Failed to fetch pending items' }, { status: 500 });
   }

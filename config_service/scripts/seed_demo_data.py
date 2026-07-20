@@ -74,7 +74,6 @@ def main() -> None:
                     node_type="org",
                     config_json={
                         "knowledge_source": {"grafana": ["dash/org-default"]},
-                        "mcp_servers": ["mcps://grafana"],
                         "alerts": {"disabled": []},
                     },
                     version=1,

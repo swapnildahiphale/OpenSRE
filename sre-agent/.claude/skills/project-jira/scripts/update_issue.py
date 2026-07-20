@@ -10,7 +10,7 @@ import argparse
 import json
 import sys
 
-from jira_client import jira_request, make_adf_text
+from jira_client import jira_request, make_assignee_field, make_text_body
 
 
 def main():
@@ -20,7 +20,11 @@ def main():
     parser.add_argument("--description", default="", help="New description")
     parser.add_argument("--status", default="", help="New status (triggers transition)")
     parser.add_argument("--priority", default="", help="New priority")
-    parser.add_argument("--assignee", default="", help="New assignee account ID")
+    parser.add_argument(
+        "--assignee",
+        default="",
+        help="New assignee: Atlassian account ID (Cloud) or username (Data Center)",
+    )
     parser.add_argument("--json", action="store_true", help="Output as JSON")
     args = parser.parse_args()
 
@@ -29,7 +33,8 @@ def main():
         if args.summary:
             fields["summary"] = args.summary
         if args.description:
-            fields["description"] = make_adf_text(args.description)
+            # make_text_body picks ADF (Cloud v3) or Wiki Markup string (DC v2).
+            fields["description"] = make_text_body(args.description)
         if args.priority:
             fields["priority"] = {"name": args.priority}
 
@@ -39,10 +44,11 @@ def main():
             )
 
         if args.assignee:
+            # Assignee field shape differs by API version (Cloud accountId vs DC name).
             jira_request(
                 "PUT",
                 f"/issue/{args.issue_key}/assignee",
-                json_body={"accountId": args.assignee},
+                json_body=make_assignee_field(args.assignee),
             )
 
         if args.status:

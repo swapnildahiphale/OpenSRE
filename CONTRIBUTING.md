@@ -62,7 +62,7 @@ Look for issues labeled:
 
 ```bash
 git clone https://github.com/swapnildahiphale/OpenSRE.git
-cd opensre
+cd OpenSRE
 ```
 
 2. **Set up environment**
@@ -76,14 +76,20 @@ cp .env.example .env
 
 ```bash
 make dev
-# Starts Postgres, config-service, credential-resolver, envoy, sre-agent
+# Starts Postgres, config-service, Neo4j, sre-agent, web-ui
 # Migrations run automatically
+# Web console: http://localhost:3002
 ```
 
-4. **Run the web UI** (separate terminal)
+Optional:
+- `make dev-teams` — also start the Microsoft Teams bot (port 3978)
+
+4. **Iterate on the web UI locally** (optional — `make dev` already runs web-ui in Docker)
 
 ```bash
+# Stop the Docker web-ui container first, then:
 cd web_ui && pnpm install && pnpm dev
+# Point at Docker backends on :8081 / :8001
 ```
 
 5. **Run tests**

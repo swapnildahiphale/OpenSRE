@@ -9,7 +9,7 @@ export default function LearningPage() {
         change-control workflows.
       </p>
       <p className="text-sm text-stone-500">
-        Use <Link className="underline" href="/configuration">Team Configuration</Link> to manage live agent config today.
+        Use <Link className="underline" href="/team/agents">Team Configuration</Link> to manage live agent config today.
       </p>
         </div>
     );

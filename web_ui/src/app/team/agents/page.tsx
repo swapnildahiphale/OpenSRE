@@ -11,7 +11,6 @@ import {
   Loader2,
   Zap,
   Brain,
-  Wrench,
   Users,
   ToggleLeft,
   ToggleRight,
@@ -29,8 +28,6 @@ import {
   Edit2,
   Trash2,
   LayoutTemplate,
-  Server,
-  BookOpen,
 } from 'lucide-react';
 import { apiFetch } from '@/lib/apiClient';
 import { QuickStartWizard } from '@/components/onboarding/QuickStartWizard';
@@ -39,28 +36,13 @@ import { HelpTip } from '@/components/onboarding/HelpTip';
 
 interface AgentModel {
   name: string;
-  temperature: number;
-  max_tokens: number;
-  reasoning?: 'none' | 'low' | 'medium' | 'high' | 'xhigh';
-  verbosity?: 'low' | 'medium' | 'high';
 }
-
-// Helper to detect reasoning models (o1, o3, o4, gpt-5 series)
-const isReasoningModel = (modelName: string): boolean => {
-  return modelName.startsWith('o1') ||
-         modelName.startsWith('o3') ||
-         modelName.startsWith('o4') ||
-         modelName.startsWith('gpt-5');
-};
 
 interface AgentPrompt {
   system: string;
   prefix?: string;
   suffix?: string;
 }
-
-// Dict-based configuration schema
-type AgentTools = { [tool_id: string]: boolean };
 
 interface AgentConfig {
   id: string;
@@ -69,32 +51,11 @@ interface AgentConfig {
   enabled: boolean;
   model: AgentModel;
   prompt: AgentPrompt;
-  tools: AgentTools;  // Dict format: {tool_id: boolean}
-  disable_default_tools?: string[];  // Team overrides to disable inherited tools
-  enable_extra_tools?: string[];     // Team overrides to add extra tools
   sub_agents: { [agent_id: string]: boolean };  // Dict format: {agent_id: boolean}
   disable_default_sub_agents?: string[];  // Team overrides to disable inherited sub-agents
   enable_extra_sub_agents?: string[];     // Team overrides to add team-specific sub-agents
-  mcps?: { [mcp_id: string]: boolean };  // Dict format: {mcp_id: boolean}
-  skills?: { [skill_id: string]: boolean };
-  max_turns: number;
   handoff_strategy?: string;
   source: 'org' | 'team';
-}
-
-interface ToolDefinition {
-  name: string;
-  description: string;
-  source: 'built-in' | 'mcp';
-  mcp_server?: string;
-}
-
-interface SkillDefinition {
-  id: string;
-  name: string;
-  description: string;
-  category: string;
-  required_integrations: string[];
 }
 
 interface RemoteAgentConfig {
@@ -156,14 +117,6 @@ export default function AgentSettingsPage() {
   const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
-  const [showToolPicker, setShowToolPicker] = useState(false);
-  const [toolPool, setToolPool] = useState<ToolDefinition[]>([]);
-  const [skillsPool, setSkillsPool] = useState<SkillDefinition[]>([]);
-  const [loadingTools, setLoadingTools] = useState(false);
-
-  // NEW: MCP Servers state
-  const [mcpServers, setMcpServers] = useState<Record<string, any>>({});
-
   // View mode: 'visual' for topology, 'json' for raw config
   const [viewMode, setViewMode] = useState<'visual' | 'json'>('visual');
   const [effective, setEffective] = useState<unknown | null>(null);
@@ -178,46 +131,6 @@ export default function AgentSettingsPage() {
   const [quickStartInitialStep, setQuickStartInitialStep] = useState(1);
 
   const teamId = identity?.team_node_id;
-
-  const loadToolPool = useCallback(async () => {
-    setLoadingTools(true);
-    try {
-      // Fetch tools catalog from agent service (includes built-in + MCP tools)
-      const res = await fetch('/api/team/tools');
-      if (res.ok) {
-        const data = await res.json();
-        const tools: ToolDefinition[] = (data.tools || []).map((tool: any) => ({
-          name: tool.id,
-          description: tool.description || '',
-          source: tool.source === 'mcp' ? 'mcp' as const : 'built-in' as const,
-        }));
-
-        setToolPool(tools);
-      }
-    } catch (e) {
-      console.error('Failed to load tool pool:', e);
-    } finally {
-      setLoadingTools(false);
-    }
-  }, []);
-
-  const loadSkillsPool = useCallback(async () => {
-    try {
-      const res = await fetch('/api/team/skills');
-      if (res.ok) {
-        const data = await res.json();
-        setSkillsPool((data.skills || []).map((s: any) => ({
-          id: s.id,
-          name: s.name,
-          description: s.description || '',
-          category: s.category || '',
-          required_integrations: s.required_integrations || [],
-        })));
-      }
-    } catch (err) {
-      console.error('Failed to load skills pool:', err);
-    }
-  }, []);
 
   const loadAgents = useCallback(async () => {
     if (!teamId) return;
@@ -236,10 +149,6 @@ export default function AgentSettingsPage() {
         // Load entrance agent (the root orchestrator for this team's topology)
         // Falls back to 'planner' if not specified
         setEntranceAgentId(data.entrance_agent || 'planner');
-
-        // NEW: Load MCP servers
-        const mcpServersConfig = data.mcp_servers || {};
-        setMcpServers(mcpServersConfig);
 
         // Load remote agents (flat dict pattern)
         const remoteAgentsConfig = data.remote_agents || {};
@@ -261,16 +170,11 @@ export default function AgentSettingsPage() {
             name: cfg.name || id,
             description: cfg.description || '',
             enabled: cfg.enabled !== false,
-            model: cfg.model || { name: 'gpt-5.2', temperature: 0.3, max_tokens: 16000 },
+            model: cfg.model || { name: 'inherit' },
             prompt: cfg.prompt || { system: '' },
-            tools: cfg.tools || {},
-            disable_default_tools: cfg.disable_default_tools,
-            enable_extra_tools: cfg.enable_extra_tools,
             sub_agents: cfg.sub_agents || {},
             disable_default_sub_agents: cfg.disable_default_sub_agents,
             enable_extra_sub_agents: cfg.enable_extra_sub_agents,
-            mcps: cfg.mcps,
-            max_turns: cfg.max_turns || 20,
             handoff_strategy: cfg.handoff_strategy,
             source: 'org', // TODO: detect from raw config
           };
@@ -342,9 +246,7 @@ export default function AgentSettingsPage() {
 
   useEffect(() => {
     loadAgents();
-    loadToolPool();
-    loadSkillsPool();
-  }, [loadAgents, loadToolPool, loadSkillsPool]);
+  }, [loadAgents]);
 
   // Pre-fill team overrides when raw data loads
   useEffect(() => {
@@ -576,12 +478,9 @@ export default function AgentSettingsPage() {
       name: newAgentId.trim(),
       description: '',
       enabled: true,
-      model: { name: 'gpt-5.2', temperature: 0.3, max_tokens: 16000 },
+      model: { name: 'inherit' },
       prompt: { system: '' },
-      tools: {},
       sub_agents: {},
-      mcps: {},
-      max_turns: 20,
       source: 'team',
     };
     setAgents(prev => ({ ...prev, [id]: newAgent }));
@@ -609,14 +508,8 @@ export default function AgentSettingsPage() {
               enabled: editingAgent.enabled,
               model: editingAgent.model,
               prompt: editingAgent.prompt,
-              tools: editingAgent.tools,
-              disable_default_tools: editingAgent.disable_default_tools,
-              enable_extra_tools: editingAgent.enable_extra_tools,
               // Use canonical sub_agents dict format: {agent_id: boolean}
               sub_agents: editingAgent.sub_agents,
-              mcps: editingAgent.mcps,
-              skills: editingAgent.skills,
-              max_turns: editingAgent.max_turns,
               handoff_strategy: editingAgent.handoff_strategy,
             },
           },
@@ -968,11 +861,9 @@ export default function AgentSettingsPage() {
                 name: remoteAgent.name,
                 description: remoteAgent.description || '',
                 enabled: true,
-                model: { name: 'remote', temperature: 0, max_tokens: 0 },
+                model: { name: 'inherit' },
                 prompt: { system: '' },
-                tools: { enabled: [], disabled: [] },
-                sub_agents: [],
-                max_turns: 0,
+                sub_agents: {},
                 source: 'team' as const,
               } : null);
 
@@ -1118,143 +1009,13 @@ export default function AgentSettingsPage() {
                         }
                         className="w-full px-3 py-2 text-sm rounded-lg border border-stone-200 dark:border-stone-600 bg-white dark:bg-stone-700"
                       >
-                        <optgroup label="Reasoning Models">
-                          <option value="gpt-5">gpt-5</option>
-                          <option value="o1">o1</option>
-                          <option value="o3-mini">o3-mini</option>
-                          <option value="o4-mini">o4-mini</option>
-                        </optgroup>
-                        <optgroup label="Standard Models">
-                          <option value="gpt-5.2">gpt-5.2</option>
-                          <option value="gpt-5.2-mini">gpt-5.2-mini</option>
-                          <option value="gpt-4-turbo">gpt-4-turbo</option>
-                          <option value="gpt-3.5-turbo">gpt-3.5-turbo</option>
-                        </optgroup>
+                        <option value="inherit">inherit (session default)</option>
+                        <option value="sonnet">sonnet</option>
+                        <option value="opus">opus</option>
+                        <option value="haiku">haiku</option>
                       </select>
                     </div>
-
-                    <div>
-                      <label className="block text-xs font-medium text-stone-500 mb-1">
-                        Max Turns
-                      </label>
-                      <input
-                        type="number"
-                        min="1"
-                        max="100"
-                        value={editingAgent.max_turns}
-                        onChange={(e) =>
-                          setEditingAgent({
-                            ...editingAgent,
-                            max_turns: parseInt(e.target.value) || 20,
-                          })
-                        }
-                        className="w-full px-3 py-2 text-sm rounded-lg border border-stone-200 dark:border-stone-600 bg-white dark:bg-stone-700"
-                      />
-                    </div>
                   </div>
-
-                  {/* Conditional model parameters based on model type */}
-                  {isReasoningModel(editingAgent.model.name) ? (
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <div className="flex items-center gap-1 mb-1">
-                          <label className="block text-xs font-medium text-stone-500">
-                            Reasoning Effort
-                          </label>
-                          <HelpTip id="reasoning-effort" position="top">
-                            Controls how much the model &quot;thinks&quot; before responding.
-                            Higher values improve quality but increase latency and cost.
-                            Only available for reasoning models (o1, o3, o4, gpt-5).
-                          </HelpTip>
-                        </div>
-                        <select
-                          value={editingAgent.model.reasoning || 'medium'}
-                          onChange={(e) =>
-                            setEditingAgent({
-                              ...editingAgent,
-                              model: {
-                                ...editingAgent.model,
-                                reasoning: e.target.value as AgentModel['reasoning'],
-                              },
-                            })
-                          }
-                          className="w-full px-3 py-2 text-sm rounded-lg border border-stone-200 dark:border-stone-600 bg-white dark:bg-stone-700"
-                        >
-                          <option value="none">None (fastest)</option>
-                          <option value="low">Low</option>
-                          <option value="medium">Medium (default)</option>
-                          <option value="high">High</option>
-                          <option value="xhigh">Extra High (most thorough)</option>
-                        </select>
-                      </div>
-
-                      <div>
-                        <div className="flex items-center gap-1 mb-1">
-                          <label className="block text-xs font-medium text-stone-500">
-                            Verbosity
-                          </label>
-                          <HelpTip id="verbosity" position="top">
-                            Controls the length and detail of responses.
-                            Only available for reasoning models (o1, o3, o4, gpt-5).
-                          </HelpTip>
-                        </div>
-                        <select
-                          value={editingAgent.model.verbosity || 'medium'}
-                          onChange={(e) =>
-                            setEditingAgent({
-                              ...editingAgent,
-                              model: {
-                                ...editingAgent.model,
-                                verbosity: e.target.value as AgentModel['verbosity'],
-                              },
-                            })
-                          }
-                          className="w-full px-3 py-2 text-sm rounded-lg border border-stone-200 dark:border-stone-600 bg-white dark:bg-stone-700"
-                        >
-                          <option value="low">Low (concise)</option>
-                          <option value="medium">Medium (default)</option>
-                          <option value="high">High (detailed)</option>
-                        </select>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <div className="flex items-center gap-1 mb-1">
-                          <label className="block text-xs font-medium text-stone-500">
-                            Temperature
-                          </label>
-                          <HelpTip id="temperature" position="top">
-                            Controls randomness in responses. Lower values (0-0.3) are more
-                            deterministic, higher values (0.7-2) are more creative.
-                            Only available for standard models (not reasoning models).
-                          </HelpTip>
-                        </div>
-                        <input
-                          type="number"
-                          step="0.1"
-                          min="0"
-                          max="2"
-                          value={editingAgent.model.temperature}
-                          onChange={(e) =>
-                            setEditingAgent({
-                              ...editingAgent,
-                              model: {
-                                ...editingAgent.model,
-                                temperature: parseFloat(e.target.value) || 0,
-                              },
-                            })
-                          }
-                          className="w-full px-3 py-2 text-sm rounded-lg border border-stone-200 dark:border-stone-600 bg-white dark:bg-stone-700"
-                        />
-                      </div>
-                      <div className="flex items-end">
-                        <p className="text-xs text-stone-400 dark:text-stone-500 pb-2">
-                          Reasoning models use &quot;Reasoning Effort&quot; instead of temperature.
-                        </p>
-                      </div>
-                    </div>
-                  )}
                 </div>
 
                 {/* System Prompt */}
@@ -1304,407 +1065,6 @@ export default function AgentSettingsPage() {
                         : 'No prompt configured'}
                     </div>
                   )}
-                </div>
-
-                {/* Tools */}
-                <div className="bg-stone-50 dark:bg-stone-800 rounded-xl p-4 border border-stone-200 dark:border-stone-700">
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center gap-2">
-                      <Wrench className="w-5 h-5 text-stone-500" />
-                      <h3 className="font-semibold text-stone-900 dark:text-white">Tools</h3>
-                    </div>
-                    <button
-                      onClick={() => setShowToolPicker(!showToolPicker)}
-                      className="text-xs text-stone-500 hover:text-stone-400 flex items-center gap-1"
-                    >
-                      {showToolPicker ? (
-                        <>
-                          <EyeOff className="w-4 h-4" />
-                          Hide
-                        </>
-                      ) : (
-                        <>
-                          <Eye className="w-4 h-4" />
-                          Manage Tools
-                        </>
-                      )}
-                    </button>
-                  </div>
-
-                  {showToolPicker ? (
-                    <div className="space-y-4">
-                      {/* Instructions */}
-                      <div className="text-xs text-stone-500 bg-stone-50 dark:bg-stone-700 border border-stone-200 dark:border-stone-600 rounded-lg p-3">
-                        <p className="mb-2">
-                          <strong>Default tools:</strong> Built-in tools automatically available to this agent.
-                        </p>
-                        <p className="mb-2">
-                          <strong>Extra tools:</strong> Additional tools from your team's tool pool (built-in + MCP).
-                        </p>
-                        <p>
-                          Click tools below to disable defaults or add extras.
-                        </p>
-                      </div>
-
-                      {/* Disabled Default Tools */}
-                      {(editingAgent.disable_default_tools || []).length > 0 && (
-                        <div>
-                          <div className="text-xs font-medium text-stone-700 dark:text-stone-300 mb-2">
-                            Disabled Default Tools:
-                          </div>
-                          <div className="flex flex-wrap gap-2">
-                            {(editingAgent.disable_default_tools || []).map((tool) => (
-                              <button
-                                key={tool}
-                                onClick={() => {
-                                  setEditingAgent({
-                                    ...editingAgent,
-                                    disable_default_tools: (editingAgent.disable_default_tools || []).filter(t => t !== tool),
-                                  });
-                                }}
-                                className="group flex items-center gap-1.5 px-2.5 py-1 text-xs rounded bg-clay-light/15 dark:bg-clay/20 text-clay-dark dark:text-clay-light hover:bg-clay-light/20 dark:hover:bg-clay/40 transition-colors"
-                                title="Click to re-enable"
-                              >
-                                {tool}
-                                <X className="w-3 h-3 opacity-60 group-hover:opacity-100" />
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Enabled Extra Tools */}
-                      {(editingAgent.enable_extra_tools || []).length > 0 && (
-                        <div>
-                          <div className="text-xs font-medium text-stone-700 dark:text-stone-300 mb-2">
-                            Enabled Extra Tools:
-                          </div>
-                          <div className="flex flex-wrap gap-2">
-                            {(editingAgent.enable_extra_tools || []).map((tool) => (
-                              <button
-                                key={tool}
-                                onClick={() => {
-                                  setEditingAgent({
-                                    ...editingAgent,
-                                    enable_extra_tools: (editingAgent.enable_extra_tools || []).filter(t => t !== tool),
-                                  });
-                                }}
-                                className="group flex items-center gap-1.5 px-2.5 py-1 text-xs rounded bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 hover:bg-green-200 dark:hover:bg-green-900/50 transition-colors"
-                                title="Click to remove"
-                              >
-                                {tool}
-                                <X className="w-3 h-3 opacity-60 group-hover:opacity-100" />
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Default Tools (from dict config) */}
-                      {(() => {
-                        const enabledTools = Object.entries(editingAgent.tools || {})
-                          .filter(([_, enabled]) => enabled)
-                          .map(([tool, _]) => tool);
-                        const hasWildcard = editingAgent.tools?.['*'] === true;
-
-                        if (enabledTools.length === 0 && !hasWildcard) return null;
-
-                        return (
-                          <div>
-                            <div className="text-xs font-medium text-stone-700 dark:text-stone-300 mb-2">
-                              Default Tools {hasWildcard && '(all enabled)'}:
-                            </div>
-                            {hasWildcard ? (
-                              <div className="text-xs text-stone-500 italic">
-                                Using wildcard pattern (*). All built-in tools are enabled by default.
-                              </div>
-                            ) : (
-                              <div className="flex flex-wrap gap-2">
-                                {enabledTools
-                                  .filter(t => !(editingAgent.disable_default_tools || []).includes(t))
-                                  .map((tool) => (
-                                  <button
-                                    key={tool}
-                                    onClick={() => {
-                                      setEditingAgent({
-                                        ...editingAgent,
-                                        disable_default_tools: [...(editingAgent.disable_default_tools || []), tool],
-                                      });
-                                    }}
-                                    className="px-2.5 py-1 text-xs rounded bg-stone-100 dark:bg-stone-700 text-stone-700 dark:text-stone-300 hover:bg-stone-200 dark:hover:bg-stone-600 transition-colors"
-                                    title="Click to disable"
-                                  >
-                                    {tool}
-                                  </button>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })()}
-
-                      {/* Add Extra Tools */}
-                      <div>
-                        <div className="text-xs font-medium text-stone-700 dark:text-stone-300 mb-2">
-                          Add Extra Tools from Pool:
-                        </div>
-                        {loadingTools ? (
-                          <div className="text-xs text-stone-500">Loading tool pool...</div>
-                        ) : (
-                          <div className="max-h-40 overflow-y-auto border border-stone-200 dark:border-stone-600 rounded-lg p-2">
-                            <div className="flex flex-wrap gap-2">
-                              {toolPool
-                                .filter(t => !(editingAgent.enable_extra_tools || []).includes(t.name))
-                                .map((tool) => (
-                                <button
-                                  key={tool.name}
-                                  onClick={() => {
-                                    setEditingAgent({
-                                      ...editingAgent,
-                                      enable_extra_tools: [...(editingAgent.enable_extra_tools || []), tool.name],
-                                    });
-                                  }}
-                                  className="flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-lg border border-dashed border-stone-300 dark:border-stone-600 text-stone-600 dark:text-stone-400 hover:border-stone-400 hover:text-stone-500 dark:hover:text-stone-300 transition-colors"
-                                  title={tool.description || 'Add this tool'}
-                                >
-                                  <span className="text-lg leading-none">+</span>
-                                  {tool.name}
-                                  {tool.source === 'mcp' && (
-                                    <span className="text-[10px] px-1 py-0.5 rounded bg-stone-200 dark:bg-stone-700 text-stone-600 dark:text-stone-400">
-                                      MCP
-                                    </span>
-                                  )}
-                                </button>
-                              ))}
-                            </div>
-                            {toolPool.length === 0 && (
-                              <div className="text-xs text-stone-500 italic">
-                                No tools in pool. Add MCPs or built-in tools first.
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  ) : (
-                    /* Compact summary view */
-                    <div className="space-y-2">
-                      <div className="text-sm text-stone-600 dark:text-stone-400">
-                        {(() => {
-                          const hasWildcard = editingAgent.tools?.['*'] === true;
-                          const enabledCount = Object.values(editingAgent.tools || {}).filter(Boolean).length;
-                          return hasWildcard ? (
-                            <>All default tools enabled</>
-                          ) : (
-                            <>{enabledCount} default tools</>
-                          );
-                        })()}
-                        {(editingAgent.disable_default_tools || []).length > 0 && (
-                          <span className="text-clay dark:text-clay-light">
-                            {' '}− {editingAgent.disable_default_tools?.length} disabled
-                          </span>
-                        )}
-                        {(editingAgent.enable_extra_tools || []).length > 0 && (
-                          <span className="text-green-600 dark:text-green-400">
-                            {' '}+ {editingAgent.enable_extra_tools?.length} extra
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* MCP Servers (Editable) */}
-                <div className="bg-stone-50 dark:bg-stone-800 rounded-xl p-4 border border-stone-200 dark:border-stone-700">
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center gap-2">
-                      <Server className="w-5 h-5 text-forest" />
-                      <h3 className="font-semibold text-stone-900 dark:text-white">
-                        MCP Servers
-                      </h3>
-                      <span className="text-xs text-stone-500">
-                        (click to enable/disable)
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="space-y-3">
-                    {(() => {
-                      const agentMcps = editingAgent.mcps || {};
-                      const enabledMcps = Object.entries(agentMcps)
-                        .filter(([_, enabled]) => enabled)
-                        .map(([id, _]) => id);
-
-                      // Get list of available MCP servers
-                      const availableMcps = Object.entries(mcpServers)
-                        .filter(([_, config]: [string, any]) => config.enabled)
-                        .map(([id, config]: [string, any]) => ({
-                          id,
-                          name: config.name || id,
-                          tools: config.tools || [],
-                          enabled_tools: config.enabled_tools || ['*']
-                        }));
-
-                      return (
-                        <>
-                          {/* Currently enabled MCPs */}
-                          {enabledMcps.length > 0 && (
-                            <div className="flex flex-wrap gap-2">
-                              {enabledMcps.map((mcpId) => {
-                                const mcpInfo = availableMcps.find(m => m.id === mcpId);
-                                const toolCount = mcpInfo?.enabled_tools.includes('*')
-                                  ? mcpInfo?.tools.length || 0
-                                  : mcpInfo?.enabled_tools.length || 0;
-
-                                return (
-                                  <button
-                                    key={mcpId}
-                                    onClick={() => {
-                                      setEditingAgent({
-                                        ...editingAgent,
-                                        mcps: {
-                                          ...agentMcps,
-                                          [mcpId]: false
-                                        }
-                                      });
-                                    }}
-                                    className="flex items-center gap-2 px-3 py-1.5 text-sm rounded-lg transition-colors group bg-forest-light/100 text-white hover:bg-forest-dark"
-                                    title={`Click to remove (${toolCount} tools)`}
-                                  >
-                                    <Server className="w-4 h-4" />
-                                    {mcpInfo?.name || mcpId}
-                                    <span className="text-xs opacity-75">({toolCount})</span>
-                                    <X className="w-3 h-3 opacity-60 group-hover:opacity-100" />
-                                  </button>
-                                );
-                              })}
-                            </div>
-                          )}
-
-                          {/* Available MCPs to add */}
-                          {(() => {
-                            const disabledMcps = availableMcps.filter(
-                              mcp => !enabledMcps.includes(mcp.id)
-                            );
-
-                            if (disabledMcps.length === 0) return null;
-
-                            return (
-                              <div>
-                                <div className="text-xs text-stone-500 mb-2">Add MCP server:</div>
-                                <div className="flex flex-wrap gap-2">
-                                  {disabledMcps.map((mcp) => {
-                                    const toolCount = mcp.enabled_tools.includes('*')
-                                      ? mcp.tools.length
-                                      : mcp.enabled_tools.length;
-
-                                    return (
-                                      <button
-                                        key={mcp.id}
-                                        onClick={() => {
-                                          setEditingAgent({
-                                            ...editingAgent,
-                                            mcps: {
-                                              ...agentMcps,
-                                              [mcp.id]: true
-                                            }
-                                          });
-                                        }}
-                                        className="flex items-center gap-2 px-3 py-1.5 text-sm rounded-lg transition-colors bg-white dark:bg-stone-700 border border-stone-300 dark:border-stone-600 text-stone-700 dark:text-stone-300 hover:border-forest hover:text-forest dark:hover:text-forest-light"
-                                        title={`Click to add (${toolCount} tools)`}
-                                      >
-                                        <Server className="w-4 h-4" />
-                                        {mcp.name}
-                                        <span className="text-xs opacity-75">({toolCount})</span>
-                                      </button>
-                                    );
-                                  })}
-                                </div>
-                              </div>
-                            );
-                          })()}
-
-                          {availableMcps.length === 0 && (
-                            <div className="text-sm text-stone-500 italic">
-                              No MCP servers available. Configure them in the <a href="/team/tools" className="text-forest hover:underline">Tools page</a>.
-                            </div>
-                          )}
-                        </>
-                      );
-                    })()}
-                  </div>
-                </div>
-
-                {/* Skills Section */}
-                <div className="bg-stone-50 dark:bg-stone-800 rounded-xl p-4 border border-stone-200 dark:border-stone-700">
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center gap-2">
-                      <BookOpen className="w-5 h-5 text-violet-500" />
-                      <h3 className="font-semibold text-stone-900 dark:text-white">Skills</h3>
-                      <span className="text-xs text-stone-500">(click to enable/disable)</span>
-                    </div>
-                  </div>
-
-                  <div className="space-y-3">
-                    {/* Enabled skills */}
-                    {skillsPool.length > 0 && (
-                      <div className="flex flex-wrap gap-2">
-                        {skillsPool
-                          .filter(skill => {
-                            const agentSkills = editingAgent?.skills || {};
-                            return agentSkills[skill.id] === true;
-                          })
-                          .map(skill => (
-                            <button
-                              key={skill.id}
-                              onClick={() => {
-                                if (!editingAgent) return;
-                                const agentSkills = { ...(editingAgent.skills || {}) };
-                                agentSkills[skill.id] = false;
-                                setEditingAgent({ ...editingAgent, skills: agentSkills });
-                              }}
-                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-violet-500 text-white hover:bg-violet-600 transition-colors"
-                              title={skill.description}
-                            >
-                              <BookOpen className="w-3.5 h-3.5" />
-                              {skill.name}
-                              <X className="w-3 h-3 ml-1" />
-                            </button>
-                          ))}
-                      </div>
-                    )}
-
-                    {/* Available skills to add */}
-                    {skillsPool.length > 0 && (
-                      <div className="flex flex-wrap gap-2">
-                        {skillsPool
-                          .filter(skill => {
-                            const agentSkills = editingAgent?.skills || {};
-                            return agentSkills[skill.id] !== true;
-                          })
-                          .map(skill => (
-                            <button
-                              key={skill.id}
-                              onClick={() => {
-                                if (!editingAgent) return;
-                                const agentSkills = { ...(editingAgent.skills || {}) };
-                                agentSkills[skill.id] = true;
-                                setEditingAgent({ ...editingAgent, skills: agentSkills });
-                              }}
-                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-white dark:bg-stone-700 border border-stone-300 dark:border-stone-600 text-stone-700 dark:text-stone-300 hover:border-violet-500 hover:text-violet-600 dark:hover:text-violet-400 transition-colors"
-                              title={skill.description}
-                            >
-                              <BookOpen className="w-3.5 h-3.5" />
-                              {skill.name}
-                            </button>
-                          ))}
-                      </div>
-                    )}
-
-                    {skillsPool.length === 0 && (
-                      <p className="text-sm text-stone-500">Loading skills...</p>
-                    )}
-                  </div>
                 </div>
 
                 {/* Sub-Agents (Editable) */}

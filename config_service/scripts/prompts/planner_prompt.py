@@ -9,9 +9,6 @@ This module builds the planner system prompt following the standard agent patter
     system_prompt = apply_role_based_prompt(...)      # Role sections
     system_prompt += build_agent_prompt_sections(...) # Shared sections
 
-Context (runtime metadata, team config) is now passed in the user message,
-not the system prompt. This allows context to flow naturally to sub-agents.
-
 NOTE: The custom_prompt from team config / templates is the source of truth.
 When no custom prompt is configured, we load from 01_slack_incident_triage
 template as the canonical default.
@@ -67,9 +64,6 @@ def build_planner_system_prompt(
         system_prompt = base_prompt + capabilities
         system_prompt = apply_role_based_prompt(...)  # Add delegation guidance
         system_prompt += shared_sections (behavioral principles, error handling, etc.)
-
-    NOTE: Runtime metadata and contextual info are now passed in the user message,
-    not the system prompt. Use build_user_context() to build the user message context.
 
     Args:
         enabled_agents: List of agent keys to include in capabilities
@@ -145,9 +139,6 @@ def build_planner_system_prompt_from_team_config(
 
     This is a convenience wrapper that extracts the relevant fields from
     a TeamLevelConfig object and passes them to build_planner_system_prompt.
-
-    NOTE: Runtime metadata and contextual info are now passed in the user message.
-    Use build_user_context() to build the user message context.
 
     Args:
         team_config: TeamLevelConfig object from config service

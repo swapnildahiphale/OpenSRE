@@ -39,10 +39,13 @@ def test_parse_enabled_skills_env_unset():
 
 
 def test_parse_enabled_skills_env_all():
-    """ENABLED_SKILLS=all returns None (all skills)."""
+    """ENABLED_SKILLS=all returns _ALL_SKILLS sentinel."""
     os.environ["ENABLED_SKILLS"] = "all"
     try:
-        assert parse_enabled_skills_env() is None
+        result = parse_enabled_skills_env()
+        from config import _ALL_SKILLS
+
+        assert result is _ALL_SKILLS
     finally:
         del os.environ["ENABLED_SKILLS"]
 
@@ -286,3 +289,23 @@ def test_remove_disabled_skill_dirs_all_enabled(tmp_path):
     removed = remove_disabled_skill_dirs(str(tmp_path), None, SAMPLE_NAME_MAP)
     assert removed == []
     assert (tmp_path / "investigate").exists()
+
+
+def test_remove_disabled_skill_dirs_deletes_only_disabled(tmp_path):
+    for d in ("investigate", "observability-loki"):
+        sd = tmp_path / d
+        sd.mkdir()
+        (sd / "SKILL.md").write_text(f"---\nname: {d}\n---\n# {d}\n")
+    name_map = build_skill_name_map(str(tmp_path))
+    removed = remove_disabled_skill_dirs(str(tmp_path), {"investigate"}, name_map)
+    assert removed == ["observability-loki"]
+    assert (tmp_path / "investigate").is_dir()
+    assert not (tmp_path / "observability-loki").exists()
+
+
+def test_remove_disabled_noop_when_enabled_is_none(tmp_path):
+    sd = tmp_path / "investigate"
+    sd.mkdir()
+    (sd / "SKILL.md").write_text("---\nname: investigate\n---\n")
+    assert remove_disabled_skill_dirs(str(tmp_path), None, {}) == []
+    assert sd.is_dir()
