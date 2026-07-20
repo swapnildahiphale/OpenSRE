@@ -61,14 +61,15 @@ In [Azure Bot](https://portal.azure.com) → **Configuration**, set **Messaging 
 Only needed for real Teams UI — not for Web Chat or routine code deploys.
 
 1. Copy `manifest/manifest.json` and replace `{{TEAMS_APP_ID}}` with your app ID.
-2. Build the zip:
+2. Add a Teams color icon as `manifest/color.png` (192×192 PNG). `outline.png` is included.
+3. Build the zip:
 
    ```bash
    cd teams-bot/manifest
    zip -r ../opensre-teams-app.zip manifest.json color.png outline.png
    ```
 
-3. In **Teams** → **Apps** → **Manage your apps** → **Upload a custom app**, upload the zip.
+4. In **Teams** → **Apps** → **Manage your apps** → **Upload a custom app**, upload the zip.
 
 Full onboarding checklist, licensing notes, and troubleshooting:
 [`docs/TEAMS_SETUP.md`](../docs/TEAMS_SETUP.md).
