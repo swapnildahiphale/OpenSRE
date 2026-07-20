@@ -192,9 +192,11 @@ services:
       # scripts (CloudWatch, EC2, ECS, Lambda). kubectl auth uses the per-context
       # AWS_PROFILE already baked into ~/.kube/config, so it is unaffected here.
       # Override either in .env if you want a different default account.
-      - AWS_PROFILE=${AWS_PROFILE:-gen1-com-dev-devops}
-      - AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION:-us-west-1}
-      - AWS_REGION=${AWS_REGION:-us-west-1}
+      # No org-specific profile default — set AWS_PROFILE in .env (or rely on
+      # the profile already named in each kubeconfig context).
+      - AWS_PROFILE=${AWS_PROFILE:-default}
+      - AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION:-us-west-2}
+      - AWS_REGION=${AWS_REGION:-us-west-2}
       # Bitbucket (vcs-bitbucket skill): BKT_* vars come from env_file (.env) above.
       # Do not add empty BKT_PROJECT/BKT_REPO defaults here — unset is better than "".
       # GitHub (vcs-github skill): GITHUB_TOKEN / GITHUB_REPOSITORY come from env_file (.env) above.
