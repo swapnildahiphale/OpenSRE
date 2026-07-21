@@ -72,6 +72,7 @@ This starts Postgres, config-service, Neo4j, sre-agent, and the web console. Mig
 | **Knowledge Graph** | Neo4j service topology, dependency traversal, blast radius |
 | **Multi-provider LLM** | Direct Anthropic by default; optional LiteLLM for OpenAI, Gemini, and more |
 | **Web Console** | Investigations, memory hub, config editor |
+| **Slack Integration** | Investigate incidents directly from Slack (`make dev-slack`) |
 | **Teams Bot** | Investigate incidents from Microsoft Teams (`make dev-teams`) |
 
 **[→ See all features](https://www.opensre.in)** · **[Roadmap](https://www.opensre.in/docs)**
@@ -81,12 +82,17 @@ This starts Postgres, config-service, Neo4j, sre-agent, and the web console. Mig
 | Command | What it does |
 |---------|-------------|
 | `make dev` | Start all services (Postgres, config, Neo4j, agent, web UI) |
+| `make dev-slack` | Start all services + Slack bot |
 | `make dev-teams` | Start all services + Microsoft Teams bot |
 | `make stop` | Stop all services |
 | `make status` | Show service health status |
 | `make logs` | Follow all service logs |
 | `make logs-agent` | Follow sre-agent logs only |
 | `make clean` | Remove containers, volumes, and images |
+
+### Slack integration
+
+[Create a Slack app](https://api.slack.com/apps?new_app=1), add `SLACK_BOT_TOKEN` and `SLACK_APP_TOKEN` to `.env`, and run `make dev-slack`. [Full guide](https://www.opensre.in/docs/integrations).
 
 ### Microsoft Teams
 
