@@ -3,8 +3,9 @@
 </p>
 
 <p align="center">
-  <b>Your AI SRE that investigates production incidents</b><br>
-  <sub>Long-term memory · Knowledge graph · 51 production skills</sub>
+  <strong>OpenSRE — the memory-first AI SRE</strong><br />
+  Self-hosted · Episodic memory · Knowledge graph · Web console · Slack &amp; Teams<br />
+  <sub>opensre.in — not affiliated with Tracer / opensre.com</sub>
 </p>
 
 <p align="center">
@@ -152,9 +153,11 @@ make e2e-teardown    # Delete Kind cluster and clean up
 
 ## Comparing OpenSRE
 
-How does OpenSRE compare to commercial incident response tools like PagerDuty Copilot, Rootly AI, and Shoreline? See the full breakdown:
+**OpenSRE — the memory-first AI SRE** at [opensre.in](https://opensre.in) is not affiliated with Tracer’s OpenSRE at opensre.com.
 
-**[→ Comparison matrix](https://www.opensre.in/compare)** · **[Blog: OpenSRE vs Commercial Tools](https://www.opensre.in/blog/opensre-vs-commercial-incident-tools)**
+- **[OpenSRE vs Tracer OpenSRE](https://opensre.in/compare/opensre-vs-tracer)** — team platform with episodic memory & knowledge graph
+- **[vs commercial tools](https://opensre.in/compare)** — PagerDuty AI, Rootly AI, Shoreline
+- **[Blog: commercial comparison](https://opensre.in/blog/opensre-vs-commercial-incident-tools)**
 
 ## Built With
 

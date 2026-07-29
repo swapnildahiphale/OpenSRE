@@ -9,6 +9,7 @@ from claude_agent_sdk import (
     TextBlock,
     TaskNotificationMessage,
     TaskStartedMessage,
+    TaskUpdatedMessage,
 )
 
 
@@ -166,6 +167,122 @@ def test_multiple_outstanding_requires_all_notifications():
         assert [e.type for e in events].count("result") == 1
         assert events[-1].type == "result"
         assert "done after both" in events[-1].data["text"]
+
+    asyncio.run(_run())
+
+
+def test_task_terminal_via_task_updated_only_still_completes():
+    """Regression: a task can signal its TERMINAL state ONLY via a
+    TaskUpdatedMessage, with no matching TaskNotificationMessage. The
+    outstanding-task set must clear on the terminal TaskUpdated status so the
+    parent's ResultMessage becomes the terminal ``result`` — otherwise the run
+    stays in ``background_waiting`` until the wall-clock timeout (the real
+    OC-2362 hang).
+    """
+
+    async def _run():
+        session = InteractiveAgentSession("t-updated")
+        session.client = MagicMock()
+
+        async def fake_query(prompt):
+            async for _ in prompt:
+                pass
+
+        async def fake_receive_messages():
+            yield TaskStartedMessage(
+                subtype="task_started",
+                data={},
+                task_id="bg-1",
+                description="Deep check",
+                uuid="u1",
+                session_id="sess-1",
+                tool_use_id=None,
+                task_type="agent",
+            )
+            # Terminal state arrives ONLY as TaskUpdatedMessage — no notification.
+            yield TaskUpdatedMessage(
+                subtype="task_updated",
+                data={},
+                task_id="bg-1",
+                patch={"status": "completed"},
+                status="completed",
+                session_id="sess-1",
+                uuid="u2",
+            )
+            yield _assistant("Root cause: disk full")
+            yield _result(result="Root cause: disk full")
+
+        session.client.query = AsyncMock(side_effect=fake_query)
+        session.client.receive_messages = MagicMock(side_effect=fake_receive_messages)
+
+        events = [e async for e in session.execute("investigate")]
+        types = [e.type for e in events]
+        assert types.count("result") == 1
+        assert events[-1].type == "result"
+        assert "disk full" in events[-1].data["text"]
+        # Outstanding set must be empty once the terminal update is seen.
+        assert session._outstanding_background_tasks == set()
+
+    asyncio.run(_run())
+
+
+def test_non_terminal_task_updated_keeps_waiting():
+    """A non-terminal TaskUpdatedMessage (e.g. ``running``) must NOT clear the
+    task — the run should still wait (background_waiting) for a real terminal
+    signal before emitting the final result.
+    """
+
+    async def _run():
+        session = InteractiveAgentSession("t-updated-running")
+        session.client = MagicMock()
+
+        async def fake_query(prompt):
+            async for _ in prompt:
+                pass
+
+        async def fake_receive_messages():
+            yield TaskStartedMessage(
+                subtype="task_started",
+                data={},
+                task_id="bg-1",
+                description="Deep check",
+                uuid="u1",
+                session_id="sess-1",
+                tool_use_id=None,
+                task_type="agent",
+            )
+            # Non-terminal update — must be ignored for outstanding tracking.
+            yield TaskUpdatedMessage(
+                subtype="task_updated",
+                data={},
+                task_id="bg-1",
+                patch={"status": "running"},
+                status="running",
+                session_id="sess-1",
+                uuid="u2",
+            )
+            yield _result(result="interim")
+            # Now the real terminal signal clears it.
+            yield TaskUpdatedMessage(
+                subtype="task_updated",
+                data={},
+                task_id="bg-1",
+                patch={"status": "completed"},
+                status="completed",
+                session_id="sess-1",
+                uuid="u3",
+            )
+            yield _result(result="final")
+
+        session.client.query = AsyncMock(side_effect=fake_query)
+        session.client.receive_messages = MagicMock(side_effect=fake_receive_messages)
+
+        events = [e async for e in session.execute("investigate")]
+        types = [e.type for e in events]
+        assert "background_waiting" in types
+        assert types.count("result") == 1
+        assert events[-1].type == "result"
+        assert "final" in events[-1].data["text"]
 
     asyncio.run(_run())
 

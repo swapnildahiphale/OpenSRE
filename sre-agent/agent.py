@@ -40,6 +40,7 @@ from typing import AsyncIterator
 
 # Claude SDK imports
 from claude_agent_sdk import (
+    TERMINAL_TASK_STATUSES,
     AssistantMessage,
     ClaudeAgentOptions,
     ClaudeSDKClient,
@@ -48,6 +49,7 @@ from claude_agent_sdk import (
     TaskNotificationMessage,
     TaskProgressMessage,
     TaskStartedMessage,
+    TaskUpdatedMessage,
     TextBlock,
 )
 from dotenv import load_dotenv
@@ -1375,6 +1377,21 @@ class InteractiveAgentSession:
                                     status=message.status,
                                     summary=message.summary,
                                 )
+                            elif isinstance(message, TaskUpdatedMessage):
+                                # A background task's TERMINAL state can arrive
+                                # ONLY as a TaskUpdatedMessage — the SDK does not
+                                # always emit a matching TaskNotificationMessage
+                                # (e.g. tasks that finish or are killed). If we
+                                # don't clear the task_id here, the outstanding
+                                # set never empties, the parent's ResultMessage is
+                                # treated as interim (background_waiting), and the
+                                # whole run hangs until the wall-clock timeout.
+                                # Clear on any terminal status from EITHER message.
+                                status = message.status or message.patch.get("status")
+                                if status in TERMINAL_TASK_STATUSES:
+                                    self._outstanding_background_tasks.discard(
+                                        message.task_id
+                                    )
                             elif isinstance(message, AssistantMessage):
                                 for block in message.content:
                                     if isinstance(block, TextBlock):
