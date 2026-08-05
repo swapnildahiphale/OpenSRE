@@ -1079,13 +1079,21 @@ async def answer(request: AnswerRequest):
     """
     Send answer to agent's AskUserQuestion.
     """
-    if request.thread_id not in _active_sessions:
+    session = _active_sessions.get(request.thread_id)
+    if session is None:
         raise HTTPException(404, f"No active session for thread {request.thread_id}")
 
     print(f"📬 Forwarding answer to thread {request.thread_id}")
 
-    _active_sessions[request.thread_id]
-    # TODO: Implement answer forwarding when InteractiveAgentSession supports it
+    if not session.is_running:
+        raise HTTPException(409, "Investigation is not executing")
+
+    try:
+        await session.provide_answer(request.answers)
+    except RuntimeError as e:
+        if "No pending question" not in str(e):
+            raise
+        raise HTTPException(409, str(e)) from e
 
     return {"status": "ok", "thread_id": request.thread_id}
 

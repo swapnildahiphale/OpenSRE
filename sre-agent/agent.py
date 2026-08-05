@@ -1676,12 +1676,11 @@ class InteractiveAgentSession:
 
     async def provide_answer(self, answers: dict) -> None:
         """Provide answer to pending AskUserQuestion."""
-        if (
-            hasattr(self, "_pending_answer_event")
-            and self._pending_answer_event is not None
-        ):
-            self._pending_answer = answers
-            self._pending_answer_event.set()
+        if not hasattr(self, "_pending_answer_event") or self._pending_answer_event is None:
+            raise RuntimeError("No pending question")
+
+        self._pending_answer = answers
+        self._pending_answer_event.set()
 
 
 def create_agent_session(thread_id: str, team_config=None):
