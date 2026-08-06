@@ -53,6 +53,21 @@ def test_answer_returns_409_for_running_session_without_pending_question(client)
     assert response.status_code == 409
 
 
+def test_answer_does_not_translate_unrelated_runtime_error(client):
+    class FailingSession:
+        is_running = True
+
+        async def provide_answer(self, answers):
+            raise RuntimeError("storage failure: No pending question index is corrupt")
+
+    server_simple._active_sessions["failing"] = FailingSession()
+
+    with pytest.raises(RuntimeError, match="storage failure"):
+        client.post(
+            "/answer", json={"thread_id": "failing", "answers": {"q": "a"}}
+        )
+
+
 def test_answer_delivers_to_running_session_with_pending_question(client):
     session = _session("pending", is_running=True)
     session._pending_answer_event = asyncio.Event()

@@ -1088,11 +1088,11 @@ async def answer(request: AnswerRequest):
     if not session.is_running:
         raise HTTPException(409, "Investigation is not executing")
 
+    from agent import NoPendingQuestionError
+
     try:
         await session.provide_answer(request.answers)
-    except RuntimeError as e:
-        if "No pending question" not in str(e):
-            raise
+    except NoPendingQuestionError as e:
         raise HTTPException(409, str(e)) from e
 
     return {"status": "ok", "thread_id": request.thread_id}
