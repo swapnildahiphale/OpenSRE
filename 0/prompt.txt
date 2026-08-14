@@ -1,0 +1,951 @@
+Base directory for this skill: /Users/swapnil/.claude/skills/flow
+
+# flow — task and session manager skill
+
+## 1. What flow is
+
+`flow` is a small CLI (assumed on `$PATH`) that the user uses to track
+personal work and bootstrap per-task Claude sessions. Metadata (projects,
+tasks, workdirs, session IDs) lives in a single SQLite database at
+`~/.flow/flow.db`. Free-form plan content lives on disk as markdown
+"briefs" at `~/.flow/projects/<slug>/brief.md` and
+`~/.flow/tasks/<slug>/brief.md`. Progress notes accumulate as dated
+markdown files under each entity's `updates/` subdirectory. The user runs
+one long-lived Claude session per task in its own terminal tab, resumed via
+`flow do <task>`.
+
+You are speaking inside one of those Claude sessions (or the user's
+ambient "dispatch" session). Your job is to interpret the user's natural
+language requests and turn them into the exact `flow` commands and file
+edits they imply. You never edit `flow.db` directly. You never solve
+problems during task intake — you interview, then write what the user
+said.
+
+> **Paths in this skill.** Every `~/.flow/...` path you see is the
+> *default* layout. The flow root is configurable via `$FLOW_ROOT`;
+> if it's set to something else, substitute that root in every path
+> reference. The authoritative paths are always whatever `flow show
+> task` / `flow show project` print under `brief:`, `updates:`,
+> `kb:`, etc. — read those, don't reconstruct paths from prose.
+
+## 1a. When invoked explicitly with no intent
+
+If this skill is invoked without a trigger phrase — for example the
+user typed `/flow` or asked you to load the flow skill but did not
+say what they want done — DO NOT auto-run any workflow. Do not
+silently call `flow list tasks`, do not enter §4.1 "start the day",
+do not propose opening a task, do not start an intake interview.
+The user just asked what this skill is for. Answer that question
+first; let them choose what happens next.
+
+**Behavior:**
+
+1. In 2–3 sentences, describe what you can do for the user with
+   flow under the hood — capture work as briefs, log progress
+   notes, resume Claude sessions across days, track what they're
+   waiting on. Frame it as your capabilities, not commands. The
+   user does not need to learn flow's CLI.
+2. Use `AskUserQuestion` (header: "What now?") to offer the main
+   actions. Pick 3–4 options that fit the current state — for
+   example:
+   - "Show me what's on my plate" — runs §4.1 start-the-day.
+   - "Add a new task" — runs §4.2 task intake.
+   - "Add a project" — runs §4.3 project intake.
+   - "Just exploring" — stop and wait.
+3. Dispatch on the user's pick. If "Just exploring" or the user
+   skips the question, stop and let them lead.
+
+This section ONLY governs the bare-invocation case. Trigger-phrase
+recipes in §4 ("what should I work on", "add a task", etc.) still
+fire on natural-language requests — when the user already expressed
+an intent, follow the matching recipe instead of re-asking via §1a.
+
+## 2. The model
+
+- **Projects** group related tasks: name, slug, `work_dir`, priority,
+  status (`active`/`done`), `brief.md`.
+- **Tasks** are units of work: name, slug (via `--slug`), `work_dir`
+  (mandatory — project's, user-supplied, or auto-created
+  `~/.flow/tasks/<slug>/workspace/` for floating tasks), priority, status
+  (`backlog`/`in-progress`/`done`), optional `project_slug`, optional
+  `waiting_on` note, `brief.md`. A task carries a Claude `session_id` once
+  `flow do` has bootstrapped it.
+- **Playbooks** are reusable, runnable definitions (name, slug, work_dir,
+  optional `project_slug`, `brief.md`). Each invocation creates a
+  **playbook-run** — a `kind=playbook_run` task with its own session, a
+  snapshotted `brief.md`, and `updates/`. Editing the playbook brief
+  doesn't affect past runs; runs are reproducible. See references/playbooks.md.
+- **Owners** are durable, repo-scoped self-prompting controllers that own
+  an outcome via recurring fresh headless ticks (a `charter.md` + ledger +
+  clock, self-pacing via `flow owner next`; `--every` is the fallback
+  heartbeat floor). Status `active`/`paused`/`retired`. Managed tasks are
+  tagged `owner:<slug>`; a human-decision task is also tagged `question`.
+  See §4.17.
+- **Workdirs** is a convenience registry of known local repo paths for
+  matching repo intent to disk — NOT the source of truth for a task's
+  work_dir (`tasks.work_dir` is).
+- **Updates** are dated markdown progress notes under
+  `~/.flow/tasks/<slug>/updates/YYYY-MM-DD-<kebab>.md` (and `projects/`),
+  written by you via `Write`. Not in the DB; permanent — archiving never
+  deletes them.
+- **Status is 3 values:** `backlog`, `in-progress`, `done` (no `blocked`).
+  Waiting on someone → set `waiting_on` (§4.6). Set aside permanently →
+  `archive`.
+
+## 3. First-run detection & setup
+
+The first `flow` command in a session doubles as an init probe; a brand-new
+user (missing DB) gets guided setup. The full recipe — the `flow list` probe,
+the "Set up flow?" AskUserQuestion, `flow init`, and the five-step first-run
+coaching — lives in **references/setup.md**. Read it when a flow command
+errors about a missing database, or when onboarding a fresh user.
+## 4. Command reference
+
+This is a terse cheat sheet. Use `flow <command> --help` for up-to-date
+flags.
+
+```
+Setup
+  flow init                                 create ~/.flow/, init DB, install skill
+  flow skill install [--force]              (re)install the skill file
+  flow skill uninstall                      remove the skill
+  flow skill update                         install --force after upgrading the binary
+
+Create
+  flow add project "<name>" --work-dir <path> [--slug <s>] [--priority h|m|l] [--mkdir]
+  flow add task    "<name>" [--slug <s>] [--project <slug>] [--work-dir <path>] [--mkdir]
+                           [--priority high|medium|low] [--due <date>] [--assignee <name>]
+                           [--tag <t> ...]
+  flow add playbook "<name>" --work-dir <path> [--slug <s>] [--project <slug>] [--mkdir]
+  flow add owner    "<name>" --work-dir <path> --every <dur> [--slug <s>] [--project <slug>] [--mkdir]
+
+Sessions
+  flow do               <ref> [--fresh] [--dangerously-skip-permissions] [--force]
+                              [--with "<instruction>" | --with-file <path>]
+  flow do --here        <ref> [--force]   (bind THIS Claude session to the task — no new tab)
+  flow do --auto        <ref> [--with "<instruction>" | --with-file <path>]
+                              (run headlessly in the background — no tab, no human; the
+                               session does the work and self-completes via `flow done`.
+                               Implies --dangerously-skip-permissions. Cannot combine with --here.)
+  flow done             <ref>
+
+Playbook runs
+  flow run playbook <slug> [--with "<instr>" | --with-file <path>]
+                                    spawn a fresh run session (new task with kind=playbook_run)
+  flow run playbook <slug> --here   bind THIS Claude session to the new run (no new tab)
+  flow run playbook <slug> --auto   run the playbook headlessly in the background (no tab, no human)
+  flow list runs [<playbook-slug>]  list playbook runs (filter by playbook optional)
+
+Owners (autonomous ownership — see §4.17)
+  flow owner list                   all owners with status + next tick   (alias: flow list owners)
+  flow owner show   <slug>          charter + what it owns (in-flight / playbook runs / questions) + next tick   (alias: flow show owner <slug>)
+  flow owner start  <slug>          begin ticking — first tick now, then every <dur> (reactivates a paused OR retired owner)
+  flow owner pause  <slug>          stop ticking, keep all state
+  flow owner tick   <slug>          wake the owner NOW, interactively (a tab you drive); --auto = headless now
+  flow owner next   <slug> --in <dur> | --at <when>   set the next tick time (how a tick self-paces)
+  flow owner retire <slug> [--delete]   stop permanently (status=retired+archived); --delete removes row + dir
+  (scheduled ticks run headlessly; `flow owner tick` is the on-demand / guided-first-run path)
+
+Read
+  flow show task    [<ref>]     (no arg → reverse-lookup via $CLAUDE_CODE_SESSION_ID)
+  flow show project [<ref>]     (no arg → project of the bound task)
+  flow show playbook    [<ref>]
+  flow transcript   [<ref>] [--compact]    (readable transcript from session jsonl)
+  flow list tasks    [--status backlog|in-progress|done] [--project <slug>]
+                     [--priority high|medium|low] [--since today|monday|7d|YYYY-MM-DD]
+                     [--include-archived]
+  flow list projects [--status active|done] [--include-archived]
+  flow list playbooks   [--project <slug>] [--include-archived]
+
+Edit / mutate
+  flow edit           <ref>          opens brief.md in $EDITOR, bumps updated_at
+  flow update task    <ref> [--work-dir <path>] [--mkdir]
+                            [--status backlog|in-progress|done] [--priority high|medium|low]
+                            [--assignee <name>] [--clear-assignee]
+                            [--due-date <date>] [--clear-due]
+                            [--waiting "<who or what>"] [--clear-waiting]
+  flow update project <ref> [--priority high|medium|low]
+  flow archive        <ref>
+  flow unarchive      <ref>
+  (flow edit, flow archive, flow unarchive also accept playbook refs)
+
+Workdirs
+  flow workdir list
+  flow workdir add <path> [--name <nickname>]
+  flow workdir remove <path>
+  flow workdir scan [<root>] [--add]
+```
+
+All references (`<ref>`) resolve by **exact slug match only**. There is
+no fuzzy or substring matching. Use `--slug` to pick a short, memorable
+slug at creation time (e.g. `--slug caas-exit`). If omitted, a slug is
+auto-generated from the name (truncated to ~6 words).
+
+## 4a. Interactive choices (use `AskUserQuestion` everywhere)
+
+**This section overrides any inline prose phrasing later in the skill.**
+If a later section says "offer X", "ask Y", or "confirm Z", that
+always means "invoke `AskUserQuestion` with appropriate options" —
+never a prose question typed into the chat.
+
+Every choice the user makes — always AskUserQuestion, never a prose
+question. Yes/no confirmations, pick-one-of-several, priority, slug
+suggestions, project attachment, mutation confirmations, "want me to
+do X?" — every single one runs through the tool so the user can click
+to select instead of typing. Common patterns:
+
+| Pattern | Options |
+|---------|---------|
+| Yes / No | Two options with contextual labels (e.g. "Save it" / "Revise", "Open now" / "Not now") |
+| Pick from list | One option per candidate (tasks, projects, slugs) |
+| Priority | "High", "Medium", "Low" |
+| Mutation confirm | "Yes, do it" / "No, wait" with the action named in the description |
+
+Keep `header` under 12 chars. Put enough context in `question` so
+the choice is clear without scrolling back. If the user already
+answered in their message, don't re-ask — just use their answer.
+
+**Prose questions are deprecated.** Don't write "Want me to do X?"
+or "Should I do Y?" or "(yes/no)" in chat — those force the user to
+type a free-text reply. The tool produces clickable options; always
+prefer the tool.
+
+**Mid-interview drift.** Within an open-ended interview (intake,
+deferred-section prompt), the parent question may be free-form
+("Why?", "Done when?") but follow-up clarifications often narrow into
+enumerable choices (architectures, install methods, yes/no). The
+moment a sub-question has 2–4 discrete options, switch to
+AskUserQuestion. Don't keep typing prose just because you started in
+prose. The "interview" framing governs the *opening* question; every
+narrowing inside it follows the same always-AskUserQuestion rule as
+the rest of the skill.
+
+## 5. Core workflows
+
+These are the load-bearing part of the skill. When the user says one of
+the trigger phrases, follow the corresponding recipe exactly.
+
+### 4.1 Start the day
+
+**Triggers:** "start my day", "what should I do today", "what am I
+working on", "where did I leave off", "give me a status".
+
+**Recipe:**
+
+1. Run `flow list projects` and `flow list tasks --status in-progress`.
+2. Run `flow list tasks --status backlog --priority high`.
+3. Read the `waiting_on` and stale markers in the tasks output.
+4. Summarize in 4 sections:
+   - **In flight** (`in-progress`): 1 bullet per task, include any ⚠
+     stale marker and any `[waiting: ...]` note.
+   - **High-priority backlog**: 1 bullet per backlog task marked high.
+   - **Waiting on someone**: pull out tasks with `waiting_on` set so the
+     user can see the whole block at once.
+   - **Stale** (anything with the ⚠ marker): call these out explicitly.
+   - **Active playbooks**: any playbook with a run in the past 7 days.
+     Pull from `flow list runs --since 7d` grouped by playbook; show
+     playbook slug + most recent run timestamp. Skip if there are no
+     runs in the window — don't show an empty header.
+5. Use `AskUserQuestion` to let the user pick which task to work on.
+   List each in-progress and high-priority backlog task as an option
+   (label = slug, description = one-line summary). Include an "Add a
+   new task" option if appropriate.
+
+Do not auto-run `flow do` after listing. Wait for the user to pick.
+
+### 4.2 Add a task — INTERVIEW MODE (mandatory)
+
+**Triggers:** "add a task", "new task", "track this work", "let me add a
+flow task for X".
+
+**The interview is the whole point** — you interview before saving.
+NEVER solution during intake, NEVER fill blanks with guesses. If a
+section is unclear, ask; if the user says "I don't know yet", write
+"Open question: ..." in the brief and move on.
+
+**Required sections (always asked, in this order):**
+
+1. **Name** — one-sentence description (e.g. "Add OAuth login to the
+   budgeting app").
+2. **Slug** — short, memorable, ASCII. AskUserQuestion with 2–3
+   candidates derived from the name (e.g. `oauth`, `auth-budget`,
+   `oauth-budget`); "Other" lets them type a custom one. If they pick
+   Other and leave it blank, omit `--slug`.
+3. **Where?** — work_dir. Use the §6 recipe; pass `--mkdir` (AskUserQuestion
+   "Yes, create it" / "No, I'll fix the path") if the path doesn't exist.
+4. **Priority** — AskUserQuestion "High" / "Medium (Recommended)" / "Low",
+   default Medium. Skip if already stated.
+
+Also, before saving: **project attachment** — AskUserQuestion with one
+option per existing project (label = slug, desc = name) plus "None
+(floating task)"; skip if no projects exist.
+
+**Optional sections (offered, can be deferred):** after the required
+fields, AskUserQuestion:
+
+> "Want to capture more detail now (Why, Done when, Out of scope, Open
+> questions), or defer until you start the task?"
+> - Detail now (recommended for tasks you'll start later)
+> - Defer until you start the task
+
+- **Detail now:** interview Why / Done when / Out of scope / Open
+  questions and draft the full brief (template → references/templates.md).
+- **Defer:** save a thin brief (template → references/templates.md). The
+  §9 deferred-section prompt walks the missing sections at `flow do`
+  time, when the user has more context.
+
+**Confirmation:** show the drafted brief, then AskUserQuestion (header:
+"Brief", "Save it" / "Revise"). Do NOT run `flow add task` until "Save
+it"; on "Revise", ask what to change and re-confirm.
+
+**After `flow add task` succeeds** it prints the slug and a stub
+`brief.md` path. Overwrite the stub with your drafted content using
+**Read once, then Edit (`replace_all: true`) or Write** — the harness
+requires a prior Read before any mutation.
+
+**Tag step — always ask, easy to skip.** Right after the brief saves,
+before "Open now?", surface ONE tag question. The user skips with a
+click; do NOT pre-skip on their behalf.
+
+1. `flow list tags` for the existing vocabulary.
+2. AskUserQuestion (header: "Tags?", `multiSelect: true`): if tags exist,
+   offer the top 3 as `#<tag>` (desc "N tasks already have this tag") +
+   "New tag(s)" (Other → comma-separated) + "Skip — no tags". If none
+   exist, ask "Tag this task? (optional)" → "Yes, set tags" / "Skip — no
+   tags"; on Yes, prompt for comma-separated values.
+3. On any selection: `flow update task <slug> --tag <t1> --tag <t2> ...`.
+   On "Skip": nothing, move on without dwelling.
+
+The only legitimate pre-skip is when the user already said "just save
+it" / "no more questions" this turn.
+
+**Finally, "Open now?" — shape depends on binding.** Probe `flow show
+task` (no arg): errors with `not bound to a task` → unbound (dispatch);
+else already bound.
+
+**Unbound — three options** (AskUserQuestion, header "Open now?"):
+- **Yes, in a new tab** — §4.4 `flow do <slug>` (spawns a tab, flips to
+  in-progress). Pick when work hasn't started.
+- **Continue here (bind this session)** — run **`flow do --here <slug>`**
+  now (binds `$CLAUDE_CODE_SESSION_ID`, flips to in-progress, no tab).
+  Pick when the work already began in this session — the common case when
+  §4.14 triggered intake from the SessionStart intercept.
+- **No, keep in backlog** — save and stop.
+
+**Status follow-through:** neither Yes-path leaves the task in backlog
+(both flip to in-progress). If the task is purely retrospective (records
+something already complete here — "track the script I just wrote"),
+immediately offer §4.7 closure after Continue-here (AskUserQuestion
+"Mark done now?") so it moves backlog → in-progress → done — never leave
+a retrospective record sitting in in-progress.
+
+**Bound — two options ONLY** (AskUserQuestion "Yes, open it" / "No, keep
+in backlog"). Do NOT offer "Continue here"/"Rebind"/any variant: a
+session_id belongs to at most one task (partial unique index), and `flow
+do --here` REJECTS a re-bind even with `--force` — offering it surfaces
+an option the binary refuses. Intent is almost always "open in a separate
+tab". On "Yes" → §4.4; on "No" → stop.
+
+> **Different-tab hint.** "Continue here" only ever attaches the
+> *current* dispatch session. To track work from a *different* open
+> session, switch to that tab and run `flow do --here <slug>` there.
+
+### 4.3 Add a project
+
+**Triggers:** "add a project", "new project", "track this initiative".
+
+Project intake is a What/Why/Where/Scope interview (no "Done when" — projects
+are ongoing) with a MANDATORY first-task follow-up afterward. Full recipe →
+read **references/intake-project.md** and follow it. Do not `flow do` a
+project; you `do` tasks, not projects.
+### 4.4 Start / resume work on a task
+
+**Triggers — "run `flow do <ref>`":** "resume/pick up/continue/open X",
+"let me work on X" / "let's work on X", "let's do X" / "do X" / "do the
+X", "start/begin/get going on X", or a bare `flow do X`.
+
+**Autonomous-mode triggers — `flow do --auto <ref>`** (headless
+background run, no human): "run X autonomously/unattended/headlessly",
+"do X in the background", "kick off X and walk away", "fire and forget
+X", or a bare `flow do --auto X`.
+
+**Recipe:**
+
+1. **Ask session mode first** via AskUserQuestion (skip if the user
+   already stated one — "with skip permissions", "normally", "run
+   autonomously"):
+   - **Regular** — normal session with tool-approval prompts (safer).
+   - **Skip permissions** — `--dangerously-skip-permissions` (faster).
+   - **Autonomous (background)** — `flow do --auto`: headless, no tab, no
+     human; does the work and self-completes via `flow done`. Implies
+     skip-permissions.
+2. Run `flow do <ref>` (one positional, exact slug match). Add
+   `--dangerously-skip-permissions` for skip-permissions, or `--auto` for
+   Autonomous (don't add both — `--auto` implies skip).
+3. On "no task matching", ask the user to clarify or offer `flow add task`.
+4. Pass `--fresh` ONLY if the user explicitly asked ("start over", "fresh
+   session"). Never on your own.
+
+**Autonomous mode (`--auto`):** launches a detached headless run instead
+of a tab, returns immediately, does the work end-to-end and calls `flow
+done` on itself when "Done when" is met (still triggers the close-out
+sweep). It implies `--dangerously-skip-permissions` and
+**cannot be combined with `--here`** (`--here` binds the current session; `--auto`
+spawns its own). It CAN take `--with`/`--with-file`. Lifecycle surfaces on
+the task: `flow show task` shows `auto_run: running (pid …) | completed |
+dead` + a log under `tasks/<slug>/auto-runs/`; `flow list tasks` has an
+`AUTO` column. `dead` = crashed/exited without closing (check the log);
+`completed` = finished and closed itself. After launch, report it and
+stop — do NOT poll, tail the log, or peek at its separate session.
+
+**After `flow do` succeeds** it already spawned the tab and exported env
+vars. Report "opened tab: <title>" and stop. Do NOT: run diagnostics
+(`pgrep`, `ls ~/.claude/...`, `osascript`) to verify the tab; spawn a tab
+yourself; re-run `flow do` unless asked; or peek into the new session (you
+have no access). If `flow do` errored (rc≠0), relay it and stop — no
+workarounds.
+
+#### `flow do` edge cases & surgical instructions
+
+Read **references/do-advanced.md** when any of these apply:
+- `flow do` errors with the **live-session guard** (the task's session is
+  already running in another tab).
+- `flow do` errors asking for **macOS Accessibility** (Terminal.app backend).
+- The user wants to fire a one-off instruction at a task without opening the
+  tab: `--with "<instruction>"` or `--with-file <path>` (also works on
+  `flow run playbook`).
+### 4.5 Save a progress note
+
+**Triggers:** "save a note", "log progress", "write an update", "note
+that…", "record that I…", "document that I just…".
+
+**Recipe:**
+
+1. Compose a filename: `YYYY-MM-DD-<kebab-short-title>.md`. The kebab
+   title is 3–5 words summarizing the note. Use today's date.
+2. Compose the note content. **Under 10 lines.** Exactly two paragraphs
+   plus an optional blockers line:
+   - Paragraph 1: what got done. Specific. No hedging.
+   - Paragraph 2: what's next or what the user is thinking about next.
+   - Optional blockers: "Blocked on: <X>" if applicable.
+3. **Show the filename and the content to the user.** Then use
+   `AskUserQuestion` (header: "Save note?", options: "Save it" /
+   "Revise") to confirm. Do not write silently.
+4. Determine the entity:
+   - For a **regular task**, notes go under
+     `~/.flow/tasks/<slug>/updates/`. Slug from `flow show task` (no
+     arg, reverse-lookup) or asked.
+   - For a **playbook run**, notes ALSO go under
+     `~/.flow/tasks/<run-slug>/updates/` (runs are tasks).
+   - For a **playbook definition**, notes go under
+     `~/.flow/playbooks/<slug>/updates/` for cross-invocation observations
+     ("noticed flaky output when X", "next iteration should consolidate
+     steps 2 and 3"). Use this when capturing things that should inform
+     the playbook itself, not a single run.
+   - For an **owner**, notes go under `~/.flow/owners/<slug>/updates/` —
+     this is the owner's cross-tick **journal** (§4.17). Each headless
+     tick reads the recent notes here to recover what it dispatched and
+     what to check, and appends a new note before exiting. Same `updates/`
+     convention as tasks and playbooks.
+5. Use the `Write` tool to create
+   `~/.flow/tasks/<slug>/updates/<filename>.md` with the confirmed
+   content. If the user is noting project-level progress, use
+   `~/.flow/projects/<slug>/updates/` instead.
+6. Confirm to the user: "saved: <absolute path>".
+
+Do NOT run any `flow` command for this — updates are just files.
+
+### 4.6 Waiting on someone
+
+**Triggers:** "I'm waiting on <X>", "blocked on <Y>", "stuck until <Z>",
+"need <person> to respond", "pinged <X>".
+
+**Recipe:** run `flow update task <current-task> --waiting "<who or what>"`. The
+status stays `in-progress`; `waiting_on` is just a freeform note that
+will show up in `flow list` and `flow show task` so the user remembers.
+
+**Unblocking triggers:** "X came back", "got the answer", "unblocked",
+"no longer waiting on X". Before mutating, confirm via
+`AskUserQuestion` (header: "Clear waiting?", options:
+"Yes, clear it" / "Wait, not yet"). On "Yes", run
+`flow update task <task> --clear-waiting`. On "Wait, not yet", stop
+and let the user clarify. (This matches the §8 "do not mark done
+without confirmation" anti-pattern philosophy — clearing `waiting_on`
+is a state mutation and deserves the same explicit click.)
+
+Do not infer the task slug silently — use `flow show task` (no arg)
+to discover the bound task, otherwise use `AskUserQuestion` listing
+in-progress tasks as options to disambiguate which task this is for.
+
+### 4.7 Mark done
+
+**Triggers — explicit:** "mark X done", "finish X", "X is done",
+"close out X", "wrap up X".
+
+**Triggers — wrap-up signals (treat as candidate triggers, then
+confirm via AskUserQuestion):** "shipped", "PR merged", "deployed",
+"released", "wrapped up", "that's working", "bug fixed", "test
+passes", "ready to ship", "all good now", "we're good", "that did
+it".
+
+**Why closing matters — `flow done` is not just a status flip.** It runs
+a headless Claude **close-out sweep** over the task's transcript that
+distills durable facts into the KB (`~/.flow/kb/`) and, for a
+project-attached task, writes a project update summarizing what got done
+and why. **If a task never closes, that distillation never happens** —
+learnings stay locked in the transcript and never reach central tracking,
+which is precisely the value flow exists to capture. Closure is the
+load-bearing moment, not a clean-up afterthought; letting work wrap up
+without prompting closure is a silent loss of durable knowledge.
+
+**Recipe:**
+1. Confirm via AskUserQuestion (header "Mark done?", "Yes, mark it done" /
+   "No, not yet") — per §8, NEVER mark done without an explicit click,
+   even on "great, I finished that".
+2. If no progress note was just saved, offer one (AskUserQuestion "Yes,
+   save a note first" / "No, just mark done" → §4.5 recipe on Yes).
+3. Run `flow done <ref>`. Do NOT close the tab or kill the session — `flow
+   done` leaves both intact so a future reopen can resume (session_id
+   stays on the row). The sweep runs after the status flip; relay any
+   NUDGE block it prints verbatim.
+
+**Recognizing natural close-out moments (passive).** Alongside §4.10/§4.11,
+watch for work wrapping up even when the user never says "done", and
+proactively offer closure via AskUserQuestion. **Fire when:** wrap-up
+phrasing (above); a milestone landed (PR merged, deploy succeeded, tests
+green, last open question resolved) and the user moved to small-talk /
+satisfaction ("perfect", "nice", "thanks"); or a context switch to another
+task ("now let me look at <other>") at a coherent stopping point. **Don't
+fire:** mid-debugging/implementation; after the user said "more work
+coming" this session; or in the first turns. On fire, pause and
+AskUserQuestion "Yes — close it and run the close-out sweep" (describe it:
+"flow done distills KB entries and a project update from this transcript")
+/ "Not yet, more work coming"; on Yes → the recipe above; on Not-yet, don't
+re-ask on the same thread.
+
+**Playbook notes:** run-tasks (kind=playbook_run) support `flow done
+<run-slug>` (sweep captures playbook learnings). But
+**playbook definitions are never "done" — they're archived**
+(`flow archive <playbook-slug>`); there is no `flow done playbook`.
+
+### 4.8 Archive / cleanup · ### 4.9 Weekly review
+
+Archive/cleanup ("archive X", "clean up my done tasks", "hide finished work")
+and the weekly-review digest ("weekly review", "what did I ship this week",
+"friday review") → read **references/reviews.md** and follow the matching
+recipe. Archive never deletes files on disk — briefs and updates survive.
+### 4.10 Listening for knowledge-base facts (scoop mode)
+
+A **passive** workflow — runs alongside every other, continuously, without
+the user asking. The KB is five markdown files under `~/.flow/kb/` (seeded
+by `flow init`), surfaced under the `kb:` section of `flow show`:
+
+| Bucket file | Holds — record when the user says… |
+|---|---|
+| `user.md` | user role/prefs/working style/constraints — "I'm the / I prefer / I always / I never" |
+| `org.md` | company/team/people — "our team / my manager is / <name> is / reports to" |
+| `products.md` | what the org ships — "our product / we ship / feature X / next release" |
+| `processes.md` | how the org works — "we use X for / our process / every Friday / review rule" |
+| `business.md` | customers/model/revenue — "our customers / <customer> asked / contract / margin" |
+
+**The scoop rule: append without asking.** On hearing a durable fact,
+Read the matching file, check it's not already there, Write an appended
+entry — never pause to ask "should I record this?". Then announce quietly:
+`> noted in kb/org.md: "<short paraphrase>"`.
+
+**Entry format (exact):** `- YYYY-MM-DD — <short quote or paraphrase>` —
+one terse line, quote the user's words; a list ("products are A, B, C")
+becomes one entry per item.
+
+**Guardrails (non-negotiable):**
+1. **Only durable facts.** "I'm tired today" no; "I prefer async" yes. When in doubt, don't.
+2. **Deduplicate** — Read first; don't append a fact (even paraphrased) that's already there.
+3. **Never invent** — only what the user literally said or clearly implied.
+4. **Never edit existing entries** — append-only log; a changed fact is a new dated entry.
+5. **One bucket per fact** — if it fits two, pick the more specific; don't cross-post.
+6. **Privacy** — if the user inits a git repo in `~/.flow/`, remind them to `.gitignore` `kb/`.
+
+**Reading is lazy; writing stays eager.** KB files are NOT loaded at
+session start (the hook and §9 skip them). Read at most the one file you
+need, on demand, when the question actually needs it — a person/product/
+customer name you don't know (`org`/`products`/`business`), reflecting the
+user's style in a brief/note (`user`), "how do we usually do X?"
+(`processes`), or unfamiliar terminology in a brief/CLAUDE.md. Do NOT read
+when just relaying a one-shot mutation, on a purely mechanical task, or if
+you already read it this session with nothing new written. Writing needs
+no prior load.
+
+**Auxiliary files in entity directories** (any `.md` in `tasks/<slug>/`,
+`projects/<slug>/`, `playbooks/<slug>/` other than `brief.md`/`updates/`)
+surface under `flow show`'s `other:` section — same lazy-load discipline,
+load on demand.
+
+**Past work is referenceable:** `flow list` defaults to active rows; use
+`--status done` / `--include-archived` for the rest. `flow show task` and
+`flow transcript` work on done/archived tasks too.
+
+### 4.11 Scope-creep detection (passive — surface via AskUserQuestion)
+
+A **passive** workflow (like §4.10): watch the session and intervene —
+via AskUserQuestion, never a prose "want me to…?" — only when evidence is
+strong, to keep a task's transcript focused instead of letting unrelated
+work pile up under whichever task owns the tab. In a bound session a
+`UserPromptSubmit` hook re-injects a one-line anchor each prompt (naming
+the task, citing §4.11/§4.7) so this and the close-out check stay live;
+the hook only re-anchors — the judgment is yours.
+
+**Fire when the *work itself* (not a single question) moved off the
+bootstrapped task** — any of: Edit/Write calls in a tree outside the bound
+task's `work_dir` and not covered by its brief; ≥2 turns debugging a
+product/service/repo the brief doesn't mention; a new named line of
+investigation ("while we're here, also look at <X>") getting sustained
+attention. **Don't fire on:** a one-off tangential question; Read-only
+research outside work_dir (trigger is write-side); debugging that touches
+nearby infra the brief reasonably implies; the very first turn.
+
+**Recipe:** pause and AskUserQuestion (header "New task?", question names
+the `<current-slug>` and the one-line drift):
+- **Yes, new task** — run the §4.2 intake interview for a name derived
+  from what you observed; attach to the bound task's project only if it
+  genuinely belongs, else floating/other per intake; then offer `flow do
+  <new-slug>` (AskUserQuestion "Yes, open it" / "No, keep in backlog") so
+  the follow-on gets its own transcript.
+- **No, stay here** — accept it, update your model of the task's scope,
+  don't re-ask on the same thread.
+- **Later** — offer a drift note (AskUserQuestion "Yes, save a drift
+  note" / "No, just continue") on the current task, then continue.
+
+This lives in the skill, not the hook, because detection needs
+session state (edits, debug topics) that only exists in the running
+conversation. Note "the bootstrapped task" includes playbook-run tasks —
+same triggers and recipe.
+
+### 4.12–4.13 Playbooks (add · run · capture-back)
+
+Playbooks are reusable, re-runnable definitions; each invocation creates a
+`kind=playbook_run` task with its own session and a frozen **snapshot** of
+the playbook brief. Any playbook work → read **references/playbooks.md** and
+follow it:
+- "add a playbook" / "create a playbook for X" → intake interview.
+- "run/trigger/fire/kick off the X playbook" → `flow run playbook`.
+- persisting in-run procedural adjustments back to the live playbook brief.
+- first-run capture-back (the first run crystallizes the real procedure).
+
+**Do not auto-fire `flow run playbook`** — manual trigger only, even if a
+playbook is named in passing. Do not propose scheduling during playbook
+intake. "The bootstrapped task" for drift/close-out purposes includes
+playbook-run tasks.
+### 4.14 Substantive-unrelated-work check (passive, ongoing)
+
+This is a **passive workflow** that runs alongside every other workflow.
+It fires when substantive work emerges that doesn't belong to the
+current task binding.
+
+**Triggers (any one is enough):**
+
+- In a **dispatch session** (`flow show task` reports unbound):
+  - You've been in active design / brainstorming / debugging
+    discussion for ≥ 2 turns about a concrete topic, OR
+  - You've made any Edit/Write tool calls, OR
+  - You've invoked a process skill (`superpowers:brainstorming`,
+    `superpowers:writing-plans`, `superpowers:executing-plans`,
+    `superpowers:systematic-debugging`,
+    `superpowers:test-driven-development`) — a process-skill invocation
+    is itself a substantive-work signal.
+- In a **bound session** (`flow show task` resolves a task): same triggers as §4.11
+  (work moved off the bootstrapped task's scope).
+
+**NOT a trigger:**
+
+- One-off question answered in a single turn.
+- Reading files / running queries to inform an answer.
+- The very first message after session start (you don't yet know if
+  this is one-off or substantive).
+
+**Recipe:**
+
+1. Pause current work.
+2. Run `flow list tasks --status in-progress` and
+   `flow list tasks --status backlog --priority high` to see candidates.
+3. Use AskUserQuestion to offer three options:
+   - **Create a new flow task** for this work — run §4.2 intake.
+     §4.2's "Open now?" tail will offer **Continue here (bind this
+     session)** alongside new-tab and backlog (since this is a
+     dispatch session). Continue-here is usually the right pick
+     from this path: substantive work has already started in this
+     conversation, and binding preserves the transcript.
+   - **Switch to an existing task** — list candidates as options. On
+     selection, by default spawn `flow do <slug>` (new tab). Note:
+     if THIS session is already bound to another task, do NOT offer
+     `flow do --here <existing-slug>` as a sub-option — the binary
+     would refuse (session_id uniqueness invariant), and even
+     `--force` doesn't override it.
+   - **Proceed ad-hoc** (user accepts no resumability, no context
+     accumulation).
+
+**Process-skill ordering:** when a process skill triggers this check,
+load the skill first (so the user sees the right tool engage), then
+**before** taking the skill's first concrete action, run the check.
+If the user picks "create new task" or "switch to existing task," the
+process skill resumes inside the new session, not this one.
+
+**Important: this is an ongoing check, not one-shot.** Re-evaluate the
+triggers each turn — especially when transitioning into design /
+implementation / debugging work. The SessionStart hook gets you the
+first check; you are responsible for every subsequent check.
+Re-evaluate on every turn.
+
+### 4.15 Upgrade flow itself
+
+**Triggers:** "update flow", "upgrade flow", "new flow version", "what
+version am I on", a bare `flow --version`, or a SessionStart
+`flow-version-stale:` signal. The procedure — capture `flow --version`, read
+the README install/upgrade sections at https://github.com/Facets-cloud/flow
+(do not invent download URLs), replace the binary, `xattr -d
+com.apple.quarantine`, `flow skill update`, re-check version — lives in
+**references/upgrade.md**.
+### 4.16a Tagging tasks
+
+Tags are free-form single-string labels for cross-cutting identification
+(`#frontend`, `#urgent`, `key:value` convention for kv semantics). Any tag
+work — add/remove/clear, "what tags does X have", "list my tags", "find tasks
+tagged X" → read **references/tags.md**. ALWAYS `flow list tags` before
+suggesting a new tag (vocabulary discipline); never auto-tag without the user
+naming the tag.
+### 4.16 Bind an in-flight session to a task
+
+**Triggers:** "bind this session to <task>", "track this session under
+<task>", "attach this conversation to <task>". To bind THIS session so future
+`flow do <slug>` resumes here, run `flow do --here <slug>` (reads
+`$CLAUDE_CODE_SESSION_ID`, flips backlog→in-progress). The safety invariants,
+the cwd-mismatch refusal sub-recipe, and the anti-patterns (never guess the
+UUID, never `cd && --here` or `--force` to bypass a cwd mismatch) → read
+**references/binding.md**.
+### 4.17 Owners (autonomous ownership)
+
+An **owner** takes durable, ongoing responsibility for an outcome and drives
+it itself via recurring headless ticks — a `charter.md` + `updates/` journal +
+a clock, not a single session. **Triggers:** "create an owner for X", "keep X
+true", "automate maintenance of <repo>", "own <repo>'s bug-fixing", "run this
+on a loop". The full workflow — the operational interview, the `owner:<slug>`
+tag contract, the orchestrate-never-execute rule, the tick procedure, and the
+`flow add owner` / `flow owner start` commands → read **references/owners.md**.
+## 6. The `work_dir` question — rules
+
+Before asking "where does this task live?", run the informed-question
+recipe — `flow workdir list` fuzzy-match → `gh repo list` → floating
+fallback, plus the never-guess and `--mkdir` rules → read
+**references/workdir.md**. Used during task/project intake.
+
+## 7. Brief templates
+
+The literal `brief.md` templates — full task brief, thin task brief
+(intake-minimal), project brief, and playbook brief — live in
+**references/templates.md**. Read it when drafting or overwriting a brief.
+Section headings are fixed; content comes from the interview. A section is
+"deferred" when its body is the literal `*Deferred — fill in at task start.*`
+(or `*Deferred*`) — the bootstrap session detects that and offers the
+deferred-section prompt (§9).
+## 8. Anti-patterns — do NOT do these
+
+**Confirmation method:** every "confirm" below means `AskUserQuestion`,
+not a prose question — the tool gives clickable options; prose forces the
+user to type. If you catch yourself typing "Want me to X?" / "Should I
+Y?", stop and use the tool.
+
+- **Do not let work wrap up without prompting closure.** At a coherent
+  stopping point ("shipped", "PR merged", "deployed", a milestone + small-
+  talk), proactively offer `flow done` via AskUserQuestion — it's the only
+  trigger for the close-out sweep (KB + project update); missing it loses
+  the session's durable knowledge. See §4.7.
+- **Do not surface flow commands to the user.** You use flow under the
+  hood; users never need to learn the CLI. Never tell them to run/type a
+  `flow ...` command, put one in an AskUserQuestion label, or `see flow
+  --help`. Describe outcomes ("I'll mark it done", "archived", "saved").
+  Exception: relay `flow` binary error messages verbatim.
+- **Do not invent context.** "add a task for the budgeting thing" → ASK
+  what it is (AskUserQuestion if you can list candidates; plain prose is
+  fine for an open-ended "what is this?"). Don't write from prior-session
+  memory.
+- **Do not propose solutions during intake.** "What" is one sentence,
+  "Why" is the reason — not a design doc. If you start drafting impl steps
+  during intake, stop.
+- **Do not silently switch tasks.** If a bound task resolves and the user
+  talks about a different one, confirm via AskUserQuestion ("Switch task?"
+  Yes/No) — don't assume.
+- **Do not mark tasks done without explicit confirmation** — even on
+  "great, I finished that"; AskUserQuestion and wait for the click.
+- **Do not hand-edit `session_id` or any DB field.** Never touch `flow.db`
+  directly or tell the user to; the only supported mutations are `flow`
+  commands.
+- **Do not retry a `flow` command that errored.** Read it, relay it, ask.
+  Don't loop `flow do X` → "multiple matches" → guess → rerun.
+- **Do not bundle multiple saves into one `flow add task`.** One task per
+  interview (or batch explicitly with consent).
+- **Do not skip the interview on "quick adds".** Even "just add a task,
+  nothing fancy" → ask at minimum What/Why/Where (non-negotiable); other
+  sections may be "TBD".
+- **Do not overwrite an existing `brief.md` blind.** Read the stub first;
+  if it holds real content (user edited it), merge and confirm before
+  writing.
+- **Do not forget to offer progress notes.** At natural breakpoints,
+  proactively AskUserQuestion ("Save note?" Yes/No).
+- **Do not silently continue scope-drifted work** under the bound task
+  (new repo/product/sustained investigation — §4.11 signals). Surface via
+  AskUserQuestion and offer a new task; unrelated work poisons the
+  transcript.
+- **Do not auto-fire `flow run playbook`.** Manual trigger only — needs an
+  explicit verb ("run"/"trigger"/"fire"/"start"), even if a playbook is
+  named in passing.
+- **Do not edit a run-task's `brief.md` to change future behavior** — it's
+  a frozen snapshot; edit the playbook's `brief.md` and start a new run.
+- **Do not propose scheduling during playbook intake** — out of scope for
+  v1; playbooks are manual.
+
+## 9. The execution-session bootstrap contract
+
+When `flow do <task>` spawns a Claude session in a new terminal tab, it
+pre-allocates a UUID, writes it to `tasks.session_id` before spawning,
+and passes it to `claude --session-id <uuid>`. This makes the session's
+jsonl file appear at the deterministic path
+`~/.claude/projects/<encoded-cwd>/<uuid>.jsonl`. There is no
+self-registration step — the DB is authoritative from the moment the
+tab opens.
+
+Subsequent `flow do <same-task>` calls read that UUID and spawn
+`claude --resume <uuid>` to continue the same conversation.
+
+**If you are the execution session spawned by `flow do`:**
+
+Do ALL of the following in order, before touching any code or
+proposing any plan:
+
+1. **Invoke the flow skill via the `Skill` tool.** The `flow hook
+   session-start` output already names this step, but the hook is
+   belt-and-braces — the Skill tool is the authoritative way to load
+   the operating manual that governs workflows, KB discipline, and
+   scope-creep detection.
+
+2. **Load the task context:**
+   ```
+   flow show task
+   ```
+   From its output, use the `Read` tool on:
+   - The file at the `brief:` path (the task brief — the problem
+     statement the user captured when creating this task).
+   - Every file listed under `updates:` (prior progress notes, in
+     chronological order — skim for blockers and decisions).
+
+   **Do NOT read the `kb:` files at bootstrap.** They're lazy-loaded
+   on demand — see §5.10 for when to actually Read them.
+
+   **If `flow show task` indicates `kind: playbook_run`:** also run
+   `flow show playbook <playbook-slug>` first (for context: the playbook's
+   intent and recent runs). Note any files under its `other:` section —
+   they're sidecar references you can load on demand. Then read your
+   task's `brief.md` — that's the snapshot taken when this run started,
+   and it's your authoritative instructions. The playbook's live
+   `brief.md` may have evolved since; you don't need to re-read it.
+
+   **Files listed under `other:`** in any `flow show` output (task,
+   project, or playbook) are sidecar references — research notes, decision
+   trees, design docs, etc. dropped into the entity's directory. Do **not**
+   read them eagerly. Read them on demand when something in the brief, in
+   user input, or in the work makes them relevant. This matches the
+   lazy-load principle for KB files (§5.10 in the skill, §4.10 in the
+   section numbering).
+
+3. **Load the parent project context, if any.** If `flow show task`
+   printed a `project:` line that isn't `(floating)`, run:
+   ```
+   flow show project <project-slug>
+   ```
+   (or just `flow show project` — it defaults to the bound task's project).
+   From its output, use `Read` on:
+   - The file at its `brief:` path (the project brief — overarching
+     context, goals, scope shared across sibling tasks).
+   - Every file listed under its `updates:` (project-level progress
+     notes — often capture cross-task decisions and blockers that
+     matter for your task even if your task's own updates don't
+     mention them).
+
+   Again, skip the project's `kb:` section at bootstrap.
+
+4. **Load repo conventions.** Read `CLAUDE.md` in your `work_dir` (if
+   present), plus any nested `CLAUDE.md` files under subdirectories
+   you plan to modify. These are authoritative for build commands,
+   test commands, style, and gotchas — they override any assumption
+   you might make from the brief.
+
+5. **Only then begin work.** If any brief section is blank or
+   unclear, ASK the user before inferring. If the user didn't
+   specify a "Done when" in the brief, confirm acceptance criteria
+   with them before making changes.
+
+**Throughout the session**, watch for new KB-worthy facts per §5.10 and
+append them to the matching `kb/*.md` file on the fly — no permission
+needed, no interview required. Just write and quietly note what you
+recorded. And lazy-read any kb file when you hit a question that
+actually needs that context — not before.
+
+### Deferred-section prompt
+
+If any section body in your brief is the literal `*Deferred — fill in at
+task start.*` or `*Deferred*`, pause before doing any work and offer the
+user (via AskUserQuestion):
+
+- **Fill in now** — run a mini-§4.2 interview for just the missing
+  sections (Why, Done when, Out of scope, Open questions). Save the
+  filled-in brief by overwriting the existing `brief.md`.
+- **Skip — proceed** — accept that scope is implicit. Reasonable for
+  small/known tasks.
+
+This shifts the intake burden from intake-time to task-start-time, where
+the user has more context.
+
+Applies only to regular tasks (kind=regular). Playbook-run briefs are
+snapshots and should not be edited; if the live playbook brief had
+deferred sections, those should have been resolved at playbook intake.
+
+### Cross-task transcripts & field edits
+
+To understand what happened in a sibling task's session, use `flow transcript
+<slug>` (`--compact` to omit tool results/thinking). For the full `flow
+update task` / `flow update project` field-edit semantics — work-dir, status,
+priority, assignee, due-date, waiting, and tag flags — → read
+**references/commands-advanced.md**. There is no `--session-id` flag; binding
+is owned by `flow do` / `flow do --here`.
+## 10. How "what task am I on?" gets answered
+
+`tasks.session_id` is the single source of truth. Every Claude Code
+session has `$CLAUDE_CODE_SESSION_ID` in its env (Claude Code injects
+it); flow's commands reverse-lookup this value against
+`tasks.session_id` to find the bound task. Two implications:
+
+- `flow show task` with no argument resolves the bound task via
+  reverse-lookup. So does `flow show project` (it resolves the bound
+  task's project).
+- When saving a progress note, the "current task" is whatever the
+  reverse-lookup returns. If `flow show task` errors with
+  `not bound to a task`, ask the user which task to attribute it to.
+
+There is no `FLOW_TASK` or `FLOW_PROJECT` env var to read. `flow do`
+no longer injects them; the DB binding is sufficient.
+
+A session is "bound" when some task carries its session_id (set by
+`flow do <slug>` at spawn time, or by `flow do --here <slug>`
+retroactively). A session is "dispatch / unbound" when no task does
+— `flow show task` errors with a friendly message.
+
+## 11. When in doubt
+
+Ask. The worst outcome is writing a bad brief or silently
+mis-attributing a progress note. The second-worst outcome is running
+`flow do` on the wrong task. Both are avoided by one clarifying
+question. The user's time budget for a clarifying question is vastly
+lower than their budget for fixing a wrong save after the fact.
+
+In a dispatch session (no task bound to this session), also re-check
+§4.14 (substantive-unrelated-work) on every turn. The skill is
+responsible for ongoing detection; the SessionStart hook is only a
+one-shot trigger.
