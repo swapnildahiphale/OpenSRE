@@ -1,0 +1,48 @@
+You are running an automated close-out sweep for completed flow task "public-docker-ci".
+
+## How to think about this sweep
+
+Two things happen here, with deliberately DIFFERENT bars:
+  - **KB entries** (in /Users/swapnil/.flow/kb/*.md) are forever — they sit at the top of every future task brief. Bar: very strict. Default: write nothing.
+  - The **project log entry** is local to the project and a sibling task may benefit from a richer narrative. Bar: looser. A bit rich is fine. Default: write something if the session moved the project forward.
+
+## Steps
+
+1. Invoke the flow skill via the Skill tool. This loads §4.10 (KB rules) and §4.5 (update-file shape).
+
+2. Run: flow transcript public-docker-ci
+   This prints the conversation transcript from the task's Claude session. Read it carefully end to end.
+
+3. KB sweep — strict bar, distill the essence.
+
+   For each of these five files, ask: across the WHOLE transcript, is there a durable fact about the user, their org, products, processes, or business that belongs there per §4.10's bucket table AND meets ALL three bars below?
+     - /Users/swapnil/.flow/kb/user.md
+     - /Users/swapnil/.flow/kb/org.md
+     - /Users/swapnil/.flow/kb/products.md
+     - /Users/swapnil/.flow/kb/processes.md
+     - /Users/swapnil/.flow/kb/business.md
+
+   The three bars (ALL must be met):
+     a. **Durable** — still true / still relevant in three months. Not 'today I felt X', not 'we tried approach Y for this one PR'.
+     b. **Surprising or non-obvious** — not derivable from the code, the README, or what a sibling task would already know.
+     c. **Future-relevant** — a future Claude session would change a decision because of it. If you can't picture that, skip.
+
+   Most task transcripts contribute nothing to the KB. Mechanical work, narrow bug fixes, local refactors, routine debugging — these almost never produce KB entries. The expected answer for most files on most tasks is 'no'. Don't reach.
+
+4. Writing KB entries — INTERPRET the essence; do not transcribe.
+
+   This is the close-out mode of §4.10 and is DIFFERENT from real-time scoop. In real-time scoop you capture what the user just said, mostly verbatim, because it's a single fresh fact. Here you've read the whole conversation — your job is to SYNTHESIZE: pull out the durable insight in compact paraphrase, in your own words, capturing the essence and (where helpful) the why. Avoid quote dumps. One concise dated bullet per insight.
+
+   For each KB file you decide needs an entry, Read it first to check for duplicates (in any form — paraphrase, near-duplicate, superset). If something similar already exists, skip; do not append. Append using the §4.10 entry format: one dated bullet per insight, your own paraphrase capturing the essence, never invent or embellish beyond what the transcript supports.
+
+5. Project update — looser bar, narrative OK.
+
+   This task is attached to project "opensre". The project log is local and lives next to the work, so a richer entry is fine — capture what got decided, what shipped, what was tried, what's now open. Sibling-task sessions will read this to catch up.
+
+   Write ONE file at:
+     /Users/swapnil/.flow/projects/opensre/updates/YYYY-MM-DD-<kebab-title>.md
+   Shape per skill §4.5: roughly two paragraphs (can stretch a little if there's real substance). Paragraph 1: what got decided / learned / shipped at the project level. Paragraph 2: what is next or now open. Optional trailing 'Blocked on: <X>' line.
+
+   The (still real, but looser) bar: write ONLY if the session moved the project forward — a decision was made, something shipped, a learning emerged, a blocker was added/removed, an approach was chosen, etc. Skip when the work was purely mechanical with no project-level narrative (e.g. a single typo fix). Do NOT write a template or a 'task X was marked done' summary. The goal is something a sibling-task session would actually want to read; if you can't picture that, skip.
+
+6. Do not output a chat summary. Write any files silently and exit. Empty output is a successful sweep when the transcript didn't warrant entries.
