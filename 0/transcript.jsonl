@@ -1,0 +1,2 @@
+{"v":1,"agent":"claude-code","cli_version":"0.10.0","type":"user","content":[{"text":"Close out public-docker-ci: Docker Hub CI shipped on public OpenSRE PR #21; smoke publish succeeded."}]}
+{"v":1,"agent":"claude-code","cli_version":"0.10.0","type":"assistant","content":"Task complete. Public-only docker-publish workflow live; secrets set; multi-arch images verified on Docker Hub."}

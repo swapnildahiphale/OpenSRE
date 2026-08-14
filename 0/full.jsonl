@@ -1,0 +1,2 @@
+{"type":"user","message":{"role":"user","content":"Close out public-docker-ci: Docker Hub CI shipped on public OpenSRE PR #21; smoke publish succeeded."}}
+{"type":"assistant","message":{"role":"assistant","content":"Task complete. Public-only docker-publish workflow live; secrets set; multi-arch images verified on Docker Hub."}}

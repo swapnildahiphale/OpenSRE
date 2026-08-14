@@ -1,0 +1,1 @@
+Close out public-docker-ci: Docker Hub CI shipped on public OpenSRE PR #21; smoke publish succeeded.
