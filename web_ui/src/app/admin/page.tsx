@@ -96,13 +96,12 @@ export default function AdminHomePage() {
   const [services, setServices] = useState<ServiceHealth[]>([]);
   const [integrations, setIntegrations] = useState<IntegrationHealth[]>([]);
 
-  // Onboarding state - visitors use localStorage only
-  const isVisitor = identity?.auth_kind === 'visitor';
+  // Admin users use localStorage-only onboarding (no team-scoped prefs API).
   const {
     shouldShowWelcome,
     markWelcomeSeen,
     markFirstAgentRunCompleted,
-  } = useOnboarding({ isVisitor });
+  } = useOnboarding({ localStorageOnly: true });
   const [showWelcomeModal, setShowWelcomeModal] = useState(false);
 
   // Show welcome modal on first visit

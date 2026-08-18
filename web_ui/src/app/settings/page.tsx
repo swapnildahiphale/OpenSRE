@@ -121,9 +121,7 @@ export default function SettingsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { identity, loading: identityLoading } = useIdentity();
-  // Visitors use localStorage only for onboarding state
-  const isVisitor = identity?.auth_kind === 'visitor';
-  const { resetOnboarding } = useOnboarding({ isVisitor });
+  const { resetOnboarding } = useOnboarding();
 
   // Tab state - synced with URL query param
   const [activeTab, setActiveTab] = useState<SettingsTab>('general');
@@ -210,7 +208,7 @@ export default function SettingsPage() {
   const [newRoutingValue, setNewRoutingValue] = useState('');
 
   const isAdmin = identity?.role === 'admin';
-  const canWrite = !isVisitor;
+  const canWrite = identity?.can_write ?? false;
 
   // Theme toggle
   useEffect(() => {
@@ -557,30 +555,10 @@ export default function SettingsPage() {
 
   return (
     <div className="p-8 max-w-6xl mx-auto">
-      {/* Visitor Read-Only Banner */}
-      {isVisitor && (
-        <div className="mb-6 bg-forest-light/10 dark:bg-forest/20 border border-forest-light/30 dark:border-forest/30 rounded-xl p-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-forest-light/15 dark:bg-forest/20 rounded-lg">
-              <Info className="w-5 h-5 text-forest dark:text-forest-light" />
-            </div>
-            <div>
-              <h3 className="font-medium text-forest dark:text-forest-light">Visitor Mode</h3>
-              <p className="text-sm text-forest dark:text-forest-light">
-                You&apos;re exploring the playground in read-only mode. Configuration changes are disabled.
-                <a href="mailto:hello@opensre.io?subject=OpenSRE Demo Interest" className="ml-1 underline hover:no-underline">
-                  Contact us
-                </a> to set up your own team.
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
-
       <div className="mb-8">
         <h1 className="text-2xl font-semibold text-stone-900 dark:text-white">Settings</h1>
         <p className="text-sm text-stone-500 mt-1">
-          {isAdmin ? 'Manage preferences and run ad-hoc agents.' : isVisitor ? 'Explore settings (read-only in visitor mode).' : 'Manage your preferences.'}
+          {isAdmin ? 'Manage preferences and run ad-hoc agents.' : 'Manage your preferences.'}
         </p>
       </div>
 
@@ -846,7 +824,7 @@ export default function SettingsPage() {
                       <button
                         onClick={saveRoutingConfig}
                         disabled={routingSaving || !canWrite}
-                        title={!canWrite ? 'Visitors cannot modify routing configuration' : undefined}
+                        title={!canWrite ? 'You do not have write access' : undefined}
                         className="flex items-center gap-2 px-4 py-2 bg-stone-600 text-white rounded-lg hover:bg-stone-700 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         {routingSaving ? (
@@ -863,7 +841,7 @@ export default function SettingsPage() {
                       </button>
                       {!canWrite && (
                         <p className="text-xs text-forest dark:text-forest-light mt-2">
-                          Configuration changes are disabled in visitor mode.
+                          Configuration changes are disabled for your account.
                         </p>
                       )}
                     </div>
@@ -1105,14 +1083,14 @@ export default function SettingsPage() {
                     <button
                       onClick={saveOutputConfig}
                       disabled={outputConfigLoading || !canWrite}
-                      title={!canWrite ? 'Visitors cannot modify output configuration' : undefined}
+                      title={!canWrite ? 'You do not have write access' : undefined}
                       className="px-4 py-2 bg-forest text-white rounded-lg hover:bg-forest-dark disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       {outputConfigLoading ? 'Saving...' : 'Save Configuration'}
                     </button>
                     {!canWrite && (
                       <p className="text-xs text-forest dark:text-forest-light mt-2">
-                        Configuration changes are disabled in visitor mode.
+                        Configuration changes are disabled for your account.
                       </p>
                     )}
                   </div>
@@ -1695,7 +1673,7 @@ export default function SettingsPage() {
                 <button
                   onClick={saveFeatureConfigs}
                   disabled={featuresSaving || !canWrite}
-                  title={!canWrite ? 'Visitors cannot modify feature configuration' : undefined}
+                  title={!canWrite ? 'You do not have write access' : undefined}
                   className="flex items-center gap-2 px-4 py-2 bg-stone-600 text-white rounded-lg hover:bg-stone-700 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {featuresSaving ? (
@@ -1713,7 +1691,7 @@ export default function SettingsPage() {
                 <button
                   onClick={syncCronJobs}
                   disabled={syncingCronJobs || !canWrite}
-                  title={!canWrite ? 'Visitors cannot sync scheduled jobs' : undefined}
+                  title={!canWrite ? 'You do not have write access' : undefined}
                   className="flex items-center gap-2 px-4 py-2 bg-stone-100 dark:bg-stone-700 text-stone-700 dark:text-stone-300 rounded-lg hover:bg-stone-200 dark:hover:bg-stone-700 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {syncingCronJobs ? (
@@ -1729,7 +1707,7 @@ export default function SettingsPage() {
                   )}
                 </button>
                 <span className="text-xs text-stone-500">
-                  {!canWrite ? 'Configuration changes are disabled in visitor mode.' : 'Save config first, then apply to activate scheduled jobs'}
+                  {!canWrite ? 'Configuration changes are disabled for your account.' : 'Save config first, then apply to activate scheduled jobs'}
                 </span>
               </div>
 

@@ -4,8 +4,6 @@ import "./globals.css";
 import { Sidebar } from "@/components/Sidebar";
 import { SignInGate } from "@/components/SignInGate";
 import { ThemeProvider } from "@/components/ThemeProvider";
-import { VisitorSessionProvider } from "@/components/VisitorSessionProvider";
-import { VisitorWarningBanner } from "@/components/VisitorWarningBanner";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -56,13 +54,10 @@ export default function RootLayout({
       >
         <ThemeProvider>
           <SignInGate>
-            <VisitorSessionProvider>
-              <div className="min-h-screen">
-                <Sidebar />
-                <main className="lg:pl-64 min-h-screen transition-all duration-200">{children}</main>
-              </div>
-              <VisitorWarningBanner />
-            </VisitorSessionProvider>
+            <div className="min-h-screen">
+              <Sidebar />
+              <main className="lg:pl-64 min-h-screen transition-all duration-200">{children}</main>
+            </div>
           </SignInGate>
         </ThemeProvider>
       </body>

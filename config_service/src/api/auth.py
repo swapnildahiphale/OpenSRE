@@ -34,7 +34,7 @@ def authenticate_team_request(
 ) -> tuple[str, Optional[OIDCPrincipal], str]:
     """Return (auth_kind, oidc_principal, raw_token_string).
 
-    auth_kind: "team_token" | "oidc" | "impersonation" | "visitor"
+    auth_kind: "team_token" | "oidc" | "impersonation"
     """
     mode = os.getenv("TEAM_AUTH_MODE", "token")  # token|oidc|both
     token = _split_bearer(authorization)
@@ -46,30 +46,9 @@ def authenticate_team_request(
     # 2 dots may be:
     # - OIDC JWT (RS256)
     # - OpenSRE-issued team impersonation JWT (HS256)
-    # - OpenSRE-issued visitor JWT (HS256)
     if dots == 2:
-        # Check for visitor token first
-        secret = (os.getenv("IMPERSONATION_JWT_SECRET") or "").strip()
-        if secret:
-            try:
-                from src.core.impersonation import verify_visitor_token
-
-                claims = verify_visitor_token(token)
-                principal = OIDCPrincipal(
-                    subject=str(claims.get("sub", "")),
-                    email=claims.get("email"),
-                    org_id=str(claims.get("org_id") or ""),
-                    team_node_id=str(claims.get("team_node_id") or ""),
-                    claims=claims,
-                )
-                return "visitor", principal, token
-            except ValueError:
-                # Not a visitor token, continue to other methods
-                pass
-            except Exception:
-                pass
-
         # Prefer impersonation if configured; it is explicitly issued by config_service.
+        secret = (os.getenv("IMPERSONATION_JWT_SECRET") or "").strip()
         if secret:
             try:
                 from src.core.impersonation import verify_team_impersonation_token
@@ -283,21 +262,12 @@ def require_admin(
 class TeamPrincipal:
     """Principal for team-level authentication."""
 
-    auth_kind: str  # "team_token" | "oidc" | "impersonation" | "visitor"
+    auth_kind: str  # "team_token" | "oidc" | "impersonation"
     org_id: str
     team_node_id: str
     subject: Optional[str] = None
     email: Optional[str] = None
     token: Optional[str] = None
-    visitor_session_id: Optional[str] = None  # Set for visitor auth
-
-    def is_visitor(self) -> bool:
-        """Check if this is a visitor (public playground user)."""
-        return self.auth_kind == "visitor"
-
-    def can_write(self) -> bool:
-        """Check if this principal can write configuration."""
-        return not self.is_visitor()
 
 
 def require_team_auth(
@@ -347,15 +317,10 @@ def require_team_auth(
         finally:
             db.close()
 
-    # OIDC, impersonation, or visitor JWT
+    # OIDC or impersonation JWT
     if dots == 2:
         auth_kind, principal, _ = authenticate_team_request(authorization)
         if principal:
-            # Extract visitor session ID if this is a visitor token
-            visitor_session_id = None
-            if auth_kind == "visitor":
-                visitor_session_id = principal.claims.get("visitor_session_id")
-
             return TeamPrincipal(
                 auth_kind=auth_kind,
                 org_id=principal.org_id or "",
@@ -363,7 +328,6 @@ def require_team_auth(
                 subject=principal.subject,
                 email=principal.email,
                 token=token,
-                visitor_session_id=visitor_session_id,
             )
 
     AUTH_FAILURES_TOTAL.labels("team_auth_failed").inc()

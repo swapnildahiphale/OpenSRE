@@ -73,13 +73,11 @@ export default function TeamDashboardPage() {
   // Opens the shared investigation slide-over (same drawer the Agent Runs page uses).
   const [showChat, setShowChat] = useState(false);
 
-  // Onboarding state - visitors use localStorage only
-  const isVisitor = identity?.auth_kind === 'visitor';
   const {
     shouldShowWelcome,
     markWelcomeSeen,
     markFirstAgentRunCompleted,
-  } = useOnboarding({ isVisitor });
+  } = useOnboarding();
   const [showWelcomeModal, setShowWelcomeModal] = useState(false);
 
   // Show welcome modal on first visit

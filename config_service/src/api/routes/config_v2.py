@@ -37,17 +37,6 @@ logger = structlog.get_logger(__name__)
 # =============================================================================
 
 
-def _check_visitor_write_access(authorization: str) -> None:
-    """
-    Check if the authorization header contains a visitor token.
-
-    Note: Visitor write access is now ALLOWED for the playground demo.
-    Visitors can configure integrations and agents to try out the product.
-    """
-    # Visitors are now allowed to write for playground demo
-    pass
-
-
 def _resolve_team_identity(
     authorization: str,
     x_org_id: Optional[str],
@@ -81,9 +70,6 @@ def _resolve_team_identity(
                 if oidc_principal.org_id and oidc_principal.team_node_id:
                     return oidc_principal.org_id, oidc_principal.team_node_id
             elif auth_kind == "oidc" and oidc_principal:
-                if oidc_principal.org_id and oidc_principal.team_node_id:
-                    return oidc_principal.org_id, oidc_principal.team_node_id
-            elif auth_kind == "visitor" and oidc_principal:
                 if oidc_principal.org_id and oidc_principal.team_node_id:
                     return oidc_principal.org_id, oidc_principal.team_node_id
         except Exception as e:
@@ -1084,9 +1070,6 @@ async def update_my_config(
 
     Auth: Supports both Bearer token (v1 style) and X-Org-Id/X-Team-Node-Id headers (v2 style).
     """
-    # Visitors cannot modify configuration
-    _check_visitor_write_access(authorization)
-
     org_id, team_node_id = _resolve_team_identity(
         authorization, x_org_id, x_team_node_id, db
     )

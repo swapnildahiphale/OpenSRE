@@ -64,9 +64,8 @@ const triggerIcon = (s: string) => {
 export default function TeamAgentRunsPage() {
   const router = useRouter();
   const { identity } = useIdentity();
-  const isVisitor = identity?.auth_kind === 'visitor';
   const { state: onboardingState, markFirstAgentRunCompleted, setQuickStartStep } =
-    useOnboarding({ isVisitor });
+    useOnboarding();
   const [runs, setRuns] = useState<AgentRun[]>([]);
   const [episodes, setEpisodes] = useState<ThreadEpisode[]>([]);
   const [loading, setLoading] = useState(true);

@@ -16,9 +16,8 @@ interface OnboardingWrapperProps {
  */
 export function OnboardingWrapper({ children }: OnboardingWrapperProps) {
   const { identity } = useIdentity();
-  // Admin users don't have team context, so treat them like visitors
-  // (localStorage-only) to avoid 401 from team-scoped /api/team/preferences
-  const isVisitor = identity?.auth_kind === 'visitor' || identity?.role === 'admin';
+  // Admin users don't have team context — localStorage only to avoid 401 from team prefs API.
+  const localStorageOnly = identity?.role === 'admin';
   const [showWizard, setShowWizard] = useState(false);
   const [wizardInitialStep, setWizardInitialStep] = useState(1);
 
@@ -49,7 +48,7 @@ export function OnboardingWrapper({ children }: OnboardingWrapperProps) {
       {children}
 
       {/* Floating continue button - appears when user navigates away mid-wizard */}
-      <ContinueOnboardingButton onContinue={handleContinueOnboarding} isVisitor={isVisitor} />
+      <ContinueOnboardingButton onContinue={handleContinueOnboarding} localStorageOnly={localStorageOnly} />
 
       {/* Quick Start Wizard modal */}
       {showWizard && (
@@ -58,7 +57,7 @@ export function OnboardingWrapper({ children }: OnboardingWrapperProps) {
           onRunAgent={handleRunAgent}
           onSkip={handleSkip}
           initialStep={wizardInitialStep}
-          isVisitor={isVisitor}
+          localStorageOnly={localStorageOnly}
         />
       )}
     </>
