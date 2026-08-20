@@ -1,0 +1,119 @@
+namespace: opensre
+
+global:
+  imagePullPolicy: Always
+  security:
+    allowInsecureImages: true
+  configService:
+    url: "http://opensre-config-service.opensre.svc.cluster.local:8080"
+    orgId: "pilot"
+  database:
+    # When postgresql.enabled=false, operator puts DATABASE_URL in opensre-config-service-env
+    databaseUrlSecretName: opensre-config-service-env
+    databaseUrlSecretKey: DATABASE_URL
+
+ingress:
+  enabled: true
+  className: nginx
+  host: opensre.example.com
+  annotations: {}
+  tls:
+    enabled: true
+    secretName: opensre-tls
+
+externalSecrets:
+  enabled: false
+
+postgresql:
+  enabled: true
+  image:
+    repository: bitnamilegacy/postgresql
+  auth:
+    username: opensre
+    database: opensre
+  primary:
+    persistence:
+      enabled: true
+      size: 8Gi
+
+neo4j:
+  enabled: true
+  neo4j:
+    name: opensre-neo4j
+    edition: community
+    acceptLicenseAgreement: "yes"
+  volumes:
+    data:
+      mode: defaultStorageClass
+  # Official Neo4j chart defaults services.neo4j to LoadBalancer (public NLB on EKS).
+  # Simple-mode only needs in-cluster ClusterIP (release-named + admin services).
+  services:
+    neo4j:
+      enabled: false
+
+services:
+  configService:
+    enabled: true
+    image: swapnildahiphale/opensre-config-service:v1.2.0
+    adminAuthMode: token
+    teamAuthMode: token
+    migrations:
+      hookEnabled: false  # embedded Postgres: hook Job runs before DB pod exists; initContainer migrates instead
+      enabled: true
+
+  orchestrator:
+    enabled: false
+
+  slackBot:
+    enabled: false
+
+  teamsBot:
+    enabled: false
+    image: swapnildahiphale/opensre-teams-bot:v1.2.0
+
+  k8sGateway:
+    enabled: false
+
+  credentialResolver:
+    enabled: false
+
+  sandboxRouter:
+    enabled: false
+
+  sandboxCleanup:
+    enabled: false
+
+  agent:
+    enabled: true
+    replicas: 1
+    command: ["python", "/app/server_simple.py"]
+    sandbox:
+      enabled: false
+    livenessProbe:
+      enabled: false  # server_simple.py has no dedicated :8081 health server
+    cleanup:
+      enabled: false
+    # Match web-ui/config-service: uid 1000 + fsGroup so session PVC is writable
+    podSecurityContext:
+      runAsNonRoot: true
+      runAsUser: 1000
+      fsGroup: 1000
+    serviceAccount:
+      create: true
+      name: opensre-agent
+    k8sRbac:
+      create: true
+      scope: cluster
+      namespaces: []
+    sessionStore:
+      persistence:
+        enabled: true
+        size: 10Gi
+    image: swapnildahiphale/opensre-sre-agent:v1.2.0
+
+  webUi:
+    enabled: true
+    image: swapnildahiphale/opensre-web-ui:v1.2.0
+    cookieSecure: true
+    oidc:
+      enabled: false

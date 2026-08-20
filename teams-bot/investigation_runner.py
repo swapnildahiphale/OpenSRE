@@ -1,5 +1,6 @@
 """Drive sre-agent SSE and map events to Teams stream/cards."""
 
+import logging
 import re
 import time
 from typing import Awaitable, Callable, Optional
@@ -20,7 +21,14 @@ from state import (
 )
 from stream_handler import handle_stream_event, parse_sse_event
 
+logger = logging.getLogger(__name__)
+
 UPDATE_INTERVAL_SECONDS = 0.5
+# aiohttp ClientSession defaults to total=300s. Channel investigations await
+# the SSE stream in-handler; a 5-minute cut cancelled the handler (TimeoutError)
+# after the "Working on it" ack and before the final card. Agent wall-clock cap
+# is AGENT_TIMEOUT_SECONDS (600s) — keep SSE total above that plus buffer.
+SSE_CLIENT_TIMEOUT = aiohttp.ClientTimeout(total=900, sock_connect=30)
 
 StreamUpdate = Callable[[str], Awaitable[None]]
 StreamClose = Callable[[], Awaitable[None]]
@@ -29,8 +37,11 @@ UpdateCard = Callable[[str, dict], Awaitable[None]]  # activity_id, card
 
 
 def sanitize_thread_id(conversation_id: str) -> str:
+    # Keep enough of the Teams conversation id to stay unique. Channel threads
+    # include ;messageid=… and personal chats are long a:… ids — both exceeded
+    # the old 80-char cap / varchar(64) column.
     cleaned = re.sub(r"[^a-zA-Z0-9]+", "-", (conversation_id or "unknown").lower())
-    cleaned = cleaned.strip("-")[:80]
+    cleaned = cleaned.strip("-")[:240]
     return f"teams-{cleaned}"
 
 
@@ -112,7 +123,11 @@ async def _run_investigation_body(
     cfg = Config()
     state = InvestigationState(thread_id=thread_id)
     url = f"{cfg.SRE_AGENT_URL.rstrip('/')}/investigate"
-    payload = {"prompt": prompt, "thread_id": thread_id}
+    payload = {
+        "prompt": prompt,
+        "thread_id": thread_id,
+        "trigger_source": "teams",
+    }
     last_update = 0.0
 
     async def process_sse_line(line: str) -> bool:
@@ -157,18 +172,33 @@ async def _run_investigation_body(
             return False
         return False
 
-    async with aiohttp.ClientSession() as session:
-        async with session.post(url, json=payload, headers=_headers(cfg)) as resp:
-            resp.raise_for_status()
-            buffer = ""
-            async for raw in resp.content.iter_any():
-                buffer += raw.decode("utf-8", errors="replace")
-                while "\n" in buffer:
-                    line, buffer = buffer.split("\n", 1)
-                    if await process_sse_line(line):
-                        return
-            if buffer.strip() and await process_sse_line(buffer):
-                return
+    try:
+        async with aiohttp.ClientSession(timeout=SSE_CLIENT_TIMEOUT) as session:
+            async with session.post(url, json=payload, headers=_headers(cfg)) as resp:
+                resp.raise_for_status()
+                buffer = ""
+                async for raw in resp.content.iter_any():
+                    buffer += raw.decode("utf-8", errors="replace")
+                    while "\n" in buffer:
+                        line, buffer = buffer.split("\n", 1)
+                        if await process_sse_line(line):
+                            return
+                if buffer.strip() and await process_sse_line(buffer):
+                    return
+    except TimeoutError:
+        logger.exception("SSE timed out for thread %s", thread_id)
+        await stream_close()
+        await send_card(
+            build_final_card(
+                result_text=state.final_result,
+                error=(
+                    None
+                    if state.final_result
+                    else "Timed out waiting for the agent. Reply in this thread to continue."
+                ),
+            )
+        )
+        return
 
     # Stream closed — send the final card with whatever result we accumulated.
     await stream_close()

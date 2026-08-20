@@ -2,6 +2,7 @@
 
 import { Plus, Loader2 } from 'lucide-react';
 import { TreeCard } from './TreeCard';
+import { Button } from '@/components/ui-flow';
 
 export interface EffectiveTree {
   tree_name: string;
@@ -37,17 +38,17 @@ export function TreeSelector({
   if (loading) {
     return (
       <div className="flex items-center justify-center py-8">
-        <Loader2 className="w-6 h-6 animate-spin text-stone-400" />
-        <span className="ml-2 text-stone-500">Loading trees...</span>
+        <Loader2 className="w-6 h-6 animate-spin text-slate-400" />
+        <span className="ml-2 text-slate-500">Loading trees...</span>
       </div>
     );
   }
 
   if (trees.length === 0) {
     return (
-      <div className="bg-stone-50 dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded-xl p-8 text-center">
-        <p className="text-stone-500">No knowledge trees configured.</p>
-        <p className="text-sm text-stone-400 mt-1">
+      <div className="rounded-[1.5rem] border border-slate-200/70 bg-slate-50 dark:bg-slate-800 p-8 text-center">
+        <p className="text-slate-500">No knowledge trees configured.</p>
+        <p className="text-sm text-slate-400 mt-1">
           Ask your org admin to set up a knowledge tree for your team.
         </p>
       </div>
@@ -58,22 +59,19 @@ export function TreeSelector({
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-sm font-medium text-stone-700 dark:text-stone-300">
+          <h2 className="text-sm font-medium text-slate-700 dark:text-slate-300">
             Your Knowledge Trees
           </h2>
-          <p className="text-xs text-stone-500 mt-0.5">
+          <p className="text-xs text-slate-500 mt-0.5">
             {trees.length} tree{trees.length !== 1 ? 's' : ''} available
             {trees.some((t) => t.inherited) && ' (including inherited)'}
           </p>
         </div>
         {onCreateTree && (
-          <button
-            onClick={onCreateTree}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-stone-100 dark:bg-stone-700 text-stone-700 dark:text-stone-300 rounded-lg hover:bg-stone-200 dark:hover:bg-stone-700 transition-colors"
-          >
+          <Button variant="secondary" onClick={onCreateTree}>
             <Plus className="w-4 h-4" />
             Create Tree
-          </button>
+          </Button>
         )}
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">

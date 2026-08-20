@@ -9,7 +9,6 @@ import {
   Save,
   CheckCircle,
   XCircle,
-  Loader2,
   Sparkles,
   Edit3,
   RotateCcw,
@@ -18,6 +17,7 @@ import {
   Bot,
   AlertTriangle,
 } from 'lucide-react';
+import { Skeleton } from '@/components/ui-flow';
 
 interface AgentPrompt {
   agent: string;
@@ -229,8 +229,9 @@ export default function TeamPromptsPage() {
 
   if (loading) {
     return (
-      <div className="p-8 flex items-center justify-center">
-        <Loader2 className="w-6 h-6 animate-spin text-stone-400" />
+      <div className="p-8 flex flex-col items-center justify-center gap-3 max-w-lg mx-auto w-full">
+        <Skeleton className="h-24 w-full rounded-xl" />
+        <Skeleton className="h-32 w-full rounded-xl" />
       </div>
     );
   }
@@ -239,7 +240,7 @@ export default function TeamPromptsPage() {
     <div className="p-8 max-w-5xl mx-auto">
       <div className="flex items-center justify-between mb-8">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-forest flex items-center justify-center">
+          <div className="w-10 h-10 rounded-xl bg-emerald-600 flex items-center justify-center">
             <MessageSquareText className="w-5 h-5 text-white" />
           </div>
           <div>
@@ -259,7 +260,7 @@ export default function TeamPromptsPage() {
           className={`mb-6 p-4 rounded-xl flex items-center gap-3 ${
             message.type === 'success'
               ? 'bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 text-green-700 dark:text-green-400'
-              : 'bg-clay-light/10 dark:bg-clay/20 border border-clay-light dark:border-clay text-clay-dark dark:text-clay-light'
+              : 'bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-400'
           }`}
         >
           {message.type === 'success' ? <CheckCircle className="w-5 h-5" /> : <XCircle className="w-5 h-5" />}
@@ -376,10 +377,10 @@ export default function TeamPromptsPage() {
                           <button
                             onClick={() => handleSave(prompt.agent)}
                             disabled={saving === prompt.agent}
-                            className="flex items-center gap-2 px-4 py-2 bg-forest text-white rounded-lg hover:bg-forest-dark disabled:opacity-50"
+                            className="flex items-center gap-2 px-4 py-2 bg-emerald-100/50 text-emerald-700 rounded-lg hover:bg-emerald-100/80 disabled:opacity-50"
                           >
                             {saving === prompt.agent ? (
-                              <Loader2 className="w-4 h-4 animate-spin" />
+                              <span className="live-dot w-2 h-2 rounded-full shrink-0" aria-hidden />
                             ) : (
                               <Save className="w-4 h-4" />
                             )}
@@ -495,8 +496,8 @@ export default function TeamPromptsPage() {
                   {/* Diff View */}
                   <div className="bg-white dark:bg-stone-800 border border-stone-200 dark:border-stone-600 rounded-lg overflow-hidden">
                     {change.currentPrompt && (
-                      <div className="p-3 border-b border-stone-200 dark:border-stone-600 bg-clay-light/10 dark:bg-clay/10">
-                        <div className="text-xs text-clay mb-1">- Current</div>
+                      <div className="p-3 border-b border-stone-200 dark:border-stone-600 bg-rose-50 dark:bg-rose-900/10">
+                        <div className="text-xs text-rose-600 mb-1">- Current</div>
                         <pre className="text-xs text-stone-700 dark:text-stone-300 whitespace-pre-wrap font-mono max-h-32 overflow-y-auto">
                           {change.currentPrompt.slice(0, 500)}
                           {change.currentPrompt.length > 500 && '...'}

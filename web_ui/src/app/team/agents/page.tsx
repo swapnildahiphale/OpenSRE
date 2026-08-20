@@ -8,7 +8,6 @@ import {
   Save,
   CheckCircle,
   XCircle,
-  Loader2,
   Zap,
   Brain,
   Users,
@@ -28,11 +27,13 @@ import {
   Edit2,
   Trash2,
   LayoutTemplate,
+  Plus,
 } from 'lucide-react';
 import { apiFetch } from '@/lib/apiClient';
 import { QuickStartWizard } from '@/components/onboarding/QuickStartWizard';
 import { ContinueOnboardingButton } from '@/components/onboarding/ContinueOnboardingButton';
 import { HelpTip } from '@/components/onboarding/HelpTip';
+import { PageHeader, Button, Skeleton, TeamPageShell } from '@/components/ui-flow';
 
 interface AgentModel {
   name: string;
@@ -539,139 +540,138 @@ export default function AgentSettingsPage() {
 
   if (loading) {
     return (
-      <div className="h-full flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-stone-400" />
-      </div>
+      <TeamPageShell
+        variant="fixedHeader"
+        header={<Skeleton className="h-16 w-72 rounded-xl" />}
+      >
+        <Skeleton className="h-64 w-full rounded-xl" />
+      </TeamPageShell>
     );
   }
 
   const currentAgent = selectedAgent ? agents[selectedAgent] : null;
 
   return (
-    <div className="flex flex-col h-screen">
-      {/* Header */}
-      <div className="flex-shrink-0 px-8 py-6 border-b border-stone-200 dark:border-stone-700">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-xl bg-forest flex items-center justify-center">
-              <Brain className="w-6 h-6 text-white" />
-            </div>
-            <div>
-              <h1 className="text-2xl font-bold text-stone-900 dark:text-white">
-                Agent Topology
-              </h1>
-              <p className="text-sm text-stone-500">
-                Configure your multi-agent system topology, prompts, and behaviors
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-3">
-            {/* View toggle */}
-            <div className="flex items-center bg-stone-100 dark:bg-stone-700 rounded-lg p-1">
-              <button
-                onClick={() => setViewMode('visual')}
-                className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm transition-all ${
-                  viewMode === 'visual'
-                    ? 'bg-white dark:bg-stone-700 text-stone-900 dark:text-white shadow-sm'
-                    : 'text-stone-500 hover:text-stone-700 dark:hover:text-stone-300'
-                }`}
-              >
-                <Network className="w-4 h-4" />
-                Visual
-              </button>
-              <button
-                onClick={() => setViewMode('json')}
-                className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm transition-all ${
-                  viewMode === 'json'
-                    ? 'bg-white dark:bg-stone-700 text-stone-900 dark:text-white shadow-sm'
-                    : 'text-stone-500 hover:text-stone-700 dark:hover:text-stone-300'
-                }`}
-              >
-                <Code className="w-4 h-4" />
-                JSON
-              </button>
-            </div>
+    <>
+    <TeamPageShell
+      variant="fixedHeader"
+      header={
+        <>
+        <PageHeader
+          eyebrow="Team console"
+          title="Agents"
+          subtitle="Configure your multi-agent system topology, prompts, and behaviors"
+          actions={
+            <>
+              <div className="flex items-center bg-slate-100 rounded-full p-1">
+                <button
+                  type="button"
+                  onClick={() => setViewMode('visual')}
+                  className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-sm transition-all ${
+                    viewMode === 'visual'
+                      ? 'bg-white text-slate-900 shadow-sm'
+                      : 'text-slate-500 hover:text-slate-700'
+                  }`}
+                >
+                  <Network className="w-4 h-4" />
+                  Visual
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setViewMode('json')}
+                  className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-sm transition-all ${
+                    viewMode === 'json'
+                      ? 'bg-white text-slate-900 shadow-sm'
+                      : 'text-slate-500 hover:text-slate-700'
+                  }`}
+                >
+                  <Code className="w-4 h-4" />
+                  JSON
+                </button>
+              </div>
 
-            <button
-              onClick={() => window.location.href = '/team/templates'}
-              className="flex items-center gap-2 px-4 py-2.5 bg-stone-100 dark:bg-stone-700 text-stone-700 dark:text-stone-300 rounded-lg hover:bg-stone-200 dark:hover:bg-stone-700 transition-all"
-            >
-              <LayoutTemplate className="w-4 h-4" />
-              Templates
-            </button>
-
-            <div className="relative">
-              <button
-                onClick={() => setShowAgentTypeMenu(!showAgentTypeMenu)}
-                className="flex items-center gap-2 px-4 py-2.5 bg-stone-100 dark:bg-stone-700 text-stone-700 dark:text-stone-300 rounded-lg hover:bg-stone-200 dark:hover:bg-stone-700 transition-all"
+              <Button
+                variant="secondary"
+                onClick={() => { window.location.href = '/team/templates'; }}
               >
-                <span className="text-lg leading-none">+</span>
-                Add Agent
-              </button>
+                <LayoutTemplate className="w-4 h-4" />
+                Templates
+              </Button>
 
-              {showAgentTypeMenu && (
-                <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-stone-700 rounded-lg shadow-xl border border-stone-200 dark:border-stone-600 z-50">
-                  <button
-                    onClick={() => {
-                      setShowAgentTypeMenu(false);
-                      setShowAddAgent(true);
-                    }}
-                    className="w-full px-4 py-3 text-left hover:bg-stone-100 dark:hover:bg-stone-700 transition-colors rounded-t-lg flex items-center gap-3"
-                  >
-                    <Bot className="w-4 h-4 text-stone-500" />
-                    <div>
-                      <div className="text-sm font-medium text-stone-900 dark:text-white">Add Local Agent</div>
-                      <div className="text-xs text-stone-500">Create a new internal agent</div>
-                    </div>
-                  </button>
-                  <button
-                    onClick={() => {
-                      setShowAgentTypeMenu(false);
-                      setShowAddRemoteAgent(true);
-                    }}
-                    className="w-full px-4 py-3 text-left hover:bg-stone-100 dark:hover:bg-stone-700 transition-colors rounded-b-lg flex items-center gap-3"
-                  >
-                    <ExternalLink className="w-4 h-4 text-stone-500" />
-                    <div>
-                      <div className="text-sm font-medium text-stone-900 dark:text-white">Add Remote A2A Agent</div>
-                      <div className="text-xs text-stone-500">Integrate external AI agent</div>
-                    </div>
-                  </button>
-                </div>
-              )}
-            </div>
-            <button
-              onClick={() => loadAgents()}
-              disabled={loading}
-              className="flex items-center gap-2 px-4 py-2.5 bg-stone-100 dark:bg-stone-700 text-stone-700 dark:text-stone-300 rounded-lg hover:bg-stone-200 dark:hover:bg-stone-700 disabled:opacity-50 transition-all"
-              title="Refresh from server"
-            >
-              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-            </button>
-            {editingAgent && (
-              <button
-                onClick={handleSave}
-                disabled={saving}
-                className="flex items-center gap-2 px-5 py-2.5 bg-forest text-white rounded-lg hover:bg-forest-dark disabled:opacity-50 transition-all"
-              >
-                {saving ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <Save className="w-4 h-4" />
+              <div className="relative">
+                <Button
+                  variant="secondary"
+                  onClick={() => setShowAgentTypeMenu(!showAgentTypeMenu)}
+                >
+                  <Plus className="w-4 h-4" />
+                  Add Agent
+                </Button>
+
+                {showAgentTypeMenu && (
+                  <div className="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-xl border border-slate-200/70 z-50">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowAgentTypeMenu(false);
+                        setShowAddAgent(true);
+                      }}
+                      className="w-full px-4 py-3 text-left hover:bg-slate-50 transition-colors rounded-t-xl flex items-center gap-3"
+                    >
+                      <Bot className="w-4 h-4 text-slate-500" />
+                      <div>
+                        <div className="text-sm font-medium text-slate-900">Add Local Agent</div>
+                        <div className="text-xs text-slate-500">Create a new internal agent</div>
+                      </div>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowAgentTypeMenu(false);
+                        setShowAddRemoteAgent(true);
+                      }}
+                      className="w-full px-4 py-3 text-left hover:bg-slate-50 transition-colors rounded-b-xl flex items-center gap-3"
+                    >
+                      <ExternalLink className="w-4 h-4 text-slate-500" />
+                      <div>
+                        <div className="text-sm font-medium text-slate-900">Add Remote A2A Agent</div>
+                        <div className="text-xs text-slate-500">Integrate external AI agent</div>
+                      </div>
+                    </button>
+                  </div>
                 )}
-                Save
-              </button>
-            )}
-          </div>
-        </div>
+              </div>
 
-        {/* Message */}
+              <button
+                type="button"
+                onClick={() => loadAgents()}
+                disabled={loading}
+                className="p-2 text-slate-400 hover:text-slate-600 rounded-full hover:bg-slate-100 transition-colors disabled:opacity-50"
+                title="Refresh from server"
+                aria-label="Refresh"
+              >
+                <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
+              </button>
+
+              {editingAgent && (
+                <Button variant="primary" onClick={handleSave} disabled={saving}>
+                  {saving ? (
+                    <span className="live-dot w-2 h-2 rounded-full shrink-0" aria-hidden />
+                  ) : (
+                    <Save className="w-4 h-4" />
+                  )}
+                  Save
+                </Button>
+              )}
+            </>
+          }
+        />
+
         {message && (
           <div
-            className={`mt-4 p-3 rounded-xl flex items-center gap-3 ${
+            className={`p-3 rounded-xl flex items-center gap-3 ${
               message.type === 'success'
-                ? 'bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 text-green-700 dark:text-green-400'
-                : 'bg-clay-light/10 dark:bg-clay/20 border border-clay-light dark:border-clay text-clay-dark dark:text-clay-light'
+                ? 'bg-green-50 border border-green-200 text-green-700'
+                : 'bg-rose-50 border border-rose-200 text-rose-700'
             }`}
           >
             {message.type === 'success' ? (
@@ -682,15 +682,15 @@ export default function AgentSettingsPage() {
             {message.text}
           </div>
         )}
-      </div>
-
-      <div className="flex-1 flex min-h-0">
-        {/* JSON View */}
+        </>
+      }
+      bleed={
+        <div className="flex-1 flex min-h-0">
+        {/* JSON stays in the 1240px column; visual topology fills full bleed width. */}
         {viewMode === 'json' ? (
-          <div className="flex-1 flex flex-col overflow-hidden p-6">
-            {/* Header with lineage and inheritance button */}
-            <div className="max-w-7xl mx-auto w-full mb-4 flex items-center justify-between flex-shrink-0">
-              <div className="flex items-center gap-3 text-sm text-stone-500">
+          <div className="flex-1 flex flex-col overflow-hidden max-w-[1240px] mx-auto px-10 py-6 w-full">
+            <div className="mb-4 flex items-center justify-between flex-shrink-0 w-full">
+              <div className="flex items-center gap-3 text-sm text-slate-500">
                 <span className="flex items-center gap-1">
                   Lineage: <span className="font-mono">{lineageLabel}</span>
                   <HelpTip id="config-lineage" position="right">
@@ -699,34 +699,34 @@ export default function AgentSettingsPage() {
                 </span>
                 <button
                   onClick={() => setShowInheritanceModal(true)}
-                  className="text-forest hover:text-forest-dark dark:text-forest-light dark:hover:text-forest-light underline underline-offset-2"
+                  className="text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 dark:hover:text-emerald-400 underline underline-offset-2"
                 >
                   Show inheritance details
                 </button>
               </div>
             </div>
 
-            <div className="flex-1 min-h-0 max-w-7xl mx-auto w-full grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="flex-1 min-h-0 w-full grid grid-cols-1 lg:grid-cols-2 gap-6">
               {/* Left: Active Configuration (read-only) */}
-              <div className="bg-white dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded-xl p-5 shadow-sm flex flex-col overflow-hidden">
+              <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-5 shadow-sm flex flex-col overflow-hidden">
                 <div className="flex items-center justify-between mb-3 flex-shrink-0">
-                  <div className="text-sm font-semibold text-stone-900 dark:text-white flex items-center gap-1">
+                  <div className="text-sm font-semibold text-slate-900 dark:text-white flex items-center gap-1">
                     Active Configuration
                     <HelpTip id="effective-config" position="right">
                       The <strong>active configuration</strong> is the final merged result of organization defaults combined with your team&apos;s overrides. This is what OpenSRE actually uses at runtime.
                     </HelpTip>
                   </div>
-                  <span className="text-xs text-stone-400">Read-only</span>
+                  <span className="text-xs text-slate-400">Read-only</span>
                 </div>
-                <pre className="flex-1 min-h-0 overflow-auto bg-stone-50 dark:bg-stone-900/50 border border-stone-200 dark:border-stone-700 rounded-lg p-3 text-xs font-mono text-stone-700 dark:text-stone-200">
+                <pre className="flex-1 min-h-0 overflow-auto bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 rounded-lg p-3 text-xs font-mono text-slate-700 dark:text-slate-200">
                   {effectivePretty || '(not loaded)'}
                 </pre>
               </div>
 
               {/* Right: Team Overrides (editable) */}
-              <div className="bg-white dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded-xl p-5 shadow-sm flex flex-col overflow-hidden">
+              <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-5 shadow-sm flex flex-col overflow-hidden">
                 <div className="flex items-center justify-between mb-3 flex-shrink-0">
-                  <div className="text-sm font-semibold text-stone-900 dark:text-white flex items-center gap-1">
+                  <div className="text-sm font-semibold text-slate-900 dark:text-white flex items-center gap-1">
                     Team Overrides
                     <HelpTip id="team-overrides" position="right">
                       <strong>Team Overrides</strong> are your team&apos;s custom settings. Changes here only affect your team, not the organization. Edit the JSON below and click Save to update your configuration.
@@ -738,19 +738,19 @@ export default function AgentSettingsPage() {
                   value={overridesText}
                   onChange={(e) => setOverridesText(e.target.value)}
                   placeholder={`// Your team's configuration\n// Edit and save to customize settings\n{\n  \n}`}
-                  className="flex-1 min-h-0 w-full p-3 font-mono text-xs rounded-lg border border-stone-200 dark:border-stone-600 bg-white dark:bg-stone-900 text-stone-900 dark:text-stone-100 focus:outline-none focus:ring-2 focus:ring-forest resize-none"
+                  className="flex-1 min-h-0 w-full p-3 font-mono text-xs rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500 resize-none"
                 />
 
                 <div className="mt-3 flex justify-between items-center flex-shrink-0">
-                  <p className="text-xs text-stone-500">
+                  <p className="text-xs text-slate-500">
                     Edit and save to update your team&apos;s configuration.
                   </p>
                   <button
                     onClick={saveOverrides}
                     disabled={saving}
-                    className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-forest text-white rounded-lg hover:bg-forest-dark disabled:opacity-70"
+                    className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-emerald-100/50 text-emerald-700 rounded-lg hover:bg-emerald-100/80 disabled:opacity-70"
                   >
-                    {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                    {saving ? <span className="live-dot w-2 h-2 rounded-full shrink-0" aria-hidden /> : <Save className="w-4 h-4" />}
                     Save
                   </button>
                 </div>
@@ -759,21 +759,21 @@ export default function AgentSettingsPage() {
           </div>
         ) : (
           /* Left Panel: Visual Topology */
-          <div className={`${selectedAgent ? 'w-1/2' : 'flex-1'} overflow-auto bg-stone-100 dark:bg-stone-900 transition-all duration-300 relative`}>
+          <div className={`${selectedAgent ? 'w-1/2' : 'flex-1'} overflow-auto bg-slate-50 p-4 transition-all duration-300 relative`}>
             {/* Zoom Controls */}
-            <div className="absolute top-4 right-4 z-20 flex items-center gap-1 bg-white dark:bg-stone-700 rounded-lg border border-stone-200 dark:border-stone-600 shadow-sm">
+            <div className="absolute top-4 right-4 z-20 flex items-center gap-1 bg-white dark:bg-slate-700 rounded-lg border border-slate-200 dark:border-slate-600 shadow-sm">
               <button
                 onClick={() => setZoom(z => Math.max(0.5, z - 0.1))}
-                className="px-3 py-1.5 text-stone-600 dark:text-stone-400 hover:bg-stone-100 dark:hover:bg-stone-700 rounded-l-lg"
+                className="px-3 py-1.5 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-l-lg"
               >
                 −
               </button>
-              <span className="px-2 text-xs text-stone-500 min-w-[3rem] text-center">
+              <span className="px-2 text-xs text-slate-500 min-w-[3rem] text-center">
                 {Math.round(zoom * 100)}%
               </span>
               <button
                 onClick={() => setZoom(z => Math.min(1.5, z + 0.1))}
-                className="px-3 py-1.5 text-stone-600 dark:text-stone-400 hover:bg-stone-100 dark:hover:bg-stone-700 rounded-r-lg"
+                className="px-3 py-1.5 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-r-lg"
               >
                 +
               </button>
@@ -781,7 +781,7 @@ export default function AgentSettingsPage() {
 
           {/* Zoomable Canvas */}
           <div
-            className="relative min-h-[calc(100vh-200px)] overflow-hidden"
+            className="relative min-h-[calc(100vh-200px)] overflow-hidden rounded-[1.5rem] border border-slate-200/70 bg-white"
             onWheel={handleWheel}
             onMouseDown={handleMouseDown}
             onMouseMove={handleMouseMove}
@@ -894,8 +894,8 @@ export default function AgentSettingsPage() {
             </div>
 
             {/* Legend - Fixed position, outside transformed container */}
-            <div className="absolute bottom-4 left-4 p-3 bg-white/90 dark:bg-stone-800/90 backdrop-blur rounded-lg border border-stone-200 dark:border-stone-700 z-10">
-              <div className="flex items-center gap-4 text-xs text-stone-600 dark:text-stone-400">
+            <div className="absolute bottom-4 left-4 p-3 bg-white/90 dark:bg-slate-800/90 backdrop-blur rounded-lg border border-slate-200 dark:border-slate-700 z-10">
+              <div className="flex items-center gap-4 text-xs text-slate-600 dark:text-slate-400">
                 <div className="flex items-center gap-1.5">
                   <div className="w-2.5 h-2.5 rounded-full bg-green-500" />
                   <span>Enabled</span>
@@ -905,7 +905,7 @@ export default function AgentSettingsPage() {
                   <span>Entrance Agent</span>
                 </div>
                 <div className="flex items-center gap-1.5">
-                  <div className="w-6 h-px bg-stone-400" />
+                  <div className="w-6 h-px bg-slate-400" />
                   <span>→ Uses</span>
                 </div>
               </div>
@@ -913,7 +913,7 @@ export default function AgentSettingsPage() {
 
             {/* Click hint - Fixed position, outside transformed container */}
             {!selectedAgent && (
-              <div className="absolute bottom-4 right-4 text-xs text-stone-400 dark:text-stone-600 z-10">
+              <div className="absolute bottom-4 right-4 text-xs text-slate-400 dark:text-slate-600 z-10">
                 Click an agent to configure
               </div>
             )}
@@ -923,20 +923,20 @@ export default function AgentSettingsPage() {
 
         {/* Right Panel: Agent Details (only in visual mode) */}
         {viewMode === 'visual' && selectedAgent && (
-          <div className="w-1/2 border-l border-stone-200 dark:border-stone-700 overflow-auto bg-white dark:bg-stone-800">
+          <div className="w-1/2 border-l border-slate-200 dark:border-slate-700 overflow-auto bg-white dark:bg-slate-800">
             {currentAgent && editingAgent ? (
               <div className="p-6 space-y-6">
                 {/* Agent Header */}
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-4">
-                    <div className="w-11 h-11 rounded-lg bg-stone-100 dark:bg-stone-700 border border-stone-200 dark:border-stone-600 flex items-center justify-center">
-                      <Bot className="w-5 h-5 text-stone-600 dark:text-stone-400" />
+                    <div className="w-11 h-11 rounded-lg bg-slate-100 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 flex items-center justify-center">
+                      <Bot className="w-5 h-5 text-slate-600 dark:text-slate-400" />
                     </div>
                     <div>
-                      <h2 className="text-lg font-semibold text-stone-900 dark:text-white">
+                      <h2 className="text-lg font-semibold text-slate-900 dark:text-white">
                         {currentAgent.name}
                       </h2>
-                      <p className="text-sm text-stone-500">{currentAgent.description}</p>
+                      <p className="text-sm text-slate-500">{currentAgent.description}</p>
                     </div>
                   </div>
 
@@ -949,7 +949,7 @@ export default function AgentSettingsPage() {
                     className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm transition-colors ${
                       editingAgent.enabled
                         ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400'
-                        : 'bg-stone-100 dark:bg-stone-700 text-stone-500'
+                        : 'bg-slate-100 dark:bg-slate-700 text-slate-500'
                     }`}
                   >
                     {editingAgent.enabled ? (
@@ -968,7 +968,7 @@ export default function AgentSettingsPage() {
                   {/* Close button */}
                   <button
                     onClick={handleClosePanel}
-                    className="p-2 rounded-lg hover:bg-stone-100 dark:hover:bg-stone-800 text-stone-500"
+                    className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500"
                   >
                     <X className="w-5 h-5" />
                   </button>
@@ -978,7 +978,7 @@ export default function AgentSettingsPage() {
               {/* Agent Type Badge */}
               {Object.keys(currentAgent.sub_agents || {}).length > 0 && (
                 <div className="flex items-center gap-2">
-                  <span className="text-xs px-2 py-1 rounded-full bg-stone-100 dark:bg-stone-700 text-stone-600 dark:text-stone-400 border border-stone-200 dark:border-stone-600 flex items-center gap-1">
+                  <span className="text-xs px-2 py-1 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-600 flex items-center gap-1">
                     <Sparkles className="w-3 h-3" />
                     Orchestrator
                   </span>
@@ -988,15 +988,15 @@ export default function AgentSettingsPage() {
               {/* Configuration Sections */}
               <div className="space-y-4">
                 {/* Model Configuration */}
-                <div className="bg-stone-50 dark:bg-stone-800 rounded-xl p-4 border border-stone-200 dark:border-stone-700">
+                <div className="bg-slate-50 dark:bg-slate-800 rounded-xl p-4 border border-slate-200 dark:border-slate-700">
                   <div className="flex items-center gap-2 mb-4">
-                    <Zap className="w-5 h-5 text-stone-500" />
-                    <h3 className="font-semibold text-stone-900 dark:text-white">Model</h3>
+                    <Zap className="w-5 h-5 text-slate-500" />
+                    <h3 className="font-semibold text-slate-900 dark:text-white">Model</h3>
                   </div>
 
                   <div className="grid grid-cols-2 gap-4 mb-4">
                     <div>
-                      <label className="block text-xs font-medium text-stone-500 mb-1">
+                      <label className="block text-xs font-medium text-slate-500 mb-1">
                         Model Name
                       </label>
                       <select
@@ -1007,7 +1007,7 @@ export default function AgentSettingsPage() {
                             model: { ...editingAgent.model, name: e.target.value },
                           })
                         }
-                        className="w-full px-3 py-2 text-sm rounded-lg border border-stone-200 dark:border-stone-600 bg-white dark:bg-stone-700"
+                        className="w-full px-3 py-2 text-sm rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700"
                       >
                         <option value="inherit">inherit (session default)</option>
                         <option value="sonnet">sonnet</option>
@@ -1019,17 +1019,17 @@ export default function AgentSettingsPage() {
                 </div>
 
                 {/* System Prompt */}
-                <div className="bg-stone-50 dark:bg-stone-800 rounded-xl p-4 border border-stone-200 dark:border-stone-700">
+                <div className="bg-slate-50 dark:bg-slate-800 rounded-xl p-4 border border-slate-200 dark:border-slate-700">
                   <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center gap-2">
-                      <Brain className="w-5 h-5 text-stone-500" />
-                      <h3 className="font-semibold text-stone-900 dark:text-white">
+                      <Brain className="w-5 h-5 text-slate-500" />
+                      <h3 className="font-semibold text-slate-900 dark:text-white">
                         System Prompt
                       </h3>
                     </div>
                     <button
                       onClick={() => setShowPrompt(!showPrompt)}
-                      className="flex items-center gap-1 text-xs text-stone-500 hover:text-stone-700 dark:hover:text-stone-300"
+                      className="flex items-center gap-1 text-xs text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
                     >
                       {showPrompt ? (
                         <>
@@ -1055,11 +1055,11 @@ export default function AgentSettingsPage() {
                         })
                       }
                       rows={12}
-                      className="w-full px-3 py-2 text-sm font-mono rounded-lg border border-stone-200 dark:border-stone-600 bg-white dark:bg-stone-700 resize-y"
+                      className="w-full px-3 py-2 text-sm font-mono rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 resize-y"
                       placeholder="Enter system prompt..."
                     />
                   ) : (
-                    <div className="text-sm text-stone-500 italic">
+                    <div className="text-sm text-slate-500 italic">
                       {editingAgent.prompt.system
                         ? `${editingAgent.prompt.system.slice(0, 150)}...`
                         : 'No prompt configured'}
@@ -1068,14 +1068,14 @@ export default function AgentSettingsPage() {
                 </div>
 
                 {/* Sub-Agents (Editable) */}
-                <div className="bg-stone-50 dark:bg-stone-800 rounded-xl p-4 border border-stone-200 dark:border-stone-700">
+                <div className="bg-slate-50 dark:bg-slate-800 rounded-xl p-4 border border-slate-200 dark:border-slate-700">
                   <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center gap-2">
-                      <Users className="w-5 h-5 text-stone-500" />
-                      <h3 className="font-semibold text-stone-900 dark:text-white">
+                      <Users className="w-5 h-5 text-slate-500" />
+                      <h3 className="font-semibold text-slate-900 dark:text-white">
                         Sub-Agents
                       </h3>
-                      <span className="text-xs text-stone-500">
+                      <span className="text-xs text-slate-500">
                         (click to add/remove)
                       </span>
                     </div>
@@ -1112,7 +1112,7 @@ export default function AgentSettingsPage() {
                                         },
                                       });
                                     }}
-                                    className="flex items-center gap-2 px-3 py-1.5 text-sm rounded-lg transition-colors group bg-stone-600 text-white hover:bg-stone-500"
+                                    className="flex items-center gap-2 px-3 py-1.5 text-sm rounded-lg transition-colors group bg-slate-600 text-white hover:bg-slate-500"
                                     title={`Click to remove${isRemote ? ' (Remote A2A Agent)' : ''}`}
                                   >
                                     {isRemote ? (
@@ -1139,7 +1139,7 @@ export default function AgentSettingsPage() {
 
                             return (
                               <div>
-                                <div className="text-xs text-stone-500 mb-2">Add sub-agent:</div>
+                                <div className="text-xs text-slate-500 mb-2">Add sub-agent:</div>
                                 <div className="flex flex-wrap gap-2">
                                   {availableAgents.map((agentId) => {
                                     const agent = agents[agentId];
@@ -1160,13 +1160,13 @@ export default function AgentSettingsPage() {
                                             handoff_strategy: editingAgent.handoff_strategy || 'agent_as_tool',
                                           });
                                         }}
-                                        className="flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-lg border border-dashed border-stone-300 dark:border-stone-600 text-stone-600 dark:text-stone-400 hover:border-stone-400 hover:text-stone-500 dark:hover:text-stone-300 transition-colors"
+                                        className="flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-lg border border-dashed border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-400 hover:border-slate-400 hover:text-slate-500 dark:hover:text-slate-300 transition-colors"
                                         title={isRemote ? `Remote A2A Agent: ${remoteAgent?.url}` : undefined}
                                       >
                                         <span className="text-lg leading-none">+</span>
                                         {agent?.name || remoteAgent?.name || agentId}
                                         {isRemote && (
-                                          <span className="text-[9px] px-1 py-0.5 rounded bg-stone-200 dark:bg-stone-700 text-stone-600 dark:text-stone-400">A2A</span>
+                                          <span className="text-[9px] px-1 py-0.5 rounded bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-400">A2A</span>
                                         )}
                                       </button>
                                     );
@@ -1180,7 +1180,7 @@ export default function AgentSettingsPage() {
                     })()}
 
                     {Object.keys(editingAgent.sub_agents || {}).length === 0 && (
-                      <p className="text-sm text-stone-500 italic">
+                      <p className="text-sm text-slate-500 italic">
                         No sub-agents. Add agents above to make this an orchestrator.
                       </p>
                     )}
@@ -1196,21 +1196,21 @@ export default function AgentSettingsPage() {
               {/* Remote Agent Header */}
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4">
-                  <div className="w-11 h-11 rounded-lg bg-stone-100 dark:bg-stone-700 border border-stone-200 dark:border-stone-600 flex items-center justify-center">
-                    <ExternalLink className="w-5 h-5 text-stone-600 dark:text-stone-400" />
+                  <div className="w-11 h-11 rounded-lg bg-slate-100 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 flex items-center justify-center">
+                    <ExternalLink className="w-5 h-5 text-slate-600 dark:text-slate-400" />
                   </div>
                   <div>
-                    <h2 className="text-lg font-semibold text-stone-900 dark:text-white">
+                    <h2 className="text-lg font-semibold text-slate-900 dark:text-white">
                       {editingRemoteAgent.name}
                     </h2>
-                    <p className="text-sm text-stone-500">{editingRemoteAgent.description || 'Remote A2A Agent'}</p>
+                    <p className="text-sm text-slate-500">{editingRemoteAgent.description || 'Remote A2A Agent'}</p>
                   </div>
                 </div>
 
                 {/* Close button */}
                 <button
                   onClick={handleClosePanel}
-                  className="p-2 rounded-lg hover:bg-stone-100 dark:hover:bg-stone-800 text-stone-500"
+                  className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500"
                 >
                   <X className="w-5 h-5" />
                 </button>
@@ -1218,7 +1218,7 @@ export default function AgentSettingsPage() {
 
               {/* A2A Badge */}
               <div className="flex items-center gap-2">
-                <span className="text-xs px-2 py-1 rounded-full bg-stone-100 dark:bg-stone-700 text-stone-600 dark:text-stone-400 border border-stone-200 dark:border-stone-600 flex items-center gap-1">
+                <span className="text-xs px-2 py-1 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-600 flex items-center gap-1">
                   <ExternalLink className="w-3 h-3" />
                   Remote A2A Agent
                 </span>
@@ -1227,28 +1227,28 @@ export default function AgentSettingsPage() {
               {/* Configuration Sections */}
               <div className="space-y-4">
                 {/* Connection Information */}
-                <div className="bg-stone-50 dark:bg-stone-800 rounded-xl p-4 border border-stone-200 dark:border-stone-700">
+                <div className="bg-slate-50 dark:bg-slate-800 rounded-xl p-4 border border-slate-200 dark:border-slate-700">
                   <div className="flex items-center gap-2 mb-4">
-                    <Globe className="w-5 h-5 text-stone-500" />
-                    <h3 className="font-semibold text-stone-900 dark:text-white">Connection</h3>
+                    <Globe className="w-5 h-5 text-slate-500" />
+                    <h3 className="font-semibold text-slate-900 dark:text-white">Connection</h3>
                   </div>
 
                   <div className="space-y-3">
                     <div>
-                      <label className="block text-xs font-medium text-stone-500 mb-1">
+                      <label className="block text-xs font-medium text-slate-500 mb-1">
                         Endpoint URL
                       </label>
-                      <div className="px-3 py-2 text-sm rounded-lg border border-stone-200 dark:border-stone-600 bg-stone-100 dark:bg-stone-700 text-stone-700 dark:text-stone-300 font-mono break-all">
+                      <div className="px-3 py-2 text-sm rounded-lg border border-slate-200 dark:border-slate-600 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 font-mono break-all">
                         {editingRemoteAgent.url}
                       </div>
                     </div>
 
                     <div className="grid grid-cols-2 gap-3">
                       <div>
-                        <label className="block text-xs font-medium text-stone-500 mb-1">
+                        <label className="block text-xs font-medium text-slate-500 mb-1">
                           Authentication
                         </label>
-                        <div className="px-3 py-2 text-sm rounded-lg border border-stone-200 dark:border-stone-600 bg-stone-100 dark:bg-stone-700 text-stone-700 dark:text-stone-300">
+                        <div className="px-3 py-2 text-sm rounded-lg border border-slate-200 dark:border-slate-600 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300">
                           {editingRemoteAgent.auth.type === 'none' && 'None'}
                           {editingRemoteAgent.auth.type === 'bearer' && 'Bearer Token'}
                           {editingRemoteAgent.auth.type === 'apikey' && 'API Key'}
@@ -1257,10 +1257,10 @@ export default function AgentSettingsPage() {
                       </div>
 
                       <div>
-                        <label className="block text-xs font-medium text-stone-500 mb-1">
+                        <label className="block text-xs font-medium text-slate-500 mb-1">
                           Timeout (seconds)
                         </label>
-                        <div className="px-3 py-2 text-sm rounded-lg border border-stone-200 dark:border-stone-600 bg-stone-100 dark:bg-stone-700 text-stone-700 dark:text-stone-300">
+                        <div className="px-3 py-2 text-sm rounded-lg border border-slate-200 dark:border-slate-600 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300">
                           {editingRemoteAgent.timeout || 300}s
                         </div>
                       </div>
@@ -1269,10 +1269,10 @@ export default function AgentSettingsPage() {
                 </div>
 
                 {/* Test Connection */}
-                <div className="bg-stone-50 dark:bg-stone-800 rounded-xl p-4 border border-stone-200 dark:border-stone-700">
+                <div className="bg-slate-50 dark:bg-slate-800 rounded-xl p-4 border border-slate-200 dark:border-slate-700">
                   <div className="flex items-center gap-2 mb-4">
                     <Activity className="w-5 h-5 text-green-500" />
-                    <h3 className="font-semibold text-stone-900 dark:text-white">Test Connection</h3>
+                    <h3 className="font-semibold text-slate-900 dark:text-white">Test Connection</h3>
                   </div>
 
                   <button
@@ -1302,7 +1302,7 @@ export default function AgentSettingsPage() {
                       }
                     }}
                     disabled={testingConnection}
-                    className="w-full px-4 py-2 bg-stone-600 hover:bg-stone-500 disabled:bg-stone-400 text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
+                    className="w-full px-4 py-2 bg-slate-600 hover:bg-slate-500 disabled:bg-slate-400 text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
                   >
                     {testingConnection ? (
                       <>
@@ -1322,7 +1322,7 @@ export default function AgentSettingsPage() {
                       className={`mt-3 p-3 rounded-lg text-sm ${
                         connectionTestResult.success
                           ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-400 border border-green-200 dark:border-green-800'
-                          : 'bg-clay-light/15 dark:bg-clay/20 text-clay-dark dark:text-clay-light border border-clay-light dark:border-clay'
+                          : 'bg-rose-50 dark:bg-rose-900/20 text-rose-700 dark:text-rose-400 border border-rose-200 dark:border-rose-300'
                       }`}
                     >
                       {connectionTestResult.message}
@@ -1331,10 +1331,10 @@ export default function AgentSettingsPage() {
                 </div>
 
                 {/* Actions */}
-                <div className="bg-stone-50 dark:bg-stone-800 rounded-xl p-4 border border-stone-200 dark:border-stone-700">
+                <div className="bg-slate-50 dark:bg-slate-800 rounded-xl p-4 border border-slate-200 dark:border-slate-700">
                   <div className="flex items-center gap-2 mb-4">
-                    <Settings className="w-5 h-5 text-stone-500" />
-                    <h3 className="font-semibold text-stone-900 dark:text-white">Actions</h3>
+                    <Settings className="w-5 h-5 text-slate-500" />
+                    <h3 className="font-semibold text-slate-900 dark:text-white">Actions</h3>
                   </div>
 
                   <div className="flex gap-3">
@@ -1343,7 +1343,7 @@ export default function AgentSettingsPage() {
                         setNewRemoteAgent({ ...editingRemoteAgent });
                         setShowEditRemoteAgent(true);
                       }}
-                      className="flex-1 px-4 py-2 bg-stone-200 hover:bg-stone-300 dark:bg-stone-700 dark:hover:bg-stone-600 text-stone-700 dark:text-stone-300 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
+                      className="flex-1 px-4 py-2 bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-300 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
                     >
                       <Edit2 className="w-4 h-4" />
                       Edit
@@ -1393,7 +1393,7 @@ export default function AgentSettingsPage() {
                           setMessage({ type: 'error', text: (e as Error).message || 'Failed to remove' });
                         }
                       }}
-                      className="flex-1 px-4 py-2 bg-clay hover:bg-clay-dark text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
+                      className="flex-1 px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
                     >
                       <Trash2 className="w-4 h-4" />
                       Remove
@@ -1405,27 +1405,29 @@ export default function AgentSettingsPage() {
           )}
         </div>
         )}
-      </div>
+        </div>
+      }
+    />
 
       {/* Add Agent Modal */}
       {showAddAgent && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-          <div className="bg-white dark:bg-stone-800 rounded-xl shadow-2xl w-full max-w-md mx-4 p-6">
+          <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl w-full max-w-md mx-4 p-6">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-stone-900 dark:text-white">
+              <h3 className="text-lg font-semibold text-slate-900 dark:text-white">
                 Add New Agent
               </h3>
               <button
                 onClick={() => { setShowAddAgent(false); setNewAgentId(''); }}
-                className="p-1 rounded hover:bg-stone-100 dark:hover:bg-stone-800"
+                className="p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800"
               >
-                <X className="w-5 h-5 text-stone-500" />
+                <X className="w-5 h-5 text-slate-500" />
               </button>
             </div>
             
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-stone-700 dark:text-stone-300 mb-1">
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
                   Agent Name
                 </label>
                 <input
@@ -1433,10 +1435,10 @@ export default function AgentSettingsPage() {
                   value={newAgentId}
                   onChange={(e) => setNewAgentId(e.target.value)}
                   placeholder="e.g., Database Agent"
-                  className="w-full px-3 py-2 rounded-lg border border-stone-200 dark:border-stone-600 bg-white dark:bg-stone-700"
+                  className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700"
                   autoFocus
                 />
-                <p className="text-xs text-stone-500 mt-1">
+                <p className="text-xs text-slate-500 mt-1">
                   ID will be: {newAgentId.trim().toLowerCase().replace(/\s+/g, '_') || '...'}
                 </p>
               </div>
@@ -1444,14 +1446,14 @@ export default function AgentSettingsPage() {
               <div className="flex justify-end gap-3 pt-2">
                 <button
                   onClick={() => { setShowAddAgent(false); setNewAgentId(''); }}
-                  className="px-4 py-2 text-sm text-stone-600 dark:text-stone-400 hover:text-stone-900 dark:hover:text-white"
+                  className="px-4 py-2 text-sm text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleAddAgent}
                   disabled={!newAgentId.trim()}
-                  className="px-4 py-2 text-sm bg-forest text-white rounded-lg hover:bg-forest-dark disabled:opacity-50"
+                  className="px-4 py-2 text-sm bg-emerald-100/50 text-emerald-700 rounded-lg hover:bg-emerald-100/80 disabled:opacity-50"
                 >
                   Create Agent
                 </button>
@@ -1464,11 +1466,11 @@ export default function AgentSettingsPage() {
       {/* Add Remote A2A Agent Modal */}
       {showAddRemoteAgent && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-          <div className="bg-white dark:bg-stone-800 rounded-xl shadow-2xl w-full max-w-2xl mx-4 p-6 max-h-[90vh] overflow-y-auto">
+          <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl w-full max-w-2xl mx-4 p-6 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
-                <ExternalLink className="w-5 h-5 text-stone-500" />
-                <h3 className="text-lg font-semibold text-stone-900 dark:text-white">
+                <ExternalLink className="w-5 h-5 text-slate-500" />
+                <h3 className="text-lg font-semibold text-slate-900 dark:text-white">
                   Add Remote A2A Agent
                 </h3>
               </div>
@@ -1486,16 +1488,16 @@ export default function AgentSettingsPage() {
                   });
                   setConnectionTestResult(null);
                 }}
-                className="p-1 rounded hover:bg-stone-100 dark:hover:bg-stone-800"
+                className="p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800"
               >
-                <X className="w-5 h-5 text-stone-500" />
+                <X className="w-5 h-5 text-slate-500" />
               </button>
             </div>
 
             <div className="space-y-4">
               {/* ID */}
               <div>
-                <label className="block text-sm font-medium text-stone-700 dark:text-stone-300 mb-1">
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
                   Agent ID *
                 </label>
                 <input
@@ -1503,13 +1505,13 @@ export default function AgentSettingsPage() {
                   value={newRemoteAgent.id}
                   onChange={(e) => setNewRemoteAgent({ ...newRemoteAgent, id: e.target.value.trim().toLowerCase().replace(/[^a-z0-9_]/g, '_') })}
                   placeholder="e.g., security_scanner"
-                  className="w-full px-3 py-2 rounded-lg border border-stone-200 dark:border-stone-600 bg-white dark:bg-stone-700"
+                  className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700"
                 />
               </div>
 
               {/* Name */}
               <div>
-                <label className="block text-sm font-medium text-stone-700 dark:text-stone-300 mb-1">
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
                   Display Name *
                 </label>
                 <input
@@ -1517,13 +1519,13 @@ export default function AgentSettingsPage() {
                   value={newRemoteAgent.name}
                   onChange={(e) => setNewRemoteAgent({ ...newRemoteAgent, name: e.target.value })}
                   placeholder="e.g., Security Scanner Agent"
-                  className="w-full px-3 py-2 rounded-lg border border-stone-200 dark:border-stone-600 bg-white dark:bg-stone-700"
+                  className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700"
                 />
               </div>
 
               {/* URL */}
               <div>
-                <label className="block text-sm font-medium text-stone-700 dark:text-stone-300 mb-1">
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
                   A2A Endpoint URL *
                 </label>
                 <input
@@ -1531,27 +1533,27 @@ export default function AgentSettingsPage() {
                   value={newRemoteAgent.url}
                   onChange={(e) => setNewRemoteAgent({ ...newRemoteAgent, url: e.target.value })}
                   placeholder="https://hello.a2aregistry.org/a2a"
-                  className="w-full px-3 py-2 rounded-lg border border-stone-200 dark:border-stone-600 bg-white dark:bg-stone-700 font-mono text-sm"
+                  className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 font-mono text-sm"
                 />
               </div>
 
               {/* Description */}
               <div>
-                <label className="block text-sm font-medium text-stone-700 dark:text-stone-300 mb-1">
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
                   Description
                 </label>
                 <textarea
                   value={newRemoteAgent.description}
                   onChange={(e) => setNewRemoteAgent({ ...newRemoteAgent, description: e.target.value })}
                   placeholder="What does this agent do?"
-                  className="w-full px-3 py-2 rounded-lg border border-stone-200 dark:border-stone-600 bg-white dark:bg-stone-700"
+                  className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700"
                   rows={2}
                 />
               </div>
 
               {/* Auth Type */}
               <div>
-                <label className="block text-sm font-medium text-stone-700 dark:text-stone-300 mb-1">
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
                   Authentication
                 </label>
                 <select
@@ -1560,7 +1562,7 @@ export default function AgentSettingsPage() {
                     ...newRemoteAgent,
                     auth: { type: e.target.value as any }
                   })}
-                  className="w-full px-3 py-2 rounded-lg border border-stone-200 dark:border-stone-600 bg-white dark:bg-stone-700"
+                  className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700"
                 >
                   <option value="none">No Authentication (Public)</option>
                   <option value="bearer">Bearer Token</option>
@@ -1572,7 +1574,7 @@ export default function AgentSettingsPage() {
               {/* Auth Fields - Bearer */}
               {newRemoteAgent.auth.type === 'bearer' && (
                 <div>
-                  <label className="block text-sm font-medium text-stone-700 dark:text-stone-300 mb-1">
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
                     Bearer Token *
                   </label>
                   <input
@@ -1583,7 +1585,7 @@ export default function AgentSettingsPage() {
                       auth: { ...newRemoteAgent.auth, token: e.target.value }
                     })}
                     placeholder="sk-..."
-                    className="w-full px-3 py-2 rounded-lg border border-stone-200 dark:border-stone-600 bg-white dark:bg-stone-700 font-mono text-sm"
+                    className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 font-mono text-sm"
                   />
                 </div>
               )}
@@ -1592,7 +1594,7 @@ export default function AgentSettingsPage() {
               {newRemoteAgent.auth.type === 'apikey' && (
                 <>
                   <div>
-                    <label className="block text-sm font-medium text-stone-700 dark:text-stone-300 mb-1">
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
                       API Key *
                     </label>
                     <input
@@ -1602,12 +1604,12 @@ export default function AgentSettingsPage() {
                         ...newRemoteAgent,
                         auth: { ...newRemoteAgent.auth, api_key: e.target.value }
                       })}
-                      className="w-full px-3 py-2 rounded-lg border border-stone-200 dark:border-stone-600 bg-white dark:bg-stone-700 font-mono text-sm"
+                      className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 font-mono text-sm"
                     />
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-sm font-medium text-stone-700 dark:text-stone-300 mb-1">
+                      <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
                         Location
                       </label>
                       <select
@@ -1616,14 +1618,14 @@ export default function AgentSettingsPage() {
                           ...newRemoteAgent,
                           auth: { ...newRemoteAgent.auth, location: e.target.value as 'header' | 'query' }
                         })}
-                        className="w-full px-3 py-2 rounded-lg border border-stone-200 dark:border-stone-600 bg-white dark:bg-stone-700"
+                        className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700"
                       >
                         <option value="header">Header</option>
                         <option value="query">Query Param</option>
                       </select>
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-stone-700 dark:text-stone-300 mb-1">
+                      <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
                         Key Name
                       </label>
                       <input
@@ -1633,7 +1635,7 @@ export default function AgentSettingsPage() {
                           ...newRemoteAgent,
                           auth: { ...newRemoteAgent.auth, key_name: e.target.value }
                         })}
-                        className="w-full px-3 py-2 rounded-lg border border-stone-200 dark:border-stone-600 bg-white dark:bg-stone-700 font-mono text-sm"
+                        className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 font-mono text-sm"
                       />
                     </div>
                   </div>
@@ -1644,7 +1646,7 @@ export default function AgentSettingsPage() {
               {newRemoteAgent.auth.type === 'oauth2' && (
                 <>
                   <div>
-                    <label className="block text-sm font-medium text-stone-700 dark:text-stone-300 mb-1">
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
                       Token URL *
                     </label>
                     <input
@@ -1655,12 +1657,12 @@ export default function AgentSettingsPage() {
                         auth: { ...newRemoteAgent.auth, token_url: e.target.value }
                       })}
                       placeholder="https://auth.example.com/oauth/token"
-                      className="w-full px-3 py-2 rounded-lg border border-stone-200 dark:border-stone-600 bg-white dark:bg-stone-700 font-mono text-sm"
+                      className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 font-mono text-sm"
                     />
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-sm font-medium text-stone-700 dark:text-stone-300 mb-1">
+                      <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
                         Client ID *
                       </label>
                       <input
@@ -1670,11 +1672,11 @@ export default function AgentSettingsPage() {
                           ...newRemoteAgent,
                           auth: { ...newRemoteAgent.auth, client_id: e.target.value }
                         })}
-                        className="w-full px-3 py-2 rounded-lg border border-stone-200 dark:border-stone-600 bg-white dark:bg-stone-700 font-mono text-sm"
+                        className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 font-mono text-sm"
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-stone-700 dark:text-stone-300 mb-1">
+                      <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
                         Client Secret *
                       </label>
                       <input
@@ -1684,12 +1686,12 @@ export default function AgentSettingsPage() {
                           ...newRemoteAgent,
                           auth: { ...newRemoteAgent.auth, client_secret: e.target.value }
                         })}
-                        className="w-full px-3 py-2 rounded-lg border border-stone-200 dark:border-stone-600 bg-white dark:bg-stone-700 font-mono text-sm"
+                        className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 font-mono text-sm"
                       />
                     </div>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-stone-700 dark:text-stone-300 mb-1">
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
                       Scope (Optional)
                     </label>
                     <input
@@ -1700,7 +1702,7 @@ export default function AgentSettingsPage() {
                         auth: { ...newRemoteAgent.auth, scope: e.target.value }
                       })}
                       placeholder="read write"
-                      className="w-full px-3 py-2 rounded-lg border border-stone-200 dark:border-stone-600 bg-white dark:bg-stone-700"
+                      className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700"
                     />
                   </div>
                 </>
@@ -1708,7 +1710,7 @@ export default function AgentSettingsPage() {
 
               {/* Timeout */}
               <div>
-                <label className="block text-sm font-medium text-stone-700 dark:text-stone-300 mb-1">
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
                   Timeout (seconds)
                 </label>
                 <input
@@ -1717,7 +1719,7 @@ export default function AgentSettingsPage() {
                   onChange={(e) => setNewRemoteAgent({ ...newRemoteAgent, timeout: parseInt(e.target.value) || 300 })}
                   min={10}
                   max={600}
-                  className="w-full px-3 py-2 rounded-lg border border-stone-200 dark:border-stone-600 bg-white dark:bg-stone-700"
+                  className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700"
                 />
               </div>
 
@@ -1726,16 +1728,16 @@ export default function AgentSettingsPage() {
                 <div className={`p-3 rounded-lg ${
                   connectionTestResult.success
                     ? 'bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800'
-                    : 'bg-clay-light/10 dark:bg-clay/20 border border-clay-light dark:border-clay'
+                    : 'bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-300'
                 }`}>
                   <div className="flex items-center gap-2">
                     {connectionTestResult.success ? (
                       <CheckCircle className="w-4 h-4 text-green-600" />
                     ) : (
-                      <XCircle className="w-4 h-4 text-clay" />
+                      <XCircle className="w-4 h-4 text-rose-600" />
                     )}
                     <span className={`text-sm ${
-                      connectionTestResult.success ? 'text-green-700 dark:text-green-300' : 'text-clay-dark dark:text-clay-light'
+                      connectionTestResult.success ? 'text-green-700 dark:text-green-300' : 'text-rose-700 dark:text-rose-400'
                     }`}>
                       {connectionTestResult.message}
                     </span>
@@ -1744,7 +1746,7 @@ export default function AgentSettingsPage() {
               )}
 
               {/* Actions */}
-              <div className="flex justify-between items-center gap-3 pt-2 border-t border-stone-200 dark:border-stone-600">
+              <div className="flex justify-between items-center gap-3 pt-2 border-t border-slate-200 dark:border-slate-600">
                 <button
                   onClick={async () => {
                     setTestingConnection(true);
@@ -1765,11 +1767,11 @@ export default function AgentSettingsPage() {
                     }
                   }}
                   disabled={!newRemoteAgent.url || testingConnection}
-                  className="px-4 py-2 text-sm text-stone-600 dark:text-stone-400 hover:text-stone-900 dark:hover:text-white disabled:opacity-50"
+                  className="px-4 py-2 text-sm text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white disabled:opacity-50"
                 >
                   {testingConnection ? (
                     <span className="flex items-center gap-2">
-                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span className="live-dot w-2 h-2 rounded-full shrink-0" aria-hidden />
                       Testing...
                     </span>
                   ) : (
@@ -1792,7 +1794,7 @@ export default function AgentSettingsPage() {
                       });
                       setConnectionTestResult(null);
                     }}
-                    className="px-4 py-2 text-sm text-stone-600 dark:text-stone-400 hover:text-stone-900 dark:hover:text-white"
+                    className="px-4 py-2 text-sm text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
                   >
                     Cancel
                   </button>
@@ -1855,11 +1857,11 @@ export default function AgentSettingsPage() {
                       }
                     }}
                     disabled={!newRemoteAgent.id || !newRemoteAgent.name || !newRemoteAgent.url || saving}
-                    className="px-4 py-2 text-sm bg-forest text-white rounded-lg hover:bg-forest-dark disabled:opacity-50"
+                    className="px-4 py-2 text-sm bg-emerald-100/50 text-emerald-700 rounded-lg hover:bg-emerald-100/80 disabled:opacity-50"
                   >
                     {saving ? (
                       <span className="flex items-center gap-2">
-                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <span className="live-dot w-2 h-2 rounded-full shrink-0" aria-hidden />
                         Adding...
                       </span>
                     ) : (
@@ -1876,11 +1878,11 @@ export default function AgentSettingsPage() {
       {/* Edit Remote Agent Modal */}
       {showEditRemoteAgent && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-          <div className="bg-white dark:bg-stone-800 rounded-xl shadow-2xl w-full max-w-2xl mx-4 p-6 max-h-[90vh] overflow-y-auto">
+          <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl w-full max-w-2xl mx-4 p-6 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
-                <ExternalLink className="w-5 h-5 text-stone-500" />
-                <h3 className="text-lg font-semibold text-stone-900 dark:text-white">
+                <ExternalLink className="w-5 h-5 text-slate-500" />
+                <h3 className="text-lg font-semibold text-slate-900 dark:text-white">
                   Edit Remote A2A Agent
                 </h3>
               </div>
@@ -1889,68 +1891,68 @@ export default function AgentSettingsPage() {
                   setShowEditRemoteAgent(false);
                   setConnectionTestResult(null);
                 }}
-                className="p-1 rounded hover:bg-stone-100 dark:hover:bg-stone-800"
+                className="p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800"
               >
-                <X className="w-5 h-5 text-stone-500" />
+                <X className="w-5 h-5 text-slate-500" />
               </button>
             </div>
 
             <div className="space-y-4">
               {/* ID (disabled) */}
               <div>
-                <label className="block text-sm font-medium text-stone-700 dark:text-stone-300 mb-1">
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
                   Agent ID
                 </label>
                 <input
                   type="text"
                   value={newRemoteAgent.id}
                   disabled
-                  className="w-full px-3 py-2 rounded-lg border border-stone-200 dark:border-stone-600 bg-stone-100 dark:bg-stone-700 text-stone-500 cursor-not-allowed"
+                  className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-slate-100 dark:bg-slate-700 text-slate-500 cursor-not-allowed"
                 />
               </div>
 
               {/* Name */}
               <div>
-                <label className="block text-sm font-medium text-stone-700 dark:text-stone-300 mb-1">
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
                   Display Name *
                 </label>
                 <input
                   type="text"
                   value={newRemoteAgent.name}
                   onChange={(e) => setNewRemoteAgent({ ...newRemoteAgent, name: e.target.value })}
-                  className="w-full px-3 py-2 rounded-lg border border-stone-200 dark:border-stone-600 bg-white dark:bg-stone-700"
+                  className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700"
                 />
               </div>
 
               {/* URL */}
               <div>
-                <label className="block text-sm font-medium text-stone-700 dark:text-stone-300 mb-1">
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
                   A2A Endpoint URL *
                 </label>
                 <input
                   type="url"
                   value={newRemoteAgent.url}
                   onChange={(e) => setNewRemoteAgent({ ...newRemoteAgent, url: e.target.value })}
-                  className="w-full px-3 py-2 rounded-lg border border-stone-200 dark:border-stone-600 bg-white dark:bg-stone-700 font-mono text-sm"
+                  className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 font-mono text-sm"
                 />
               </div>
 
               {/* Description */}
               <div>
-                <label className="block text-sm font-medium text-stone-700 dark:text-stone-300 mb-1">
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
                   Description
                 </label>
                 <textarea
                   value={newRemoteAgent.description}
                   onChange={(e) => setNewRemoteAgent({ ...newRemoteAgent, description: e.target.value })}
-                  className="w-full px-3 py-2 rounded-lg border border-stone-200 dark:border-stone-600 bg-white dark:bg-stone-700"
+                  className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700"
                   rows={2}
                 />
               </div>
 
               {/* Auth Type */}
               <div>
-                <label className="block text-sm font-medium text-stone-700 dark:text-stone-300 mb-1">
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
                   Authentication
                 </label>
                 <select
@@ -1959,7 +1961,7 @@ export default function AgentSettingsPage() {
                     ...newRemoteAgent,
                     auth: { type: e.target.value as any }
                   })}
-                  className="w-full px-3 py-2 rounded-lg border border-stone-200 dark:border-stone-600 bg-white dark:bg-stone-700"
+                  className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700"
                 >
                   <option value="none">No Authentication (Public)</option>
                   <option value="bearer">Bearer Token</option>
@@ -1971,7 +1973,7 @@ export default function AgentSettingsPage() {
               {/* Auth Fields - Bearer */}
               {newRemoteAgent.auth.type === 'bearer' && (
                 <div>
-                  <label className="block text-sm font-medium text-stone-700 dark:text-stone-300 mb-1">
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
                     Bearer Token *
                   </label>
                   <input
@@ -1982,7 +1984,7 @@ export default function AgentSettingsPage() {
                       auth: { ...newRemoteAgent.auth, token: e.target.value }
                     })}
                     placeholder="sk-..."
-                    className="w-full px-3 py-2 rounded-lg border border-stone-200 dark:border-stone-600 bg-white dark:bg-stone-700 font-mono text-sm"
+                    className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 font-mono text-sm"
                   />
                 </div>
               )}
@@ -1991,7 +1993,7 @@ export default function AgentSettingsPage() {
               {newRemoteAgent.auth.type === 'apikey' && (
                 <>
                   <div>
-                    <label className="block text-sm font-medium text-stone-700 dark:text-stone-300 mb-1">
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
                       API Key *
                     </label>
                     <input
@@ -2001,12 +2003,12 @@ export default function AgentSettingsPage() {
                         ...newRemoteAgent,
                         auth: { ...newRemoteAgent.auth, api_key: e.target.value }
                       })}
-                      className="w-full px-3 py-2 rounded-lg border border-stone-200 dark:border-stone-600 bg-white dark:bg-stone-700 font-mono text-sm"
+                      className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 font-mono text-sm"
                     />
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-sm font-medium text-stone-700 dark:text-stone-300 mb-1">
+                      <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
                         Location
                       </label>
                       <select
@@ -2015,14 +2017,14 @@ export default function AgentSettingsPage() {
                           ...newRemoteAgent,
                           auth: { ...newRemoteAgent.auth, location: e.target.value as 'header' | 'query' }
                         })}
-                        className="w-full px-3 py-2 rounded-lg border border-stone-200 dark:border-stone-600 bg-white dark:bg-stone-700"
+                        className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700"
                       >
                         <option value="header">Header</option>
                         <option value="query">Query Param</option>
                       </select>
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-stone-700 dark:text-stone-300 mb-1">
+                      <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
                         Key Name
                       </label>
                       <input
@@ -2032,7 +2034,7 @@ export default function AgentSettingsPage() {
                           ...newRemoteAgent,
                           auth: { ...newRemoteAgent.auth, key_name: e.target.value }
                         })}
-                        className="w-full px-3 py-2 rounded-lg border border-stone-200 dark:border-stone-600 bg-white dark:bg-stone-700 font-mono text-sm"
+                        className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 font-mono text-sm"
                       />
                     </div>
                   </div>
@@ -2043,7 +2045,7 @@ export default function AgentSettingsPage() {
               {newRemoteAgent.auth.type === 'oauth2' && (
                 <>
                   <div>
-                    <label className="block text-sm font-medium text-stone-700 dark:text-stone-300 mb-1">
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
                       Token URL *
                     </label>
                     <input
@@ -2053,12 +2055,12 @@ export default function AgentSettingsPage() {
                         ...newRemoteAgent,
                         auth: { ...newRemoteAgent.auth, token_url: e.target.value }
                       })}
-                      className="w-full px-3 py-2 rounded-lg border border-stone-200 dark:border-stone-600 bg-white dark:bg-stone-700 font-mono text-sm"
+                      className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 font-mono text-sm"
                     />
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-sm font-medium text-stone-700 dark:text-stone-300 mb-1">
+                      <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
                         Client ID *
                       </label>
                       <input
@@ -2068,11 +2070,11 @@ export default function AgentSettingsPage() {
                           ...newRemoteAgent,
                           auth: { ...newRemoteAgent.auth, client_id: e.target.value }
                         })}
-                        className="w-full px-3 py-2 rounded-lg border border-stone-200 dark:border-stone-600 bg-white dark:bg-stone-700 font-mono text-sm"
+                        className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 font-mono text-sm"
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-stone-700 dark:text-stone-300 mb-1">
+                      <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
                         Client Secret *
                       </label>
                       <input
@@ -2082,12 +2084,12 @@ export default function AgentSettingsPage() {
                           ...newRemoteAgent,
                           auth: { ...newRemoteAgent.auth, client_secret: e.target.value }
                         })}
-                        className="w-full px-3 py-2 rounded-lg border border-stone-200 dark:border-stone-600 bg-white dark:bg-stone-700 font-mono text-sm"
+                        className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 font-mono text-sm"
                       />
                     </div>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-stone-700 dark:text-stone-300 mb-1">
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
                       Scope (Optional)
                     </label>
                     <input
@@ -2097,7 +2099,7 @@ export default function AgentSettingsPage() {
                         ...newRemoteAgent,
                         auth: { ...newRemoteAgent.auth, scope: e.target.value }
                       })}
-                      className="w-full px-3 py-2 rounded-lg border border-stone-200 dark:border-stone-600 bg-white dark:bg-stone-700"
+                      className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700"
                     />
                   </div>
                 </>
@@ -2105,7 +2107,7 @@ export default function AgentSettingsPage() {
 
               {/* Timeout */}
               <div>
-                <label className="block text-sm font-medium text-stone-700 dark:text-stone-300 mb-1">
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
                   Timeout (seconds)
                 </label>
                 <input
@@ -2114,18 +2116,18 @@ export default function AgentSettingsPage() {
                   onChange={(e) => setNewRemoteAgent({ ...newRemoteAgent, timeout: parseInt(e.target.value) || 300 })}
                   min={10}
                   max={600}
-                  className="w-full px-3 py-2 rounded-lg border border-stone-200 dark:border-stone-600 bg-white dark:bg-stone-700"
+                  className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700"
                 />
               </div>
 
               {/* Actions */}
-              <div className="flex justify-end items-center gap-3 pt-2 border-t border-stone-200 dark:border-stone-600">
+              <div className="flex justify-end items-center gap-3 pt-2 border-t border-slate-200 dark:border-slate-600">
                 <button
                   onClick={() => {
                     setShowEditRemoteAgent(false);
                     setConnectionTestResult(null);
                   }}
-                  className="px-4 py-2 text-sm text-stone-600 dark:text-stone-400 hover:text-stone-900 dark:hover:text-white"
+                  className="px-4 py-2 text-sm text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
                 >
                   Cancel
                 </button>
@@ -2184,11 +2186,11 @@ export default function AgentSettingsPage() {
                     }
                   }}
                   disabled={!newRemoteAgent.name || !newRemoteAgent.url || saving}
-                  className="px-4 py-2 text-sm bg-forest text-white rounded-lg hover:bg-forest-dark disabled:opacity-50"
+                  className="px-4 py-2 text-sm bg-emerald-100/50 text-emerald-700 rounded-lg hover:bg-emerald-100/80 disabled:opacity-50"
                 >
                   {saving ? (
                     <span className="flex items-center gap-2">
-                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span className="live-dot w-2 h-2 rounded-full shrink-0" aria-hidden />
                       Saving...
                     </span>
                   ) : (
@@ -2230,38 +2232,38 @@ export default function AgentSettingsPage() {
             if (e.target === e.currentTarget) setShowInheritanceModal(false);
           }}
         >
-          <div className="bg-white dark:bg-stone-800 rounded-2xl w-full max-w-4xl max-h-[85vh] flex flex-col shadow-xl mx-4">
+          <div className="bg-white dark:bg-slate-800 rounded-2xl w-full max-w-4xl max-h-[85vh] flex flex-col shadow-xl mx-4">
             {/* Modal Header */}
-            <div className="flex items-center justify-between p-4 border-b border-stone-200 dark:border-stone-700">
-              <h2 className="text-lg font-semibold text-stone-900 dark:text-white">Configuration Inheritance</h2>
+            <div className="flex items-center justify-between p-4 border-b border-slate-200 dark:border-slate-700">
+              <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Configuration Inheritance</h2>
               <button
                 onClick={() => setShowInheritanceModal(false)}
-                className="p-1 rounded-lg hover:bg-stone-100 dark:hover:bg-stone-800 transition-colors"
+                className="p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
               >
-                <X className="w-5 h-5 text-stone-500" />
+                <X className="w-5 h-5 text-slate-500" />
               </button>
             </div>
 
             {/* Modal Explanation */}
-            <div className="p-4 border-b border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-900/50">
-              <p className="text-sm text-stone-600 dark:text-stone-400">
+            <div className="p-4 border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50">
+              <p className="text-sm text-slate-600 dark:text-slate-400">
                 <strong>Lineage:</strong> {lineageLabel}
               </p>
-              <p className="text-sm text-stone-500 dark:text-stone-500 mt-1">
+              <p className="text-sm text-slate-500 dark:text-slate-500 mt-1">
                 This shows what&apos;s configured at each level of the hierarchy. Settings from parent nodes are inherited and can be overridden by child nodes.
               </p>
             </div>
 
             {/* Modal Content (scrollable) */}
             <div className="flex-1 overflow-auto p-4">
-              <pre className="text-xs font-mono text-stone-700 dark:text-stone-200 whitespace-pre-wrap">
+              <pre className="text-xs font-mono text-slate-700 dark:text-slate-200 whitespace-pre-wrap">
                 {rawPretty || '(not loaded)'}
               </pre>
             </div>
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 }
 
@@ -2290,27 +2292,27 @@ function AgentNode({
         relative group transition-all duration-200
         ${isPrimary ? 'min-w-[100px] py-3 px-4' : 'min-w-[90px] py-2.5 px-3'}
         rounded-lg
-        bg-white dark:bg-stone-700 border-2 ${isSelected ? 'border-forest shadow-md' : 'border-stone-200 dark:border-stone-600 hover:border-stone-400'}
+        bg-white dark:bg-slate-700 border-2 ${isSelected ? 'border-emerald-500 shadow-md' : 'border-slate-200 dark:border-slate-600 hover:border-slate-400'}
         ${!agent.enabled ? 'opacity-50' : ''}
       `}
     >
       {/* Status indicator */}
       <div
-        className={`absolute -top-1.5 -right-1.5 w-3 h-3 rounded-full border-2 border-white dark:border-stone-700 ${
-          agent.enabled ? 'bg-green-500' : 'bg-stone-400'
+        className={`absolute -top-1.5 -right-1.5 w-3 h-3 rounded-full border-2 border-white dark:border-slate-700 ${
+          agent.enabled ? 'bg-green-500' : 'bg-slate-400'
         }`}
       />
 
       {/* Entrance Agent badge */}
       {isEntranceAgent && (
-        <div className="absolute -top-1.5 -left-1.5 w-4 h-4 rounded-full bg-forest-light/100 border-2 border-white dark:border-stone-700 flex items-center justify-center">
-          <Sparkles className="w-2 h-2 text-white" />
+        <div className="absolute -top-1.5 -left-1.5 w-4 h-4 rounded-full bg-emerald-100 border-2 border-emerald-500/50 dark:border-emerald-400 flex items-center justify-center">
+          <Sparkles className="w-2 h-2 text-emerald-700" />
         </div>
       )}
 
       {/* Remote badge */}
       {isRemote && (
-        <div className="absolute -top-1.5 -left-1.5 w-4 h-4 rounded-full bg-stone-500 border-2 border-white dark:border-stone-700 flex items-center justify-center">
+        <div className="absolute -top-1.5 -left-1.5 w-4 h-4 rounded-full bg-slate-500 border-2 border-white dark:border-slate-700 flex items-center justify-center">
           <ExternalLink className="w-2 h-2 text-white" />
         </div>
       )}
@@ -2318,20 +2320,20 @@ function AgentNode({
       {/* Content */}
       <div className="flex flex-col items-center gap-1">
         {isRemote ? (
-          <ExternalLink className={`${isPrimary ? 'w-5 h-5' : 'w-4 h-4'} text-stone-600 dark:text-stone-400`} />
+          <ExternalLink className={`${isPrimary ? 'w-5 h-5' : 'w-4 h-4'} text-slate-600 dark:text-slate-400`} />
         ) : (
-          <Bot className={`${isPrimary ? 'w-5 h-5' : 'w-4 h-4'} text-stone-600 dark:text-stone-300`} />
+          <Bot className={`${isPrimary ? 'w-5 h-5' : 'w-4 h-4'} text-slate-600 dark:text-slate-300`} />
         )}
-        <span className={`text-stone-800 dark:text-stone-200 font-medium text-center leading-tight ${isPrimary ? 'text-xs' : 'text-[11px]'}`}>
+        <span className={`text-slate-800 dark:text-slate-200 font-medium text-center leading-tight ${isPrimary ? 'text-xs' : 'text-[11px]'}`}>
           {agent.name}
         </span>
         {hasSubAgents && (
-          <span className="text-[9px] text-stone-400">
+          <span className="text-[9px] text-slate-400">
             {Object.keys(agent.sub_agents || {}).length} {Object.keys(agent.sub_agents || {}).length === 1 ? 'sub-agent' : 'sub-agents'}
           </span>
         )}
         {isRemote && (
-          <span className="text-[9px] px-1.5 py-0.5 rounded bg-stone-200 dark:bg-stone-700 text-stone-600 dark:text-stone-400">
+          <span className="text-[9px] px-1.5 py-0.5 rounded bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-400">
             A2A
           </span>
         )}
@@ -2339,7 +2341,7 @@ function AgentNode({
 
       {/* Hover tooltip */}
       <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 translate-y-full opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-20">
-        <div className="bg-stone-800 dark:bg-stone-200 text-white dark:text-stone-800 text-[10px] px-2 py-1 rounded whitespace-nowrap shadow-lg mt-1">
+        <div className="bg-slate-800 dark:bg-slate-200 text-white dark:text-slate-800 text-[10px] px-2 py-1 rounded whitespace-nowrap shadow-lg mt-1">
           {agent.description || 'Click to configure'}
         </div>
       </div>

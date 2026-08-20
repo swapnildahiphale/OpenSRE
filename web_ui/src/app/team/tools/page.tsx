@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { useIdentity } from '@/lib/useIdentity';
+import { PageHeader, Button, Skeleton, TeamPageShell } from '@/components/ui-flow';
 import {
   Server,
   Plus,
@@ -11,7 +12,6 @@ import {
   AlertTriangle,
   Eye,
   EyeOff,
-  Wrench,
   X,
   ToggleLeft,
   ToggleRight,
@@ -780,9 +780,12 @@ export default function TeamToolsPage() {
 
   if (loading) {
     return (
-      <div className="h-screen flex items-center justify-center">
-        <div className="text-stone-500">Loading...</div>
-      </div>
+      <TeamPageShell
+        variant="fixedHeader"
+        header={<Skeleton className="h-16 w-64 rounded-xl" />}
+      >
+        <Skeleton className="h-48 w-full rounded-xl" />
+      </TeamPageShell>
     );
   }
 
@@ -842,31 +845,31 @@ export default function TeamToolsPage() {
     return (
       <div
         key={item.id}
-        className="bg-white dark:bg-stone-800 rounded-lg border border-stone-200 dark:border-stone-700 p-4"
+        className="bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 p-4"
       >
         <div className="flex items-start justify-between gap-3">
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
-              <h3 className="font-medium text-stone-900 dark:text-white">{item.name}</h3>
+              <h3 className="font-medium text-slate-900 dark:text-white">{item.name}</h3>
               {item.source === 'org' && (
-                <span className="text-[10px] px-1.5 py-0.5 rounded bg-stone-100 dark:bg-stone-700 text-stone-500">
+                <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-700 text-slate-500">
                   Inherited
                 </span>
               )}
             </div>
-            <p className="text-sm text-stone-500 mt-1 line-clamp-2">{item.description}</p>
+            <p className="text-sm text-slate-500 mt-1 line-clamp-2">{item.description}</p>
 
             {/* Show dependent tools for integrations */}
             {dependentTools.length > 0 && (
-              <div className="mt-2 pt-2 border-t border-stone-100 dark:border-stone-700">
-                <p className="text-[10px] font-medium text-stone-500 uppercase tracking-wide mb-1">
+              <div className="mt-2 pt-2 border-t border-slate-100 dark:border-slate-700">
+                <p className="text-[10px] font-medium text-slate-500 uppercase tracking-wide mb-1">
                   Powers {dependentTools.length} tool{dependentTools.length !== 1 ? 's' : ''}:
                 </p>
                 <div className="flex flex-wrap gap-1">
                   {dependentTools.map(tool => (
                     <span
                       key={tool.id}
-                      className="text-[10px] px-1.5 py-0.5 rounded bg-stone-100 dark:bg-stone-700 text-stone-600 dark:text-stone-400"
+                      className="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-400"
                       title={tool.description}
                     >
                       {tool.name}
@@ -878,8 +881,8 @@ export default function TeamToolsPage() {
 
             {/* Show tools provided by MCP servers */}
             {item.type === 'mcp_server' && item.tools && Array.isArray(item.tools) && item.tools.length > 0 && (
-              <div className="mt-2 pt-2 border-t border-stone-100 dark:border-stone-700">
-                <p className="text-[10px] font-medium text-stone-500 uppercase tracking-wide mb-1">
+              <div className="mt-2 pt-2 border-t border-slate-100 dark:border-slate-700">
+                <p className="text-[10px] font-medium text-slate-500 uppercase tracking-wide mb-1">
                   Provides {item.tools.length} tool{item.tools.length !== 1 ? 's' : ''}:
                 </p>
                 <div className="flex flex-wrap gap-1">
@@ -890,7 +893,7 @@ export default function TeamToolsPage() {
                     return (
                       <span
                         key={idx}
-                        className="text-[10px] px-1.5 py-0.5 rounded bg-forest-light/10 dark:bg-forest/30 text-forest dark:text-forest-light"
+                        className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-100/50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400"
                         title={toolDesc}
                       >
                         {toolName}
@@ -911,7 +914,7 @@ export default function TeamToolsPage() {
                 className={`p-1 rounded transition-colors ${
                   item.enabled
                     ? 'text-green-600 hover:text-green-700'
-                    : 'text-stone-400 hover:text-stone-500'
+                    : 'text-slate-400 hover:text-slate-500'
                 }`}
                 title={item.enabled ? 'Disable' : 'Enable'}
               >
@@ -953,7 +956,7 @@ export default function TeamToolsPage() {
                     setSelectedTools(new Set(enabled));
                   }
                 }}
-                className="p-1 rounded text-stone-600 dark:text-stone-400 hover:bg-stone-100 dark:hover:bg-stone-800"
+                className="p-1 rounded text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
                 title="Filter Tools"
               >
                 <Settings className="w-4 h-4" />
@@ -969,8 +972,8 @@ export default function TeamToolsPage() {
                 }}
                 className={`text-xs px-2 py-1 rounded ${
                   hasMissing && item.enabled
-                    ? 'bg-clay-light/15 dark:bg-clay/20 text-clay-dark dark:text-clay-light'
-                    : 'bg-stone-100 dark:bg-stone-700 text-stone-600 dark:text-stone-400'
+                    ? 'bg-rose-50 dark:bg-rose-900/20 text-rose-700 dark:text-rose-400'
+                    : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-400'
                 } hover:opacity-80`}
               >
                 Configure
@@ -982,7 +985,7 @@ export default function TeamToolsPage() {
               <button
                 onClick={() => deleteMCPServer(item)}
                 disabled={saving}
-                className="p-1 rounded text-clay hover:text-clay-dark hover:bg-clay-light/10 dark:hover:bg-clay/20 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="p-1 rounded text-rose-600 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-900/20 disabled:opacity-50 disabled:cursor-not-allowed"
                 title="Delete MCP Server"
               >
                 <Trash2 className="w-4 h-4" />
@@ -995,55 +998,49 @@ export default function TeamToolsPage() {
   };
 
   return (
-    <div className="h-screen flex flex-col">
-      {/* Header */}
-      <div className="flex-shrink-0 px-8 py-6 border-b border-stone-200 dark:border-stone-700">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <div className="w-11 h-11 rounded-xl bg-forest flex items-center justify-center">
-              <Wrench className="w-5 h-5 text-white" />
+    <>
+    <TeamPageShell
+      variant="fixedHeader"
+      header={
+        <>
+          <PageHeader
+            eyebrow="Team console"
+            title="Tools"
+            subtitle="Integrations, MCP servers, and skills available to your AI agents"
+            actions={
+              <Button variant="primary" onClick={() => setShowAddCustomModal(true)}>
+                <Plus className="w-4 h-4" />
+                Add Custom
+              </Button>
+            }
+          />
+
+          {message && (
+            <div className={`p-3 rounded-xl flex items-center gap-2 text-sm ${
+              message.type === 'success'
+                ? 'bg-green-50 text-green-700 border border-green-200'
+                : message.type === 'info'
+                ? 'bg-emerald-100/50 text-emerald-700 border border-emerald-200/60'
+                : 'bg-rose-50 text-rose-700 border border-rose-200'
+            }`}>
+              {message.type === 'success' ? <CheckCircle className="w-4 h-4" /> : message.type === 'info' ? <AlertTriangle className="w-4 h-4" /> : <XCircle className="w-4 h-4" />}
+              {message.text}
             </div>
-            <div>
-              <h1 className="text-xl font-semibold text-stone-900 dark:text-white">Skills & MCPs</h1>
-              <p className="text-sm text-stone-500">Integrations, MCP servers, and skills available to your AI agents</p>
-            </div>
-          </div>
-          <button
-            onClick={() => setShowAddCustomModal(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-forest text-white rounded-lg hover:bg-forest-dark text-sm"
-          >
-            <Plus className="w-4 h-4" />
-            Add Custom
-          </button>
-        </div>
-
-
-        {message && (
-          <div className={`mt-4 p-3 rounded-lg flex items-center gap-2 text-sm ${
-            message.type === 'success'
-              ? 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400'
-              : message.type === 'info'
-              ? 'bg-forest-light/10 dark:bg-forest/20 text-forest-dark dark:text-forest-light'
-              : 'bg-clay-light/10 dark:bg-clay/20 text-clay-dark dark:text-clay-light'
-          }`}>
-            {message.type === 'success' ? <CheckCircle className="w-4 h-4" /> : message.type === 'info' ? <AlertTriangle className="w-4 h-4" /> : <XCircle className="w-4 h-4" />}
-            {message.text}
-          </div>
-        )}
-      </div>
-
-      {/* Content */}
-      <div className="flex-1 overflow-auto p-8 space-y-6">
+          )}
+        </>
+      }
+    >
+      <div className="space-y-6">
         {/* Summary Strip */}
-        <div className="flex flex-wrap gap-3 text-xs">
-          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-forest-light/10 dark:bg-forest/20 text-forest dark:text-forest-light">
+        <div className="flex flex-wrap gap-3">
+          <span className="inline-flex items-center gap-1.5 h-8 px-3 rounded-full text-xs font-medium bg-emerald-100/55 text-emerald-700">
             <Server className="w-3.5 h-3.5" />
-            <span>{customServers.length} MCP Servers</span>
-          </div>
-          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-violet-50 dark:bg-violet-900/20 text-violet-700 dark:text-violet-300">
+            {customServers.length} MCP Servers
+          </span>
+          <span className="inline-flex items-center gap-1.5 h-8 px-3 rounded-full text-xs font-medium bg-white border border-slate-200/70 text-slate-600">
             <BookOpen className="w-3.5 h-3.5" />
-            <span>{skillsCatalog.length} Skills</span>
-          </div>
+            {skillsCatalog.length} Skills
+          </span>
         </div>
 
         {/* Search Bar */}
@@ -1053,7 +1050,7 @@ export default function TeamToolsPage() {
             placeholder="Search integrations, tools, and skills..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full px-4 py-2 bg-white dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-stone-500"
+            className="w-full px-4 py-2 bg-white border border-slate-200/70 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-500/50"
           />
         </div>
 
@@ -1064,23 +1061,23 @@ export default function TeamToolsPage() {
             item.description?.toLowerCase().includes(searchQuery.toLowerCase())
           );
           return (
-            <section className="border border-stone-200 dark:border-stone-700 border-l-4 border-l-stone-400 dark:border-l-stone-500 rounded-lg overflow-hidden">
+            <section className="border border-slate-200 dark:border-slate-700 border-l-4 border-l-slate-400 dark:border-l-slate-500 rounded-lg overflow-hidden">
               <button
                 onClick={() => {
                   const next = new Set(expandedCategories);
                   next.has('integration') ? next.delete('integration') : next.add('integration');
                   setExpandedCategories(next);
                 }}
-                className="w-full flex items-center gap-3 px-4 py-3 bg-stone-50 dark:bg-stone-700/50 hover:bg-stone-100 dark:hover:bg-stone-800"
+                className="w-full flex items-center gap-3 px-4 py-3 bg-slate-50 dark:bg-slate-700/50 hover:bg-slate-100 dark:hover:bg-slate-800"
               >
                 {expandedCategories.has('integration') ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-                <Settings className="w-4 h-4 text-stone-500" />
+                <Settings className="w-4 h-4 text-slate-500" />
                 <div className="flex-1 text-left">
-                  <span className="font-medium text-stone-900 dark:text-white">Integrations</span>
-                  <span className="text-xs text-stone-500 ml-2">
+                  <span className="font-medium text-slate-900 dark:text-white">Integrations</span>
+                  <span className="text-xs text-slate-500 ml-2">
                     {searchQuery ? `${filteredIntegrations.length} of ${integrations.length}` : `${integrations.length} connected`}
                   </span>
-                  <p className="text-xs text-stone-400 dark:text-stone-500">API connections to external services (Datadog, Grafana, PagerDuty, etc.)</p>
+                  <p className="text-xs text-slate-400 dark:text-slate-500">API connections to external services (Datadog, Grafana, PagerDuty, etc.)</p>
                 </div>
               </button>
               {expandedCategories.has('integration') && (
@@ -1101,23 +1098,23 @@ export default function TeamToolsPage() {
           const filteredEnabled = filteredServers.filter(m => m.enabled).length;
           const filteredDisabled = filteredServers.filter(m => !m.enabled).length;
           return (
-            <section className="border border-stone-200 dark:border-stone-700 border-l-4 border-l-forest rounded-lg overflow-hidden">
+            <section className="border border-slate-200 dark:border-slate-700 border-l-4 border-l-emerald-500 rounded-lg overflow-hidden">
                 <button
                   onClick={() => {
                     const next = new Set(expandedCategories);
                     next.has('mcp') ? next.delete('mcp') : next.add('mcp');
                     setExpandedCategories(next);
                   }}
-                  className="w-full flex items-center gap-3 px-4 py-3 bg-stone-50 dark:bg-stone-700/50 hover:bg-stone-100 dark:hover:bg-stone-800"
+                  className="w-full flex items-center gap-3 px-4 py-3 bg-slate-50 dark:bg-slate-700/50 hover:bg-slate-100 dark:hover:bg-slate-800"
                 >
                   {expandedCategories.has('mcp') ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-                  <Server className="w-4 h-4 text-forest" />
+                  <Server className="w-4 h-4 text-emerald-600" />
                   <div className="flex-1 text-left">
-                    <span className="font-medium text-stone-900 dark:text-white">MCP Servers</span>
-                    <span className="text-xs text-stone-500 ml-2">
+                    <span className="font-medium text-slate-900 dark:text-white">MCP Servers</span>
+                    <span className="text-xs text-slate-500 ml-2">
                       {searchQuery ? `${filteredEnabled} enabled, ${filteredDisabled} disabled` : `${enabledServers.length} enabled, ${disabledServers.length} disabled`}
                     </span>
-                    <p className="text-xs text-stone-400 dark:text-stone-500">Custom tool providers via Model Context Protocol</p>
+                    <p className="text-xs text-slate-400 dark:text-slate-500">Custom tool providers via Model Context Protocol</p>
                   </div>
                 </button>
                 {expandedCategories.has('mcp') && (
@@ -1146,7 +1143,7 @@ export default function TeamToolsPage() {
           });
           const filteredCount = Object.values(filteredSkillsByCategory).reduce((n, arr) => n + arr.length, 0);
           return (
-            <section className="border border-stone-200 dark:border-stone-700 border-l-4 border-l-violet-500 rounded-lg overflow-hidden">
+            <section className="border border-slate-200 dark:border-slate-700 border-l-4 border-l-slate-400 rounded-lg overflow-hidden">
               {/* Top-level Skills header */}
               <button
                 onClick={() => {
@@ -1154,25 +1151,25 @@ export default function TeamToolsPage() {
                   next.has('skills') ? next.delete('skills') : next.add('skills');
                   setExpandedCategories(next);
                 }}
-                className="w-full flex items-center gap-3 px-4 py-3 bg-stone-50 dark:bg-stone-700/50 hover:bg-stone-100 dark:hover:bg-stone-800"
+                className="w-full flex items-center gap-3 px-4 py-3 bg-slate-50 dark:bg-slate-700/50 hover:bg-slate-100 dark:hover:bg-slate-800"
               >
                 {expandedCategories.has('skills') ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-                <BookOpen className="w-4 h-4 text-violet-500" />
+                <BookOpen className="w-4 h-4 text-slate-500" />
                 <div className="flex-1 text-left">
-                  <span className="font-medium text-stone-900 dark:text-white">Skills</span>
-                  <span className="text-xs text-stone-500 ml-2">
+                  <span className="font-medium text-slate-900 dark:text-white">Skills</span>
+                  <span className="text-xs text-slate-500 ml-2">
                     {searchQuery
                       ? `${filteredCount} of ${skillsCatalog.length}`
                       : `${enabledSkillCount} enabled / ${skillsCatalog.length}`}
                   </span>
-                  <p className="text-xs text-stone-400 dark:text-stone-500">
+                  <p className="text-xs text-slate-400 dark:text-slate-500">
                     Knowledge loaded into agent context on-demand (methodologies, runbooks, query syntax)
                   </p>
                 </div>
               </button>
 
               {expandedCategories.has('skills') && (
-                <div className="divide-y divide-stone-100 dark:divide-stone-700/50">
+                <div className="divide-y divide-slate-100 dark:divide-slate-700/50">
                   {orderedSkillCategories.map(category => {
                     const catSkills = filteredSkillsByCategory[category];
                     if (!catSkills || catSkills.length === 0) return null;
@@ -1188,7 +1185,7 @@ export default function TeamToolsPage() {
                     return (
                       <div key={category}>
                         {/* Category row */}
-                        <div className="flex items-center gap-2 px-4 py-2.5 bg-stone-50/60 dark:bg-stone-800/40">
+                        <div className="flex items-center gap-2 px-4 py-2.5 bg-slate-50/60 dark:bg-slate-800/40">
                           <button
                             onClick={() => {
                               const next = new Set(expandedCategories);
@@ -1197,11 +1194,11 @@ export default function TeamToolsPage() {
                             }}
                             className="flex items-center gap-2 flex-1 text-left min-w-0"
                           >
-                            {isCatExpanded ? <ChevronDown className="w-3.5 h-3.5 text-stone-400 flex-shrink-0" /> : <ChevronRight className="w-3.5 h-3.5 text-stone-400 flex-shrink-0" />}
-                            <span className="text-xs font-semibold text-stone-700 dark:text-stone-300 uppercase tracking-wide">
+                            {isCatExpanded ? <ChevronDown className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" /> : <ChevronRight className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />}
+                            <span className="text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wide">
                               {category}
                             </span>
-                            <span className="text-[10px] text-stone-400 ml-1">
+                            <span className="text-[10px] text-slate-400 ml-1">
                               {catEnabledCount} / {catTotal}
                             </span>
                           </button>
@@ -1212,7 +1209,7 @@ export default function TeamToolsPage() {
                               allEnabled
                                 ? 'text-green-600 hover:text-green-700'
                                 : noneEnabled
-                                ? 'text-stone-400 hover:text-stone-500'
+                                ? 'text-slate-400 hover:text-slate-500'
                                 : 'text-amber-500 hover:text-amber-600'
                             }`}
                             title={allEnabled ? 'Disable all in category' : noneEnabled ? 'Enable all in category' : 'Some enabled — enable all in category'}
@@ -1233,16 +1230,16 @@ export default function TeamToolsPage() {
                             {catSkills.map(skill => (
                               <div
                                 key={skill.id}
-                                className="flex items-start gap-3 p-3 rounded-lg border border-stone-200 dark:border-stone-600 bg-white dark:bg-stone-700"
+                                className="flex items-start gap-3 p-3 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700"
                               >
-                                <BookOpen className="w-4 h-4 text-violet-500 mt-0.5 flex-shrink-0" />
+                                <BookOpen className="w-4 h-4 text-slate-500 mt-0.5 flex-shrink-0" />
                                 <div className="min-w-0 flex-1">
-                                  <div className="font-medium text-sm text-stone-900 dark:text-white">{skill.name}</div>
-                                  <div className="text-xs text-stone-500 dark:text-stone-400 mt-0.5">{skill.description}</div>
+                                  <div className="font-medium text-sm text-slate-900 dark:text-white">{skill.name}</div>
+                                  <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{skill.description}</div>
                                   {skill.required_integrations?.length > 0 && (
                                     <div className="flex flex-wrap gap-1 mt-1.5">
                                       {skill.required_integrations.map((int: string) => (
-                                        <span key={int} className="text-[10px] px-1.5 py-0.5 rounded-full bg-violet-100 dark:bg-violet-900/30 text-violet-700 dark:text-violet-300">
+                                        <span key={int} className="text-[10px] px-1.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800/50 text-slate-600 dark:text-slate-400">
                                           {int}
                                         </span>
                                       ))}
@@ -1254,7 +1251,7 @@ export default function TeamToolsPage() {
                                   className={`p-1 rounded transition-colors flex-shrink-0 ${
                                     skill.enabled
                                       ? 'text-green-600 hover:text-green-700'
-                                      : 'text-stone-400 hover:text-stone-500'
+                                      : 'text-slate-400 hover:text-slate-500'
                                   }`}
                                   title={skill.enabled ? 'Disable' : 'Enable'}
                                 >
@@ -1279,24 +1276,25 @@ export default function TeamToolsPage() {
 
         {items.length === 0 && skillsCatalog.length === 0 && (
           <div className="text-center py-12">
-            <Server className="w-12 h-12 text-stone-300 mx-auto mb-4" />
-            <p className="text-stone-500">No tools configured yet.</p>
+            <Server className="w-12 h-12 text-slate-300 mx-auto mb-4" />
+            <p className="text-slate-500">No tools configured yet.</p>
           </div>
         )}
       </div>
+    </TeamPageShell>
 
       {/* Configuration Modal */}
       {editingItem && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white dark:bg-stone-800 rounded-xl shadow-2xl w-full max-w-md">
-            <div className="flex items-center justify-between p-4 border-b border-stone-200 dark:border-stone-700">
+          <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl w-full max-w-md">
+            <div className="flex items-center justify-between p-4 border-b border-slate-200 dark:border-slate-700">
               <div>
-                <h2 className="font-semibold text-stone-900 dark:text-white">{editingItem.name}</h2>
-                <p className="text-xs text-stone-500">{editingItem.description}</p>
+                <h2 className="font-semibold text-slate-900 dark:text-white">{editingItem.name}</h2>
+                <p className="text-xs text-slate-500">{editingItem.description}</p>
               </div>
               <button
                 onClick={() => setEditingItem(null)}
-                className="p-1 text-stone-400 hover:text-stone-600"
+                className="p-1 text-slate-400 hover:text-slate-600"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -1311,17 +1309,17 @@ export default function TeamToolsPage() {
                 return (
                   <div key={fieldName}>
                     <div className="flex items-center justify-between mb-1">
-                      <label className="block text-sm font-medium text-stone-700 dark:text-stone-300">
+                      <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
                         {field.display_name || fieldName}
-                        {field.required && <span className="text-clay ml-1">*</span>}
+                        {field.required && <span className="text-rose-600 ml-1">*</span>}
                       </label>
                       {/* Show source indicator and clear button for team-level values */}
                       {hasValue && (
                         <div className="flex items-center gap-2">
                           <span className={`text-[10px] px-1.5 py-0.5 rounded ${
                             isTeamLevel
-                              ? 'bg-forest-light/15 dark:bg-forest/30 text-forest-dark dark:text-forest-light'
-                              : 'bg-stone-100 dark:bg-stone-700 text-stone-500 dark:text-stone-400'
+                              ? 'bg-emerald-100/60 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400'
+                              : 'bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400'
                           }`}>
                             {isTeamLevel ? 'team' : 'inherited'}
                           </span>
@@ -1357,7 +1355,7 @@ export default function TeamToolsPage() {
                                   setSaving(false);
                                 }
                               }}
-                              className="text-[10px] px-1.5 py-0.5 rounded bg-forest-light/15 dark:bg-forest/30 text-forest dark:text-forest-light hover:bg-forest-light/20 dark:hover:bg-forest/40"
+                              className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-100/60 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-100/80 dark:hover:bg-emerald-500/40"
                               title="Clear this value to inherit from organization settings"
                             >
                               Clear (inherit)
@@ -1371,7 +1369,7 @@ export default function TeamToolsPage() {
                       <select
                         value={editValues[fieldName] || field.default || ''}
                         onChange={(e) => setEditValues({ ...editValues, [fieldName]: e.target.value })}
-                        className="w-full bg-stone-50 dark:bg-stone-700 border border-stone-200 dark:border-stone-600 rounded-lg px-3 py-2 text-sm"
+                        className="w-full bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-2 text-sm"
                       >
                         {field.allowed_values.map(v => (
                           <option key={v} value={v}>{v}</option>
@@ -1384,13 +1382,13 @@ export default function TeamToolsPage() {
                           value={editValues[fieldName] || ''}
                           onChange={(e) => setEditValues({ ...editValues, [fieldName]: e.target.value })}
                           placeholder={field.placeholder || field.default || ''}
-                          className="w-full bg-stone-50 dark:bg-stone-700 border border-stone-200 dark:border-stone-600 rounded-lg px-3 py-2 text-sm"
+                          className="w-full bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-2 text-sm"
                         />
                         {field.type === 'secret' && (
                           <button
                             type="button"
                             onClick={() => setShowSecrets({ ...showSecrets, [fieldName]: !showSecrets[fieldName] })}
-                            className="absolute right-2 top-1/2 -translate-y-1/2 text-stone-400"
+                            className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400"
                           >
                             {showSecrets[fieldName] ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                           </button>
@@ -1399,24 +1397,24 @@ export default function TeamToolsPage() {
                     )}
 
                     {field.description && (
-                      <p className="text-xs text-stone-500 mt-1">{field.description}</p>
+                      <p className="text-xs text-slate-500 mt-1">{field.description}</p>
                     )}
                   </div>
                 );
               })}
             </div>
 
-            <div className="p-4 border-t border-stone-200 dark:border-stone-700 flex justify-end gap-3">
+            <div className="p-4 border-t border-slate-200 dark:border-slate-700 flex justify-end gap-3">
               <button
                 onClick={() => setEditingItem(null)}
-                className="px-4 py-2 text-sm text-stone-600 hover:text-stone-900"
+                className="px-4 py-2 text-sm text-slate-600 hover:text-slate-900"
               >
                 Cancel
               </button>
               <button
                 onClick={saveConfig}
                 disabled={saving}
-                className="flex items-center gap-2 px-4 py-2 text-sm bg-forest text-white rounded-lg hover:bg-forest-dark disabled:opacity-50"
+                className="flex items-center gap-2 px-4 py-2 text-sm bg-emerald-100/50 text-emerald-700 rounded-lg hover:bg-emerald-100/80 disabled:opacity-50"
               >
                 <Save className="w-4 h-4" />
                 {saving ? 'Saving...' : 'Save'}
@@ -1429,15 +1427,15 @@ export default function TeamToolsPage() {
       {/* Tool Filtering Modal */}
       {filteringMcp && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white dark:bg-stone-800 rounded-xl shadow-2xl w-full max-w-2xl">
-            <div className="flex items-center justify-between p-4 border-b border-stone-200 dark:border-stone-700">
+          <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl w-full max-w-2xl">
+            <div className="flex items-center justify-between p-4 border-b border-slate-200 dark:border-slate-700">
               <div>
-                <h2 className="font-semibold text-stone-900 dark:text-white">Filter Tools - {filteringMcp.name}</h2>
-                <p className="text-xs text-stone-500">Select which tools from this MCP server should be available</p>
+                <h2 className="font-semibold text-slate-900 dark:text-white">Filter Tools - {filteringMcp.name}</h2>
+                <p className="text-xs text-slate-500">Select which tools from this MCP server should be available</p>
               </div>
               <button
                 onClick={() => setFilteringMcp(null)}
-                className="p-1 text-stone-400 hover:text-stone-600"
+                className="p-1 text-slate-400 hover:text-slate-600"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -1445,8 +1443,8 @@ export default function TeamToolsPage() {
 
             <div className="p-4 space-y-4 max-h-[60vh] overflow-auto">
               {/* Select All / Deselect All */}
-              <div className="flex items-center justify-between p-3 bg-stone-50 dark:bg-stone-700 rounded-lg">
-                <span className="text-sm font-medium text-stone-700 dark:text-stone-300">
+              <div className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-700 rounded-lg">
+                <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
                   {selectedTools.size === (filteringMcp.tools?.length || 0)
                     ? `All ${filteringMcp.tools?.length || 0} tools selected`
                     : `${selectedTools.size} of ${filteringMcp.tools?.length || 0} tools selected`
@@ -1461,7 +1459,7 @@ export default function TeamToolsPage() {
                       ) || [];
                       setSelectedTools(new Set(toolNames));
                     }}
-                    className="text-xs px-2 py-1 rounded bg-forest-light/15 dark:bg-forest/30 text-forest-dark dark:text-forest-light hover:opacity-80"
+                    className="text-xs px-2 py-1 rounded bg-emerald-100/60 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 hover:opacity-80"
                   >
                     Select All
                   </button>
@@ -1469,7 +1467,7 @@ export default function TeamToolsPage() {
                     onClick={() => {
                       setSelectedTools(new Set());
                     }}
-                    className="text-xs px-2 py-1 rounded bg-stone-200 dark:bg-stone-700 text-stone-700 dark:text-stone-300 hover:opacity-80"
+                    className="text-xs px-2 py-1 rounded bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:opacity-80"
                   >
                     Deselect All
                   </button>
@@ -1488,7 +1486,7 @@ export default function TeamToolsPage() {
                   return (
                     <label
                       key={toolName || idx}
-                      className="flex items-start gap-3 p-3 rounded-lg border border-stone-200 dark:border-stone-600 hover:bg-stone-50 dark:hover:bg-stone-800 cursor-pointer"
+                      className="flex items-start gap-3 p-3 rounded-lg border border-slate-200 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer"
                     >
                       <input
                         type="checkbox"
@@ -1502,20 +1500,20 @@ export default function TeamToolsPage() {
                           }
                           setSelectedTools(next);
                         }}
-                        className="mt-1 w-4 h-4 rounded border-stone-300 text-forest focus:ring-forest"
+                        className="mt-1 w-4 h-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
                       />
                       <div className="flex-1 min-w-0">
-                        <div className="text-sm font-medium text-stone-900 dark:text-white">
+                        <div className="text-sm font-medium text-slate-900 dark:text-white">
                           {toolDisplayName}
                         </div>
                         {toolDesc && (
-                          <div className="text-xs text-stone-500 mt-0.5">
+                          <div className="text-xs text-slate-500 mt-0.5">
                             {toolDesc}
                           </div>
                         )}
                         {toolCategory && (
                           <div className="mt-1">
-                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-forest-light/10 dark:bg-forest/30 text-forest dark:text-forest-light">
+                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-100/50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400">
                               {toolCategory}
                             </span>
                           </div>
@@ -1527,10 +1525,10 @@ export default function TeamToolsPage() {
               </div>
             </div>
 
-            <div className="p-4 border-t border-stone-200 dark:border-stone-700 flex justify-end gap-2">
+            <div className="p-4 border-t border-slate-200 dark:border-slate-700 flex justify-end gap-2">
               <button
                 onClick={() => setFilteringMcp(null)}
-                className="px-4 py-2 text-sm text-stone-600 dark:text-stone-400 hover:text-stone-900 dark:hover:text-white"
+                className="px-4 py-2 text-sm text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
               >
                 Cancel
               </button>
@@ -1587,7 +1585,7 @@ export default function TeamToolsPage() {
                   }
                 }}
                 disabled={saving}
-                className="px-4 py-2 bg-forest text-white rounded-lg hover:bg-forest-dark disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                className="px-4 py-2 bg-emerald-100/50 text-emerald-700 rounded-lg hover:bg-emerald-100/80 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
               >
                 {saving ? 'Saving...' : 'Save Filter'}
               </button>
@@ -1599,11 +1597,11 @@ export default function TeamToolsPage() {
       {/* Add Custom Server Modal */}
       {showAddCustomModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white dark:bg-stone-800 rounded-xl shadow-2xl w-full max-w-2xl">
-            <div className="flex items-center justify-between p-4 border-b border-stone-200 dark:border-stone-700">
+          <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl w-full max-w-2xl">
+            <div className="flex items-center justify-between p-4 border-b border-slate-200 dark:border-slate-700">
               <div>
-                <h2 className="font-semibold text-stone-900 dark:text-white">Add Custom MCP Server</h2>
-                <p className="text-xs text-stone-500">Add a custom Model Context Protocol server for your agents</p>
+                <h2 className="font-semibold text-slate-900 dark:text-white">Add Custom MCP Server</h2>
+                <p className="text-xs text-slate-500">Add a custom Model Context Protocol server for your agents</p>
               </div>
               <button
                 onClick={() => {
@@ -1618,7 +1616,7 @@ export default function TeamToolsPage() {
                   setPreviewedTools(null);
                   setMessage(null);
                 }}
-                className="p-1 text-stone-400 hover:text-stone-600"
+                className="p-1 text-slate-400 hover:text-slate-600"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -1626,21 +1624,21 @@ export default function TeamToolsPage() {
 
             <div className="p-4 space-y-4 max-h-[70vh] overflow-auto">
               <div>
-                <label className="block text-sm font-medium text-stone-700 dark:text-stone-300 mb-1">
-                  Name <span className="text-clay">*</span>
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                  Name <span className="text-rose-600">*</span>
                 </label>
                 <input
                   type="text"
                   value={newServerForm.name}
                   onChange={(e) => setNewServerForm({ ...newServerForm, name: e.target.value })}
                   placeholder="e.g., Slack MCP"
-                  className="w-full bg-stone-50 dark:bg-stone-700 border border-stone-200 dark:border-stone-600 rounded-lg px-3 py-2 text-sm"
+                  className="w-full bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-2 text-sm"
                 />
-                <p className="text-xs text-stone-500 mt-1">A friendly name for this MCP server</p>
+                <p className="text-xs text-slate-500 mt-1">A friendly name for this MCP server</p>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-stone-700 dark:text-stone-300 mb-1">
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
                   Description
                 </label>
                 <input
@@ -1648,27 +1646,27 @@ export default function TeamToolsPage() {
                   value={newServerForm.description}
                   onChange={(e) => setNewServerForm({ ...newServerForm, description: e.target.value })}
                   placeholder="e.g., Provides Slack channel and message management tools"
-                  className="w-full bg-stone-50 dark:bg-stone-700 border border-stone-200 dark:border-stone-600 rounded-lg px-3 py-2 text-sm"
+                  className="w-full bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-2 text-sm"
                 />
-                <p className="text-xs text-stone-500 mt-1">Brief description of what this MCP provides</p>
+                <p className="text-xs text-slate-500 mt-1">Brief description of what this MCP provides</p>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-stone-700 dark:text-stone-300 mb-1">
-                  Command <span className="text-clay">*</span>
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                  Command <span className="text-rose-600">*</span>
                 </label>
                 <input
                   type="text"
                   value={newServerForm.command}
                   onChange={(e) => setNewServerForm({ ...newServerForm, command: e.target.value })}
                   placeholder="e.g., npx or python or /path/to/executable"
-                  className="w-full bg-stone-50 dark:bg-stone-700 border border-stone-200 dark:border-stone-600 rounded-lg px-3 py-2 text-sm font-mono"
+                  className="w-full bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-2 text-sm font-mono"
                 />
-                <p className="text-xs text-stone-500 mt-1">The executable command to start the MCP server</p>
+                <p className="text-xs text-slate-500 mt-1">The executable command to start the MCP server</p>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-stone-700 dark:text-stone-300 mb-1">
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
                   Arguments
                 </label>
                 <textarea
@@ -1676,13 +1674,13 @@ export default function TeamToolsPage() {
                   onChange={(e) => setNewServerForm({ ...newServerForm, args: e.target.value })}
                   placeholder="One argument per line, e.g.:&#10;-m&#10;mcp_server_slack"
                   rows={4}
-                  className="w-full bg-stone-50 dark:bg-stone-700 border border-stone-200 dark:border-stone-600 rounded-lg px-3 py-2 text-sm font-mono"
+                  className="w-full bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-2 text-sm font-mono"
                 />
-                <p className="text-xs text-stone-500 mt-1">Command arguments (one per line)</p>
+                <p className="text-xs text-slate-500 mt-1">Command arguments (one per line)</p>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-stone-700 dark:text-stone-300 mb-1">
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
                   Environment Variables
                 </label>
                 <textarea
@@ -1690,28 +1688,28 @@ export default function TeamToolsPage() {
                   onChange={(e) => setNewServerForm({ ...newServerForm, env: e.target.value })}
                   placeholder="One variable per line in KEY=VALUE format, e.g.:&#10;SLACK_TOKEN=xoxb-your-token&#10;SLACK_TEAM_ID=T1234567"
                   rows={5}
-                  className="w-full bg-stone-50 dark:bg-stone-700 border border-stone-200 dark:border-stone-600 rounded-lg px-3 py-2 text-sm font-mono"
+                  className="w-full bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-2 text-sm font-mono"
                 />
-                <p className="text-xs text-stone-500 mt-1">Environment variables in KEY=VALUE format (one per line)</p>
+                <p className="text-xs text-slate-500 mt-1">Environment variables in KEY=VALUE format (one per line)</p>
               </div>
 
-              <div className="bg-stone-50 dark:bg-stone-700/50 border border-stone-200 dark:border-stone-600 rounded-lg p-3">
-                <p className="text-xs text-stone-700 dark:text-stone-300">
+              <div className="bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-600 rounded-lg p-3">
+                <p className="text-xs text-slate-700 dark:text-slate-300">
                   <strong>Tip:</strong> MCP servers are executables that communicate via stdio. Common patterns:
                 </p>
-                <ul className="text-xs text-stone-600 dark:text-stone-400 mt-2 space-y-1 ml-4 list-disc">
-                  <li><code className="bg-stone-100 dark:bg-stone-700 px-1 py-0.5 rounded">npx -y @modelcontextprotocol/server-name</code></li>
-                  <li><code className="bg-stone-100 dark:bg-stone-700 px-1 py-0.5 rounded">python -m mcp_server_module</code></li>
-                  <li><code className="bg-stone-100 dark:bg-stone-700 px-1 py-0.5 rounded">node /path/to/server.js</code></li>
+                <ul className="text-xs text-slate-600 dark:text-slate-400 mt-2 space-y-1 ml-4 list-disc">
+                  <li><code className="bg-slate-100 dark:bg-slate-700 px-1 py-0.5 rounded">npx -y @modelcontextprotocol/server-name</code></li>
+                  <li><code className="bg-slate-100 dark:bg-slate-700 px-1 py-0.5 rounded">python -m mcp_server_module</code></li>
+                  <li><code className="bg-slate-100 dark:bg-slate-700 px-1 py-0.5 rounded">node /path/to/server.js</code></li>
                 </ul>
               </div>
 
               {/* Preview Tools Section */}
               {previewedTools && previewedTools.success && (
-                <div className="border border-stone-200 dark:border-stone-700 rounded-lg overflow-hidden">
-                  <div className="bg-stone-50 dark:bg-stone-700/50 px-3 py-2 border-b border-stone-200 dark:border-stone-700">
+                <div className="border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden">
+                  <div className="bg-slate-50 dark:bg-slate-700/50 px-3 py-2 border-b border-slate-200 dark:border-slate-700">
                     <div className="flex items-center justify-between">
-                      <h3 className="text-sm font-medium text-stone-900 dark:text-white">
+                      <h3 className="text-sm font-medium text-slate-900 dark:text-white">
                         Discovered Tools ({previewedTools.tool_count})
                       </h3>
                       {previewedTools.warnings.length > 0 && (
@@ -1738,7 +1736,7 @@ export default function TeamToolsPage() {
                   {/* Tools List */}
                   <div className="max-h-60 overflow-auto p-3 space-y-2">
                     {previewedTools.tools.length === 0 ? (
-                      <p className="text-xs text-stone-500 text-center py-4">No tools discovered</p>
+                      <p className="text-xs text-slate-500 text-center py-4">No tools discovered</p>
                     ) : (
                       (() => {
                         // Group tools by category
@@ -1751,21 +1749,21 @@ export default function TeamToolsPage() {
 
                         return Object.entries(toolsByCategory).map(([category, tools]) => (
                           <div key={category} className="space-y-1">
-                            <h4 className="text-xs font-medium text-stone-600 dark:text-stone-400 uppercase tracking-wide">
+                            <h4 className="text-xs font-medium text-slate-600 dark:text-slate-400 uppercase tracking-wide">
                               {category} ({tools.length})
                             </h4>
                             {tools.map((tool, idx) => (
                               <div
                                 key={idx}
-                                className="bg-stone-50 dark:bg-stone-700/50 rounded px-2 py-1.5 border border-stone-200 dark:border-stone-600"
+                                className="bg-slate-50 dark:bg-slate-700/50 rounded px-2 py-1.5 border border-slate-200 dark:border-slate-600"
                               >
                                 <div className="flex items-start justify-between gap-2">
                                   <div className="flex-1 min-w-0">
-                                    <p className="text-xs font-mono text-stone-900 dark:text-white truncate">
+                                    <p className="text-xs font-mono text-slate-900 dark:text-white truncate">
                                       {tool.display_name}
                                     </p>
                                     {tool.description && (
-                                      <p className="text-xs text-stone-500 line-clamp-1 mt-0.5">
+                                      <p className="text-xs text-slate-500 line-clamp-1 mt-0.5">
                                         {tool.description}
                                       </p>
                                     )}
@@ -1783,11 +1781,11 @@ export default function TeamToolsPage() {
               )}
             </div>
 
-            <div className="p-4 border-t border-stone-200 dark:border-stone-700 flex justify-between gap-3">
+            <div className="p-4 border-t border-slate-200 dark:border-slate-700 flex justify-between gap-3">
               <button
                 onClick={previewMCPServer}
                 disabled={previewingTools || !newServerForm.command}
-                className="flex items-center gap-2 px-4 py-2 text-sm bg-stone-100 dark:bg-stone-700 text-stone-700 dark:text-stone-300 rounded-lg hover:bg-stone-200 dark:hover:bg-stone-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex items-center gap-2 px-4 py-2 text-sm bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <Eye className="w-4 h-4" />
                 {previewingTools ? 'Previewing...' : 'Preview Tools'}
@@ -1806,14 +1804,14 @@ export default function TeamToolsPage() {
                     setPreviewedTools(null);
                     setMessage(null);
                   }}
-                  className="px-4 py-2 text-sm text-stone-600 hover:text-stone-900"
+                  className="px-4 py-2 text-sm text-slate-600 hover:text-slate-900"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={saveCustomServer}
                   disabled={saving || !newServerForm.name || !newServerForm.command}
-                  className="flex items-center gap-2 px-4 py-2 text-sm bg-forest text-white rounded-lg hover:bg-forest-dark disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex items-center gap-2 px-4 py-2 text-sm bg-emerald-100/50 text-emerald-700 rounded-lg hover:bg-emerald-100/80 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <Plus className="w-4 h-4" />
                   {saving ? 'Adding...' : 'Add MCP Server'}
@@ -1823,6 +1821,6 @@ export default function TeamToolsPage() {
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 }

@@ -10,7 +10,7 @@ import argparse
 import json
 import sys
 
-from jira_client import get_browse_url, jira_request
+from jira_client import get_browse_url, search_jql
 
 
 def main():
@@ -24,14 +24,11 @@ def main():
 
     try:
         jql = f"project = {args.project} ORDER BY created DESC"
-        data = jira_request(
-            "GET",
-            "/search",
-            params={
-                "jql": jql,
-                "maxResults": args.max_results,
-                "fields": "summary,status,issuetype,assignee,created",
-            },
+        # Cloud uses POST /search/jql; Data Center keeps GET /search (see search_jql).
+        data = search_jql(
+            jql,
+            max_results=args.max_results,
+            fields="summary,status,issuetype,assignee,created",
         )
 
         browse_url = get_browse_url()

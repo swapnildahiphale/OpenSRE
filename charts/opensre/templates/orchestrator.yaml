@@ -1,0 +1,211 @@
+{{- if .Values.services.orchestrator.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: opensre-orchestrator
+  namespace: {{ .Values.namespace }}
+spec:
+  replicas: {{ .Values.services.orchestrator.replicas }}
+  selector:
+    matchLabels:
+      app: opensre-orchestrator
+  template:
+    metadata:
+      labels:
+        app: opensre-orchestrator
+    spec:
+      {{- if .Values.global.imagePullSecrets }}
+      imagePullSecrets:
+{{ toYaml .Values.global.imagePullSecrets | indent 8 }}
+      {{- end }}
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+      containers:
+        - name: orchestrator
+          image: {{ required "services.orchestrator.image is required" .Values.services.orchestrator.image }}
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          ports:
+            - containerPort: {{ .Values.services.orchestrator.servicePort }}
+          resources:
+{{ toYaml .Values.services.orchestrator.resources | indent 12 }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.global.database.databaseUrlSecretName }}
+                  key: {{ .Values.global.database.databaseUrlSecretKey }}
+            - name: CONFIG_SERVICE_URL
+              value: {{ required "global.configService.url is required" .Values.global.configService.url | quote }}
+            - name: AI_PIPELINE_API_URL
+              value: {{ printf "http://opensre-ai-pipeline-api.%s.svc.cluster.local:%d" .Values.namespace (.Values.services.aiPipelineApi.servicePort | int) | quote }}
+            - name: AGENT_API_URL
+              value: {{ printf "http://opensre-agent.%s.svc.cluster.local:%d" .Values.namespace (.Values.services.agent.servicePort | int) | quote }}
+            # Service-to-service auth for sre-agent /investigate (must match agent's INVESTIGATE_AUTH_TOKEN)
+            {{- if .Values.externalSecrets.contract.jwtSecret }}
+            - name: INVESTIGATE_AUTH_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.externalSecrets.contract.jwtSecret.secretName | default "opensre-jwt-secret" }}
+                  key: {{ .Values.externalSecrets.contract.jwtSecret.investigateAuthTokenKey | default "INVESTIGATE_AUTH_TOKEN" }}
+            {{- end }}
+            - name: ORCHESTRATOR_ADMIN_AUTH_CACHE_TTL_SECONDS
+              value: {{ default 15 .Values.services.orchestrator.adminAuthCacheTtlSeconds | int | quote }}
+            - name: ORCHESTRATOR_REQUIRE_ADMIN_STAR
+              value: {{ default true .Values.services.orchestrator.requireAdminStar | ternary "1" "0" | quote }}
+            - name: ORCHESTRATOR_REQUIRED_PERMISSION_PROVISION_TEAM
+              value: {{ default "admin:provision" .Values.services.orchestrator.requiredPermissions.provisionTeam | quote }}
+            - name: ORCHESTRATOR_REQUIRED_PERMISSION_PROVISION_READ
+              value: {{ default "admin:provision:read" .Values.services.orchestrator.requiredPermissions.provisionRead | quote }}
+            - name: ORCHESTRATOR_REQUIRED_PERMISSION_AGENT_RUN
+              value: {{ default "admin:agent:run" .Values.services.orchestrator.requiredPermissions.agentRun | quote }}
+            - name: ORCHESTRATOR_INTERNAL_ADMIN_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.externalSecrets.contract.configService.secretName | quote }}
+                  key: {{ .Values.externalSecrets.contract.configService.adminTokenKey | quote }}
+            {{- if .Values.externalSecrets.contract.orchestratorInternal.enabled }}
+            - name: ORCHESTRATOR_INTERNAL_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.externalSecrets.contract.orchestratorInternal.secretName | quote }}
+                  key: {{ .Values.externalSecrets.contract.orchestratorInternal.internalTokenKey | quote }}
+            {{- end }}
+            {{- if .Values.externalSecrets.contract.slack.enabled }}
+            # DEPRECATED: Signing secret loaded from slack_apps DB table.
+            # Kept as fallback when no apps are configured in config service.
+            - name: SLACK_BOT_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.externalSecrets.contract.slack.secretName | quote }}
+                  key: {{ .Values.externalSecrets.contract.slack.botTokenKey | quote }}
+            - name: SLACK_SIGNING_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.externalSecrets.contract.slack.secretName | quote }}
+                  key: {{ .Values.externalSecrets.contract.slack.signingSecretKey | quote }}
+            {{- end }}
+            {{- if .Values.externalSecrets.contract.github.enabled }}
+            - name: GITHUB_WEBHOOK_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.externalSecrets.contract.github.secretName | quote }}
+                  key: {{ .Values.externalSecrets.contract.github.webhookSecretKey | quote }}
+            {{- end }}
+            {{- if .Values.externalSecrets.contract.pagerduty.enabled }}
+            - name: PAGERDUTY_WEBHOOK_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.externalSecrets.contract.pagerduty.secretName | quote }}
+                  key: {{ .Values.externalSecrets.contract.pagerduty.webhookSecretKey | quote }}
+            {{- end }}
+            {{- if .Values.externalSecrets.contract.incidentio.enabled }}
+            - name: INCIDENTIO_WEBHOOK_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.externalSecrets.contract.incidentio.secretName | quote }}
+                  key: {{ .Values.externalSecrets.contract.incidentio.webhookSecretKey | quote }}
+            {{- end }}
+            {{- if .Values.externalSecrets.contract.recall.enabled }}
+            - name: RECALL_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.externalSecrets.contract.recall.secretName | quote }}
+                  key: {{ .Values.externalSecrets.contract.recall.apiKeyKey | quote }}
+            - name: RECALL_WEBHOOK_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.externalSecrets.contract.recall.secretName | quote }}
+                  key: {{ .Values.externalSecrets.contract.recall.webhookSecretKey | quote }}
+            - name: RECALL_REGION
+              value: {{ .Values.externalSecrets.awsRegion | quote }}
+            - name: RECALL_WEBHOOK_URL
+              value: "https://orchestrator.opensre.ai/webhooks/recall"
+            - name: RECALL_BOT_NAME
+              value: {{ .Values.externalSecrets.contract.recall.botName | default "OpenSRE Notetaker" | quote }}
+            - name: RECALL_BOT_IMAGE_URL
+              value: {{ .Values.externalSecrets.contract.recall.botImageUrl | default "https://opensre-assets.s3.us-west-2.amazonaws.com/bot-avatar.png" | quote }}
+            {{- end }}
+            {{- if .Values.externalSecrets.contract.googleChat.enabled }}
+            - name: GOOGLE_CHAT_PROJECT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.externalSecrets.contract.googleChat.secretName | quote }}
+                  key: {{ .Values.externalSecrets.contract.googleChat.projectIdKey | quote }}
+            - name: GOOGLE_CHAT_SERVICE_ACCOUNT_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.externalSecrets.contract.googleChat.secretName | quote }}
+                  key: {{ .Values.externalSecrets.contract.googleChat.serviceAccountKeyKey | quote }}
+            {{- end }}
+            {{- if .Values.externalSecrets.contract.teams.enabled }}
+            - name: TEAMS_APP_ID
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.externalSecrets.contract.teams.secretName | quote }}
+                  key: {{ .Values.externalSecrets.contract.teams.appIdKey | quote }}
+            - name: TEAMS_APP_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.externalSecrets.contract.teams.secretName | quote }}
+                  key: {{ .Values.externalSecrets.contract.teams.appPasswordKey | quote }}
+            - name: TEAMS_TENANT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.externalSecrets.contract.teams.secretName | quote }}
+                  key: {{ .Values.externalSecrets.contract.teams.tenantIdKey | quote }}
+            {{- end }}
+            {{- if .Values.externalSecrets.vercel.enabled }}
+            - name: VERCEL_WEBHOOK_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: opensre-vercel
+                  key: webhook_secret
+            - name: VERCEL_VERIFY
+              value: {{ .Values.vercelVerify | default "" | quote }}
+            {{- end }}
+            # Slack-triggered agent run parameters (enterprise defaults)
+            - name: ORCHESTRATOR_SLACK_AGENT_MAX_TURNS
+              value: {{ default 50 .Values.services.orchestrator.slack.agentMaxTurns | quote }}
+            - name: ORCHESTRATOR_SLACK_AGENT_TIMEOUT_SECONDS
+              value: {{ default 180 .Values.services.orchestrator.slack.agentTimeoutSeconds | quote }}
+            # K8s namespace for CronJobs and dedicated deployments
+            - name: K8S_NAMESPACE
+              value: {{ .Values.namespace | quote }}
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: {{ .Values.services.orchestrator.servicePort }}
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          {{- if .Values.services.orchestrator.livenessProbe.enabled }}
+          livenessProbe:
+            httpGet:
+              path: {{ .Values.services.orchestrator.livenessProbe.path | quote }}
+              port: {{ .Values.services.orchestrator.servicePort }}
+            initialDelaySeconds: {{ .Values.services.orchestrator.livenessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.services.orchestrator.livenessProbe.periodSeconds }}
+          {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: opensre-orchestrator
+  namespace: {{ .Values.namespace }}
+spec:
+  selector:
+    app: opensre-orchestrator
+  ports:
+    - port: {{ .Values.services.orchestrator.servicePort }}
+      targetPort: {{ .Values.services.orchestrator.servicePort }}
+      protocol: TCP
+{{- end }}
+
+

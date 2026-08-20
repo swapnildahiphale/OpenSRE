@@ -65,14 +65,14 @@ function mergeStates(a: OnboardingState, b: OnboardingState): OnboardingState {
 }
 
 interface UseOnboardingOptions {
-  /** When true, uses localStorage only (no server calls). Used for visitors. */
-  isVisitor?: boolean;
+  /** When true, uses localStorage only (no server calls). Used for admin users. */
+  localStorageOnly?: boolean;
 }
 
 export function useOnboarding(options: UseOnboardingOptions = {}) {
-  const { isVisitor = false } = options;
-  const isVisitorRef = useRef(isVisitor);
-  isVisitorRef.current = isVisitor;
+  const { localStorageOnly = false } = options;
+  const localStorageOnlyRef = useRef(localStorageOnly);
+  localStorageOnlyRef.current = localStorageOnly;
 
   const [state, setState] = useState<OnboardingState>(DEFAULT_STATE);
   const [loading, setLoading] = useState(true);
@@ -98,7 +98,7 @@ export function useOnboarding(options: UseOnboardingOptions = {}) {
   // steps are never lost even if one source is stale.
   const loadState = useCallback(async () => {
     // Visitors use localStorage only - no server calls
-    if (isVisitorRef.current) {
+    if (localStorageOnlyRef.current) {
       setLoading(true);
       loadFromLocalStorage();
       setLoading(false);
@@ -158,7 +158,7 @@ export function useOnboarding(options: UseOnboardingOptions = {}) {
       window.dispatchEvent(new CustomEvent('onboarding-state-change', { detail: newState }));
 
       // Async server sync — fire-and-forget but log failures
-      if (!isVisitorRef.current) {
+      if (!localStorageOnlyRef.current) {
         apiFetch('/api/team/preferences', {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
@@ -191,7 +191,7 @@ export function useOnboarding(options: UseOnboardingOptions = {}) {
     setStateAndRef(DEFAULT_STATE);
 
     // Visitors don't sync to server
-    if (isVisitorRef.current) {
+    if (localStorageOnlyRef.current) {
       return;
     }
 

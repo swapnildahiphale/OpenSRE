@@ -63,26 +63,16 @@ def test_nest_bash_under_skill():
     assert len(out[0].nested_bash) == 1
 
 
-def test_nest_closes_on_agent():
+def test_nest_keeps_bash_under_skill_after_other_tools():
     skill = _tool("Skill", {"skill": "project-jira"})
-    agent = _tool("Agent", {"subagent_type": "kubernetes", "description": "pods"})
     bash = _tool("Bash", {"command": "kubectl get pods"})
-    out = nest_bash_under_skills([skill, agent, bash])
-    assert [t.name for t in out] == ["Skill", "Agent", "Bash"]
-    assert out[0].nested_bash == []
-
-
-def test_nest_closes_on_read_then_bash_toplevel():
-    skill = _tool("Skill", {"skill": "project-jira"})
-    read = _tool("Read", {"file_path": "/tmp/SKILL.md"})
-    bash = _tool(
-        "Bash",
-        {
-            "command": "python .claude/skills/infrastructure-kubernetes/scripts/list_pods.py"
-        },
-    )
-    out = nest_bash_under_skills([skill, read, bash])
-    assert [t.name for t in out] == ["Skill", "Read", "Bash"]
+    for extra in (
+        _tool("Agent", {"subagent_type": "kubernetes", "description": "pods"}),
+        _tool("Read", {"file_path": "/tmp/SKILL.md"}),
+    ):
+        out = nest_bash_under_skills([skill, extra, bash])
+        assert [t.name for t in out] == ["Skill", extra.name]
+        assert len(out[0].nested_bash) == 1
 
 
 def test_is_plan_tool():

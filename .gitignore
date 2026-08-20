@@ -93,6 +93,11 @@ test-infra/eks/kubeconfig-eks.yaml
 .gemini/
 .superpowers/
 
+# Local web UI redesign scratch (mockups, session logs, accidental stubs)
+logs/
+web_ui/design/
+web_ui/pnpm-workspace.yaml
+
 # Large video/media files
 video-analysis-frames/
 OpenSRE*.mp4

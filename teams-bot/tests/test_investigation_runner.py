@@ -1,7 +1,9 @@
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+
 from investigation_runner import (
+    SSE_CLIENT_TIMEOUT,
     queue_message,
     run_investigation,
     sanitize_thread_id,
@@ -14,6 +16,14 @@ def test_sanitize_thread_id():
     assert tid.startswith("teams-")
     assert "@" not in tid
     assert " " not in tid
+
+
+def test_sanitize_thread_id_keeps_channel_messageid():
+    raw = "19:b6fb18b3e55b49afb74f7a0ee8a41c64@thread.tacv2;messageid=1786992182741"
+    tid = sanitize_thread_id(raw)
+    assert tid.startswith("teams-")
+    assert "1786992182741" in tid
+    assert len(tid) <= 255
 
 
 def test_shape_answers_from_card_data():
@@ -98,6 +108,7 @@ async def _make_sse_runner(sse_lines: list[str], send_card, stream_close=None):
                 send_card=send_card,
                 update_card=AsyncMock(),
             )
+    assert mock_session.post.call_args.kwargs["json"]["trigger_source"] == "teams"
 
 
 @pytest.mark.asyncio
@@ -155,3 +166,59 @@ async def test_error_event_sends_card_immediately():
     assert len(cards_sent) == 1
     card_str = str(cards_sent[0])
     assert "agent timed out" in card_str
+
+
+def test_sse_timeout_outlives_aiohttp_default_and_agent_cap():
+    # Default aiohttp total is 300s; agent wall-clock is 600s.
+    assert SSE_CLIENT_TIMEOUT.total is not None
+    assert SSE_CLIENT_TIMEOUT.total > 300
+    assert SSE_CLIENT_TIMEOUT.total >= 900
+
+
+@pytest.mark.asyncio
+async def test_sse_read_timeout_sends_error_card():
+    """If the SSE client times out, still post a Teams card instead of going silent."""
+
+    async def _iter_any():
+        raise TimeoutError("read timeout")
+        yield b""  # pragma: no cover — makes this an async generator
+
+    mock_resp = MagicMock()
+    mock_resp.raise_for_status = MagicMock()
+    mock_resp.content.iter_any = _iter_any
+
+    mock_post_ctx = AsyncMock()
+    mock_post_ctx.__aenter__ = AsyncMock(return_value=mock_resp)
+    mock_post_ctx.__aexit__ = AsyncMock(return_value=None)
+
+    mock_session = MagicMock()
+    mock_session.post = MagicMock(return_value=mock_post_ctx)
+
+    mock_session_ctx = AsyncMock()
+    mock_session_ctx.__aenter__ = AsyncMock(return_value=mock_session)
+    mock_session_ctx.__aexit__ = AsyncMock(return_value=None)
+
+    cards_sent: list[dict] = []
+
+    async def fake_send_card(card: dict):
+        cards_sent.append(card)
+        return None
+
+    with patch(
+        "investigation_runner.aiohttp.ClientSession", return_value=mock_session_ctx
+    ) as mock_cls:
+        with patch("investigation_runner.Config") as mock_cfg:
+            mock_cfg.return_value.SRE_AGENT_URL = "http://agent:8001"
+            mock_cfg.return_value.INVESTIGATE_AUTH_TOKEN = ""
+            await run_investigation(
+                thread_id="teams-test",
+                prompt="investigate latency",
+                stream_update=AsyncMock(),
+                stream_close=AsyncMock(),
+                send_card=fake_send_card,
+                update_card=AsyncMock(),
+            )
+
+    mock_cls.assert_called_once_with(timeout=SSE_CLIENT_TIMEOUT)
+    assert len(cards_sent) == 1
+    assert "Timed out waiting for the agent" in str(cards_sent[0])

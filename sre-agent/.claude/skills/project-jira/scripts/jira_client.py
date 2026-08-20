@@ -131,6 +131,69 @@ def jira_request(
         return response.json()
 
 
+def search_jql(
+    jql: str,
+    max_results: int = 50,
+    fields: str | list[str] | None = None,
+) -> dict:
+    """Run a JQL search against the configured Jira flavor.
+
+    Jira Cloud removed GET/POST ``/rest/api/3/search`` (HTTP 410). Use
+    ``POST /rest/api/3/search/jql`` instead. Data Center still uses the
+    classic ``GET /rest/api/2/search`` endpoint.
+
+    ``fields`` may be a comma-separated string or a list; Cloud expects a
+    JSON array in the POST body, DC accepts a comma-separated query param.
+    """
+    if fields is None:
+        field_list: list[str] = [
+            "summary",
+            "status",
+            "issuetype",
+            "priority",
+            "assignee",
+            "reporter",
+            "created",
+            "updated",
+            "labels",
+            "description",
+        ]
+    elif isinstance(fields, str):
+        field_list = [f.strip() for f in fields.split(",") if f.strip()]
+    else:
+        field_list = list(fields)
+
+    api_version = os.getenv("JIRA_API_VERSION", "3")
+    # Cloud (v3 default): enhanced JQL search. DC (v2): classic search.
+    if api_version == "2":
+        data = jira_request(
+            "GET",
+            "/search",
+            params={
+                "jql": jql,
+                "maxResults": max_results,
+                "fields": ",".join(field_list),
+            },
+        )
+    else:
+        data = jira_request(
+            "POST",
+            "/search/jql",
+            json_body={
+                "jql": jql,
+                "maxResults": max_results,
+                "fields": field_list,
+            },
+        )
+
+    if not isinstance(data, dict):
+        return {"issues": [], "total": 0}
+    # Cloud enhanced search omits ``total``; fall back to page length.
+    if "total" not in data:
+        data = {**data, "total": len(data.get("issues") or [])}
+    return data
+
+
 def make_adf_text(text: str) -> dict:
     """Create Atlassian Document Format (ADF) for a text block."""
     return {

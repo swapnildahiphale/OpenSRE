@@ -1,0 +1,89 @@
+{{- /*
+PodDisruptionBudgets (optional per service).
+*/ -}}
+
+{{- if and .Values.services.configService.enabled .Values.services.configService.pdb.enabled }}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: opensre-config-service
+  namespace: {{ .Values.namespace }}
+spec:
+  minAvailable: {{ .Values.services.configService.pdb.minAvailable }}
+  selector:
+    matchLabels:
+      app: opensre-config-service
+{{- end }}
+
+{{- if and .Values.services.orchestrator.enabled .Values.services.orchestrator.pdb.enabled }}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: opensre-orchestrator
+  namespace: {{ .Values.namespace }}
+spec:
+  minAvailable: {{ .Values.services.orchestrator.pdb.minAvailable }}
+  selector:
+    matchLabels:
+      app: opensre-orchestrator
+{{- end }}
+
+{{- if and .Values.services.agent.enabled .Values.services.agent.pdb.enabled }}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: opensre-agent
+  namespace: {{ .Values.namespace }}
+spec:
+  minAvailable: {{ .Values.services.agent.pdb.minAvailable }}
+  selector:
+    matchLabels:
+      app: opensre-agent
+{{- end }}
+
+{{- if and .Values.services.aiPipelineApi.enabled .Values.services.aiPipelineApi.pdb.enabled }}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: opensre-ai-pipeline-api
+  namespace: {{ .Values.namespace }}
+spec:
+  minAvailable: {{ .Values.services.aiPipelineApi.pdb.minAvailable }}
+  selector:
+    matchLabels:
+      app: opensre-ai-pipeline-api
+{{- end }}
+
+{{- if and .Values.services.webUi.enabled .Values.services.webUi.pdb.enabled }}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: opensre-web-ui
+  namespace: {{ .Values.namespace }}
+spec:
+  minAvailable: {{ .Values.services.webUi.pdb.minAvailable }}
+  selector:
+    matchLabels:
+      app: opensre-web-ui
+{{- end }}
+
+{{- if and .Values.services.k8sGateway.enabled .Values.services.k8sGateway.pdb.enabled }}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: opensre-k8s-gateway
+  namespace: {{ .Values.namespace }}
+spec:
+  minAvailable: {{ .Values.services.k8sGateway.pdb.minAvailable }}
+  selector:
+    matchLabels:
+      app: opensre-k8s-gateway
+{{- end }}
+
+

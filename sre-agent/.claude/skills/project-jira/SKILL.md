@@ -15,10 +15,15 @@ In **direct/local mode** the scripts also support self-hosted Jira Data Center v
 - Cloud (atlassian.net): `JIRA_URL`, `JIRA_EMAIL`, `JIRA_API_TOKEN`. Leave `JIRA_AUTH_SCHEME`/`JIRA_API_VERSION` unset → defaults to Basic auth + REST API v3 (ADF bodies).
 - Data Center (self-hosted): `JIRA_URL`, `JIRA_API_TOKEN`, `JIRA_AUTH_SCHEME=bearer`, `JIRA_API_VERSION=2`. Omit `JIRA_EMAIL`. The token is sent as `Authorization: Bearer <token>` and requests go to `/rest/api/2`.
 
+Do **not** set `JIRA_AUTH_SCHEME=bearer` for Cloud — Cloud API tokens require Basic auth (`email:token`). Bearer is for Data Center PATs only.
+
 Configuration environment variables you CAN check (non-secret):
 - `JIRA_URL` - Jira instance URL (e.g., `https://your-company.atlassian.net` for Cloud, `https://jira.yourcorp.com` for Data Center)
 - `JIRA_API_VERSION` - `3` (Cloud, default) or `2` (Data Center)
 - `JIRA_AUTH_SCHEME` - `bearer` for Data Center PAT auth; unset for Cloud Basic auth
+
+### Search endpoint note (Cloud vs Data Center)
+Jira Cloud removed classic `/rest/api/3/search` (returns HTTP 410). `search_issues.py` / `list_issues.py` use `POST /rest/api/3/search/jql` when `JIRA_API_VERSION` is unset/`3`. Data Center (`JIRA_API_VERSION=2`) still uses `GET /rest/api/2/search`.
 
 ### Body format note (v2 vs v3)
 Jira Cloud (v3) uses Atlassian Document Format (ADF JSON) for `description`/`body` fields. Jira Data Center (v2) uses **Jira Wiki Markup** — a plain string that supports rich formatting: `*bold*`, `_italic_`, `||...||` tables, `{code}...{code}` blocks, headings, lists, etc. The scripts auto-pick the right format from `JIRA_API_VERSION`, so callers can pass the same `--description` / `--comment` text regardless of flavor; for v2 you may use Wiki Markup syntax to get rich rendering.

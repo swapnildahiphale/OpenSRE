@@ -87,7 +87,7 @@ export default function MarkdownFallback({
   }
 
   return (
-    <div className="bg-white dark:bg-stone-800 p-3 rounded-lg border border-stone-200 dark:border-stone-600">
+    <div className="rounded-xl border border-slate-200/80 dark:border-stone-600 bg-white dark:bg-stone-800 p-4">
       <MarkdownContent content={content} />
     </div>
   );

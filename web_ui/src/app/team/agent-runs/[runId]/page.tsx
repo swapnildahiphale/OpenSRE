@@ -8,16 +8,12 @@ import { timelineToTurns, mergeTurns } from '@/lib/agentTimeline';
 import ConversationTranscript from '@/components/ConversationTranscript';
 import ConversationComposer from '@/components/ConversationComposer';
 import { interruptThread } from '@/lib/streamRequest';
-import { ArrowLeft, Loader2, CheckCircle, XCircle, Activity, Square, Clock } from 'lucide-react';
-
-const statusBadge = (s: string) => {
-  if (s === 'completed') return <CheckCircle className="w-4 h-4 text-green-600" />;
-  if (s === 'failed') return <XCircle className="w-4 h-4 text-clay" />;
-  if (s === 'timeout') return <Clock className="w-4 h-4 text-yellow-600" />;
-  if (s === 'interrupted') return <Square className="w-4 h-4 text-amber-600 fill-current" />;
-  if (s === 'running') return <Loader2 className="w-4 h-4 animate-spin text-forest" />;
-  return <Activity className="w-4 h-4 text-stone-400" />;
-};
+import {
+  EpisodeResolutionBadge,
+  RunStatusBadge,
+} from '@/components/RunStatusBadge';
+import { Skeleton, TeamPageShell } from '@/components/ui-flow';
+import { ArrowLeft } from 'lucide-react';
 
 const NO_RESUME = "This conversation can't be continued (no saved session). Start a new investigation.";
 const STORAGE_KEY = 'opensre.trace.technicalDetails';
@@ -28,6 +24,7 @@ export default function AgentRunDetailPage() {
   const {
     turns: historicalTurns, title, status,
     sessionId, threadId, continuable, errorMessage, loading, error, reload,
+    episode, triggerSource,
   } = useConversation(runId);
 
   const stream = useAgentStream({
@@ -35,9 +32,6 @@ export default function AgentRunDetailPage() {
     resumeSessionId: sessionId ?? undefined,
   });
 
-  // Pull stable callbacks out so settle/onSend deps don't churn every render.
-  // useAgentStream returns a plain object literal — not memoized — so referencing
-  // stream.reset directly in a dep array would re-create the callbacks each render.
   const {
     reset: resetStream,
     sendMessage,
@@ -48,16 +42,12 @@ export default function AgentRunDetailPage() {
   } = stream;
   const isRunning = status === 'running' || stream.isStreaming;
 
-  // When a live follow-up settles, refresh history (which now includes the new
-  // run) then clear the live timeline. reload-then-reset avoids a content gap.
   const settle = useCallback(async () => { await reload(); resetStream(); }, [reload, resetStream]);
 
   const onSend = useCallback((message: string) => {
     sendMessage(message);
   }, [sendMessage]);
 
-  // Stop works for live SSE on this page OR for runs still "running" in the DB
-  // after navigating here from the investigation drawer (no local stream).
   const onStop = useCallback(async () => {
     if (stream.isStreaming) {
       await stopStream();
@@ -90,13 +80,26 @@ export default function AgentRunDetailPage() {
     }
   }, [stream.isStreaming, stream.runStatus, stream.timeline.length, settle]);
 
-  if (loading) return <div className="p-8 flex justify-center"><Loader2 className="w-6 h-6 animate-spin text-stone-400" /></div>;
-  if (error) return <div className="p-8 text-center text-stone-500">{error}</div>;
+  if (loading) {
+    return (
+      <TeamPageShell variant="conversation">
+        <div className="py-12 space-y-4">
+          <Skeleton className="h-8 w-48" />
+          <Skeleton className="h-32 w-full rounded-xl" />
+          <Skeleton className="h-48 w-full rounded-xl" />
+        </div>
+      </TeamPageShell>
+    );
+  }
+  if (error) {
+    return (
+      <TeamPageShell variant="conversation">
+        <p className="py-12 text-center text-slate-500">{error}</p>
+      </TeamPageShell>
+    );
+  }
 
   const liveTurns = timelineToTurns(stream.timeline);
-  // mergeTurns drops the historical copy of the run being live-streamed
-  // (stream.runId) so an in-flight follow-up isn't rendered twice — once from
-  // the polled DB trace and once from the SSE stream. See mergeTurns docstring.
   const turns = mergeTurns(historicalTurns, liveTurns, stream.runId);
 
   const displayStatus = isRunning
@@ -107,45 +110,88 @@ export default function AgentRunDetailPage() {
     displayStatus === 'timeout' || displayStatus === 'failed'
   );
 
+  const channelLabel = (triggerSource ?? 'web_ui').replace(/_/g, ' ');
+  const turnLabel = `${turns.length} turn${turns.length === 1 ? '' : 's'}`;
+
   return (
-    <div className="max-w-4xl mx-auto p-6">
-      <button onClick={() => router.push('/team/agent-runs')} className="flex items-center gap-2 text-sm text-stone-500 hover:text-stone-700 mb-4">
-        <ArrowLeft className="w-4 h-4" /> Back to investigations
-      </button>
-      <div className="mb-6 min-w-0">
-        <h1 className="text-xl font-semibold text-stone-900 dark:text-white flex items-center gap-2 min-w-0">
-          <span className="truncate">{title}</span>
-          {statusBadge(displayStatus)}
-        </h1>
-      </div>
-      {showHaltBanner && (
-        <div className="mb-4 rounded-xl border border-yellow-200 dark:border-yellow-800/50 bg-yellow-50 dark:bg-yellow-900/20 px-4 py-3 text-sm text-yellow-900 dark:text-yellow-100">
-          {haltMessage}
+    <TeamPageShell
+      variant="conversation"
+      footer={
+        <div className="py-4">
+          {/* Full column width — same edges as run title / transcript */}
+          <ConversationComposer
+            embedded
+            onSend={onSend}
+            onQueueMessage={queueMessage}
+            queuedMessages={queuedMessages}
+            onStop={isRunning ? onStop : undefined}
+            busy={isRunning}
+            disabled={!isRunning && !continuable}
+            disabledReason={NO_RESUME}
+          />
         </div>
-      )}
-      <label className="flex items-center gap-2 text-xs text-stone-500 mb-3">
-        <input
-          type="checkbox"
-          checked={technicalDetails}
-          onChange={(e) => onToggle(e.target.checked)}
+      }
+    >
+      <div className="py-8">
+        <button
+          type="button"
+          onClick={() => router.push('/team/agent-runs')}
+          className="inline-flex items-center gap-2 text-sm text-slate-500 hover:text-slate-700 mb-5 transition-colors"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          Back to investigations
+        </button>
+
+        <header className="mb-6 min-w-0">
+          <div className="flex flex-wrap items-start gap-3 mb-2">
+            <h1 className="text-2xl md:text-3xl font-medium tracking-tight text-slate-900 leading-snug flex-1 min-w-0 dark:text-white">
+              {title}
+            </h1>
+            <RunStatusBadge status={displayStatus} size="md" />
+          </div>
+          <div className="flex flex-wrap items-center gap-2 text-sm">
+            {episode?.issue_type && (
+              <span className="font-mono text-[12px] text-slate-500">
+                {episode.issue_type}
+              </span>
+            )}
+            {episode && (
+              <EpisodeResolutionBadge
+                resolved={episode.resolved ?? false}
+                size="sm"
+                showIcon={false}
+              />
+            )}
+            <span className="text-xs text-slate-400 font-mono tabular-nums">
+              · {turnLabel} · {channelLabel}
+            </span>
+          </div>
+        </header>
+
+        {showHaltBanner && (
+          <div className="mb-4 rounded-xl border border-yellow-200 dark:border-yellow-800/50 bg-yellow-50 dark:bg-yellow-900/20 px-4 py-3 text-sm text-yellow-900 dark:text-yellow-100">
+            {haltMessage}
+          </div>
+        )}
+
+        <label className="flex items-center gap-2 text-xs text-slate-500 mb-4 cursor-pointer select-none">
+          <input
+            type="checkbox"
+            className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500/30"
+            checked={technicalDetails}
+            onChange={(e) => onToggle(e.target.checked)}
+          />
+          Debug Mode
+        </label>
+
+        {/* Full column width — align agent chat with run title edges */}
+        <ConversationTranscript
+          turns={turns}
+          isRunning={isRunning}
+          technicalDetails={technicalDetails}
+          backgroundWaiting={backgroundWaiting}
         />
-        Debug Mode
-      </label>
-      <ConversationTranscript
-        turns={turns}
-        isRunning={isRunning}
-        technicalDetails={technicalDetails}
-        backgroundWaiting={backgroundWaiting}
-      />
-      <ConversationComposer
-        onSend={onSend}
-        onQueueMessage={queueMessage}
-        queuedMessages={queuedMessages}
-        onStop={isRunning ? onStop : undefined}
-        busy={isRunning}
-        disabled={!isRunning && !continuable}
-        disabledReason={NO_RESUME}
-      />
-    </div>
+      </div>
+    </TeamPageShell>
   );
 }

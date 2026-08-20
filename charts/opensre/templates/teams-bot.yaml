@@ -1,0 +1,126 @@
+{{- if .Values.services.teamsBot.enabled }}
+# =============================================================================
+# Teams Bot - Microsoft Teams SDK integration
+# =============================================================================
+# Handles:
+# - Channel @mentions and personal chat messages
+# - Investigation streaming via sre-agent SSE
+# - Adaptive Card answers for clarifying questions
+# =============================================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: opensre-teams-bot
+  namespace: {{ .Values.namespace }}
+  labels:
+    app: opensre-teams-bot
+spec:
+  replicas: {{ .Values.services.teamsBot.replicas | default 1 }}
+  selector:
+    matchLabels:
+      app: opensre-teams-bot
+  template:
+    metadata:
+      labels:
+        app: opensre-teams-bot
+    spec:
+      {{- if .Values.global.imagePullSecrets }}
+      imagePullSecrets:
+{{ toYaml .Values.global.imagePullSecrets | indent 8 }}
+      {{- end }}
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+      containers:
+        - name: teams-bot
+          image: {{ required "services.teamsBot.image is required" .Values.services.teamsBot.image }}
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          # Image bakes deps via `uv sync`; avoid `uv run` at runtime (non-root cannot write .venv).
+          command: ["/app/.venv/bin/python", "app.py"]
+          ports:
+            - containerPort: {{ .Values.services.teamsBot.servicePort | default 3978 }}
+              name: http
+          resources:
+{{ toYaml .Values.services.teamsBot.resources | indent 12 }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          envFrom:
+            - secretRef:
+                name: {{ .Values.secrets.teamsBotEnv | quote }}
+          env:
+            - name: PORT
+              value: {{ .Values.services.teamsBot.servicePort | default 3978 | quote }}
+            - name: SRE_AGENT_URL
+              value: {{ printf "http://opensre-agent.%s.svc.cluster.local:%d" .Values.namespace (.Values.services.agent.servicePort | int) | quote }}
+            # uv defaults to /.cache/uv; non-root UID 1000 cannot write there.
+            - name: UV_CACHE_DIR
+              value: /tmp/uv-cache
+          readinessProbe:
+            tcpSocket:
+              port: {{ .Values.services.teamsBot.servicePort | default 3978 }}
+            initialDelaySeconds: {{ .Values.services.teamsBot.readinessProbe.initialDelaySeconds | default 5 }}
+            periodSeconds: {{ .Values.services.teamsBot.readinessProbe.periodSeconds | default 10 }}
+          {{- if .Values.services.teamsBot.livenessProbe.enabled }}
+          livenessProbe:
+            tcpSocket:
+              port: {{ .Values.services.teamsBot.servicePort | default 3978 }}
+            initialDelaySeconds: {{ .Values.services.teamsBot.livenessProbe.initialDelaySeconds | default 10 }}
+            periodSeconds: {{ .Values.services.teamsBot.livenessProbe.periodSeconds | default 30 }}
+          {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: opensre-teams-bot
+  namespace: {{ .Values.namespace }}
+  labels:
+    app: opensre-teams-bot
+spec:
+  type: ClusterIP
+  ports:
+    - port: {{ .Values.services.teamsBot.servicePort | default 3978 }}
+      targetPort: {{ .Values.services.teamsBot.servicePort | default 3978 }}
+      protocol: TCP
+      name: http
+  selector:
+    app: opensre-teams-bot
+{{- if .Values.services.teamsBot.ingress.enabled }}
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: opensre-teams-bot
+  namespace: {{ .Values.namespace }}
+  labels:
+    app: opensre-teams-bot
+  {{- if .Values.services.teamsBot.ingress.annotations }}
+  annotations:
+{{ toYaml .Values.services.teamsBot.ingress.annotations | indent 4 }}
+  {{- end }}
+spec:
+  ingressClassName: {{ .Values.services.teamsBot.ingress.className | quote }}
+  {{- if and .Values.services.teamsBot.ingress.tls.enabled .Values.services.teamsBot.ingress.tls.secretName }}
+  tls:
+    - hosts:
+        - {{ required "services.teamsBot.ingress.host is required when ingress.tls.enabled=true" .Values.services.teamsBot.ingress.host | quote }}
+      secretName: {{ .Values.services.teamsBot.ingress.tls.secretName | quote }}
+  {{- end }}
+  rules:
+    - {{- if .Values.services.teamsBot.ingress.host }}
+      host: {{ .Values.services.teamsBot.ingress.host | quote }}
+      {{- end }}
+      http:
+        paths:
+          - path: {{ .Values.services.teamsBot.ingress.path | default "/api/messages" | quote }}
+            pathType: {{ .Values.services.teamsBot.ingress.pathType | default "Exact" | quote }}
+            backend:
+              service:
+                name: opensre-teams-bot
+                port:
+                  number: {{ .Values.services.teamsBot.servicePort | default 3978 }}
+{{- end }}
+{{- end }}

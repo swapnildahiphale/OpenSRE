@@ -45,32 +45,49 @@ export function NewInvestigationDrawer({ open, onClose, onComplete }: Props) {
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end">
-      <div className="absolute inset-0 bg-black/20 dark:bg-black/40" onClick={closeChat} />
-      <div className="relative w-full max-w-2xl bg-white dark:bg-stone-800 shadow-2xl flex flex-col h-full">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-stone-200 dark:border-stone-700">
+      <div className="absolute inset-0 bg-slate-900/20" onClick={closeChat} />
+      <div className="relative flex h-full w-full max-w-2xl flex-col bg-white shadow-2xl">
+        <div className="flex items-center justify-between border-b border-slate-200/70 px-6 py-4">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-forest-light/15 dark:bg-forest/30 flex items-center justify-center"><Sparkles className="w-5 h-5 text-forest" /></div>
-            <div><h2 className="font-semibold text-stone-900 dark:text-white">Ask OpenSRE</h2><p className="text-xs text-stone-500">AI-powered incident investigation</p></div>
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-100/55">
+              <Sparkles className="h-5 w-5 text-emerald-600" />
+            </div>
+            <div>
+              <h2 className="font-semibold text-slate-900">New Investigation</h2>
+              <p className="text-xs text-slate-500">AI-powered incident investigation</p>
+            </div>
           </div>
           <div className="flex items-center gap-2">
             {runId && !isStreaming && (
-              <button onClick={() => router.push(`/team/agent-runs/${runId}`)} className="text-xs text-forest hover:underline">View saved run</button>
+              <button
+                onClick={() => router.push(`/team/agent-runs/${runId}`)}
+                className="rounded-full bg-emerald-100/50 px-3 py-1 text-xs font-medium text-emerald-700 hover:bg-emerald-100/80"
+              >
+                View saved run
+              </button>
             )}
-            <button onClick={closeChat} className="p-2 text-stone-400 hover:text-stone-600 dark:hover:text-stone-300 rounded-lg hover:bg-stone-100 dark:hover:bg-stone-800"><X className="w-5 h-5" /></button>
+            <button
+              onClick={closeChat}
+              className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+            >
+              <X className="h-5 w-5" />
+            </button>
           </div>
         </div>
         <div className="flex-1 overflow-y-auto p-6">
           {timeline.length === 0 && !isStreaming ? (
-            <div className="text-center py-12">
-              <Bot className="w-12 h-12 mx-auto text-stone-300 dark:text-stone-600 mb-4" />
-              <p className="text-stone-500 mb-2">Start an investigation</p>
-              <p className="text-sm text-stone-400">Describe the issue and the AI will analyze your systems.</p>
+            <div className="py-12 text-center">
+              <Bot className="mx-auto mb-4 h-12 w-12 text-slate-300" />
+              <p className="mb-2 text-slate-600">Start an investigation</p>
+              <p className="text-sm text-slate-400">
+                Describe the issue and the AI will analyze your systems.
+              </p>
             </div>
           ) : (
             <ConversationTranscript turns={timelineToTurns(timeline)} isRunning={isStreaming} backgroundWaiting={backgroundWaiting} />
           )}
         </div>
-        <div className="border-t border-stone-200 dark:border-stone-700 px-4 pb-4 [&>div]:mt-4">
+        <div className="border-t border-slate-200/70 px-4 pb-4 [&>div]:mt-4">
           <ConversationComposer
             onSend={sendMessage}
             onQueueMessage={queueMessage}

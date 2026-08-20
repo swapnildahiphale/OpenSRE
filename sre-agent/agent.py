@@ -1461,7 +1461,9 @@ class InteractiveAgentSession:
                                             result_text,
                                             parent_tool_use_id=parent_tool_use_id,
                                         )
-                                    pending_ids = sorted(self._outstanding_background_tasks)
+                                    pending_ids = sorted(
+                                        self._outstanding_background_tasks
+                                    )
                                     yield background_waiting_event(
                                         self.thread_id,
                                         pending_count=len(pending_ids),

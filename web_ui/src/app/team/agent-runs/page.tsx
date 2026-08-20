@@ -1,12 +1,13 @@
 'use client';
 
+import type { ReactNode } from 'react';
 import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
+import { clsx } from 'clsx';
 import { useIdentity } from '@/lib/useIdentity';
-import { apiFetch } from '@/lib/apiClient';
 import { useOnboarding } from '@/lib/useOnboarding';
-import { NewInvestigationDrawer } from '@/components/NewInvestigationDrawer';
-import { TeamPageHeader } from '@/components/team/TeamPageHeader';
+import { apiFetch } from '@/lib/apiClient';
+import { useInvestigationLauncher } from '@/components/shell/InvestigationLauncherContext';
 import {
   buildEpisodeMap,
   pickThreadSummary,
@@ -18,21 +19,31 @@ import {
   RunStatusBadge,
 } from '@/components/RunStatusBadge';
 import {
-  Activity,
-  Loader2,
+  PageHeader,
+  Chip,
+  EmptyState,
+  Button,
+  Skeleton,
+  Panel,
+  listRowHoverClass,
+  TeamPageShell,
+} from '@/components/ui-flow';
+import {
   MessageSquare,
-  Zap,
+  Monitor,
   Terminal,
-  RefreshCcw,
+  RotateCw,
   Calendar,
-  Sparkles,
+  Search,
+  Plus,
+  FileText,
 } from 'lucide-react';
 
 interface AgentRun {
   id: string;
   correlationId: string;
   agentName: string;
-  triggerSource: 'slack' | 'api' | 'scheduled' | 'manual' | 'web_ui';
+  triggerSource: 'slack' | 'api' | 'scheduled' | 'manual' | 'web_ui' | 'teams';
   triggerActor?: string;
   triggerMessage?: string;
   status: 'running' | 'completed' | 'failed' | 'timeout' | 'interrupted';
@@ -51,29 +62,87 @@ interface Conversation {
   turnCount: number;
 }
 
-const selectClass =
-  'px-3 py-1.5 text-sm rounded-lg border border-stone-200 dark:border-stone-600 bg-white dark:bg-stone-800';
+const STATUS_OPTIONS = [
+  { value: 'all', label: 'All' },
+  { value: 'running', label: 'running' },
+  { value: 'completed', label: 'completed' },
+  { value: 'interrupted', label: 'interrupted' },
+  { value: 'failed', label: 'failed' },
+  { value: 'timeout', label: 'timeout' },
+] as const;
 
+const ISSUE_TYPE_INITIAL = 5;
+const ISSUE_TYPE_BATCH = 5;
+const ISSUE_TYPE_MAX = 12;
+
+// Channel icons aligned to investigations mockup (Monitor for web ui, not Zap/flash).
 const triggerIcon = (s: string) => {
-  if (s === 'slack') return <MessageSquare className="w-4 h-4" />;
-  if (s === 'api') return <Terminal className="w-4 h-4" />;
-  if (s === 'scheduled') return <Calendar className="w-4 h-4" />;
-  return <Zap className="w-4 h-4" />;
+  if (s === 'slack' || s === 'teams') return <MessageSquare className="w-3.5 h-3.5" />;
+  if (s === 'api') return <Terminal className="w-3.5 h-3.5" />;
+  if (s === 'scheduled') return <Calendar className="w-3.5 h-3.5" />;
+  if (s === 'manual') return <FileText className="w-3.5 h-3.5" />;
+  // web_ui — desktop/monitor glyph from mockup
+  return <Monitor className="w-3.5 h-3.5" />;
 };
+
+function FilterSectionLabel({ children }: { children: ReactNode }) {
+  return (
+    <div className="text-[11px] uppercase tracking-[0.22em] text-slate-500 mb-3">
+      {children}
+    </div>
+  );
+}
+
+function StatusFilterItem({
+  active,
+  label,
+  onClick,
+}: {
+  active: boolean;
+  label: string;
+  onClick: () => void;
+}) {
+  return (
+    <li>
+      <button
+        type="button"
+        onClick={onClick}
+        className={clsx(
+          'flex items-center gap-2.5 w-full text-left text-sm transition-colors',
+          active ? 'text-emerald-700 font-medium' : 'text-slate-700 hover:text-slate-900',
+        )}
+      >
+        <span
+          className={clsx(
+            'w-3.5 h-3.5 rounded border shrink-0',
+            active ? 'border-emerald-500 bg-emerald-500' : 'border-slate-300',
+          )}
+          aria-hidden
+        />
+        {label}
+      </button>
+    </li>
+  );
+}
 
 export default function TeamAgentRunsPage() {
   const router = useRouter();
   const { identity } = useIdentity();
-  const isVisitor = identity?.auth_kind === 'visitor';
-  const { state: onboardingState, markFirstAgentRunCompleted, setQuickStartStep } =
-    useOnboarding({ isVisitor });
+  const {
+    state: onboardingState,
+    markFirstAgentRunCompleted,
+    setQuickStartStep,
+  } = useOnboarding();
   const [runs, setRuns] = useState<AgentRun[]>([]);
   const [episodes, setEpisodes] = useState<ThreadEpisode[]>([]);
   const [loading, setLoading] = useState(true);
   const [filterStatus, setFilterStatus] = useState('all');
   const [filterChannel, setFilterChannel] = useState('all');
+  const [selectedIssueTypes, setSelectedIssueTypes] = useState<Set<string>>(new Set());
+  const [issueTypeVisibleCount, setIssueTypeVisibleCount] = useState(ISSUE_TYPE_INITIAL);
   const [searchText, setSearchText] = useState('');
-  const [showChat, setShowChat] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const { open: openInvestigation, registerOnComplete } = useInvestigationLauncher();
   const teamId = identity?.team_node_id;
   const initialLoadDone = useRef(false);
 
@@ -103,11 +172,34 @@ export default function TeamAgentRunsPage() {
     loadRuns();
   }, [loadRuns]);
 
+  const handleInvestigationComplete = useCallback(() => {
+    loadRuns();
+    if (onboardingState.quickStartStep === 5) {
+      markFirstAgentRunCompleted();
+      setQuickStartStep(6);
+    }
+  }, [
+    loadRuns,
+    onboardingState.quickStartStep,
+    markFirstAgentRunCompleted,
+    setQuickStartStep,
+  ]);
+
+  useEffect(() => {
+    return registerOnComplete(handleInvestigationComplete);
+  }, [registerOnComplete, handleInvestigationComplete]);
+
   useEffect(() => {
     if (!runs.some((r) => r.status === 'running')) return;
     const id = setInterval(loadRuns, 5000);
     return () => clearInterval(id);
   }, [runs, loadRuns]);
+
+  const handleRefresh = () => {
+    setRefreshing(true);
+    loadRuns();
+    window.setTimeout(() => setRefreshing(false), 600);
+  };
 
   const episodeMap = useMemo(() => buildEpisodeMap(episodes), [episodes]);
 
@@ -132,9 +224,54 @@ export default function TeamAgentRunsPage() {
     return out.sort((a, b) => b.latestRun.startedAt.localeCompare(a.latestRun.startedAt));
   }, [runs]);
 
+  const issueTypeFreqs = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const ep of episodes) {
+      if (ep.issue_type) {
+        counts.set(ep.issue_type, (counts.get(ep.issue_type) ?? 0) + 1);
+      }
+    }
+    return [...counts.entries()]
+      .map(([value, count]) => ({ value, count }))
+      .sort((a, b) => b.count - a.count);
+  }, [episodes]);
+
+  const visibleIssueTypes = issueTypeFreqs.slice(
+    0,
+    Math.min(issueTypeVisibleCount, ISSUE_TYPE_MAX),
+  );
+  const canExpandIssueTypes =
+    issueTypeVisibleCount < Math.min(issueTypeFreqs.length, ISSUE_TYPE_MAX);
+
+  const expandIssueTypes = () => {
+    setIssueTypeVisibleCount((n) =>
+      Math.min(n + ISSUE_TYPE_BATCH, ISSUE_TYPE_MAX, issueTypeFreqs.length),
+    );
+  };
+
+  const toggleIssueType = (value: string) => {
+    setSelectedIssueTypes((prev) => {
+      const next = new Set(prev);
+      if (next.has(value)) next.delete(value);
+      else next.add(value);
+      return next;
+    });
+  };
+
+  const clearAllFilters = () => {
+    setFilterStatus('all');
+    setFilterChannel('all');
+    setSelectedIssueTypes(new Set());
+    setSearchText('');
+  };
+
   const filtered = conversations.filter((c) => {
     if (filterStatus !== 'all' && c.latestRun.status !== filterStatus) return false;
     if (filterChannel !== 'all' && c.latestRun.triggerSource !== filterChannel) return false;
+    if (selectedIssueTypes.size > 0) {
+      const ep = episodeMap.get(c.correlationId);
+      if (!ep?.issue_type || !selectedIssueTypes.has(ep.issue_type)) return false;
+    }
     if (!searchText.trim()) return true;
     const ep = episodeMap.get(c.correlationId);
     const summary = pickThreadSummary(ep, c.latestRun, c.firstRun).toLowerCase();
@@ -149,197 +286,270 @@ export default function TeamAgentRunsPage() {
 
   const channelOptions = useMemo(() => {
     const sources = new Set(runs.map((r) => r.triggerSource));
-    return ['web_ui', 'slack', 'api', 'manual', 'scheduled'].filter((s) =>
+    return ['web_ui', 'teams', 'slack', 'api', 'manual', 'scheduled'].filter((s) =>
       sources.has(s as AgentRun['triggerSource']),
     );
   }, [runs]);
 
   const runningCount = conversations.filter((c) => c.latestRun.status === 'running').length;
-  const fmtDuration = (s?: number) => (!s ? '-' : s < 60 ? `${s}s` : `${Math.floor(s / 60)}m ${s % 60}s`);
+  const fmtDuration = (s?: number) =>
+    !s ? null : s < 60 ? `${s}s` : `${Math.floor(s / 60)}m ${s % 60}s`;
+
+  const hasActiveFilters =
+    filterStatus !== 'all' ||
+    filterChannel !== 'all' ||
+    selectedIssueTypes.size > 0 ||
+    searchText.trim().length > 0;
 
   return (
-    <div className="p-6 lg:p-8 max-w-5xl mx-auto space-y-6">
-      <TeamPageHeader
-        icon={Activity}
-        title="Investigations"
-        subtitle="Past threads your team ran through the agent"
-        actions={
-          <div className="flex items-center gap-3">
-            {runningCount > 0 && (
-              <div className="flex items-center gap-2 px-3 py-1.5 bg-stone-100 dark:bg-stone-700 text-stone-700 dark:text-stone-400 rounded-full text-sm font-medium">
-                <Loader2 className="w-4 h-4 animate-spin" />
-                {runningCount} running
-              </div>
-            )}
-            <button
-              onClick={() => setShowChat(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-forest hover:bg-forest-dark text-white rounded-lg text-sm font-medium transition-colors"
-            >
-              <Sparkles className="w-4 h-4" />
-              New Investigation
-            </button>
-            <button
-              onClick={loadRuns}
-              className="p-2 text-stone-400 hover:text-stone-600 dark:hover:text-stone-300 rounded-lg hover:bg-stone-100 dark:hover:bg-stone-800"
-            >
-              <RefreshCcw className="w-5 h-5" />
-            </button>
-          </div>
-        }
-      />
-
-      {!loading && conversations.length > 0 && (
-        <div className="flex flex-wrap items-center gap-3">
-          <input
-            type="text"
-            placeholder="Search investigations..."
-            value={searchText}
-            onChange={(e) => setSearchText(e.target.value)}
-            className="flex-1 min-w-[200px] px-3 py-1.5 text-sm rounded-lg border border-stone-200 dark:border-stone-600 bg-white dark:bg-stone-800"
+    <TeamPageShell
+      className="space-y-10"
+      header={
+        <div className="flex flex-wrap items-end justify-between gap-6">
+          <PageHeader
+            eyebrow="Investigations"
+            title="Runs"
+            subtitle="Episode and thread summaries"
           />
-          <select
-            value={filterStatus}
-            onChange={(e) => setFilterStatus(e.target.value)}
-            className={selectClass}
-          >
-            <option value="all">All Status</option>
-            <option value="running">Running</option>
-            <option value="completed">Completed</option>
-            <option value="interrupted">Interrupted</option>
-            <option value="failed">Failed</option>
-            <option value="timeout">Timeout</option>
-          </select>
-          <select
-            value={filterChannel}
-            onChange={(e) => setFilterChannel(e.target.value)}
-            className={selectClass}
-          >
-            <option value="all">All channels</option>
-            {channelOptions.map((ch) => (
-              <option key={ch} value={ch}>
-                {ch.replace(/_/g, ' ')}
-              </option>
-            ))}
-          </select>
-        </div>
-      )}
-
-      {loading ? (
-        <div className="space-y-3">
-          {[1, 2, 3].map((i) => (
-            <div
-              key={i}
-              className="animate-pulse bg-white dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded-xl p-4"
-            >
-              <div className="flex gap-2 mb-3">
-                <div className="h-5 w-16 bg-stone-200 dark:bg-stone-700 rounded-full" />
-                <div className="h-5 w-24 bg-stone-200 dark:bg-stone-700 rounded-full" />
-              </div>
-              <div className="h-4 w-full bg-stone-200 dark:bg-stone-700 rounded mb-2" />
-              <div className="h-4 w-3/4 bg-stone-200 dark:bg-stone-700 rounded" />
+          {!loading && conversations.length > 0 && (
+            <div className="flex items-center gap-3 shrink-0">
+              {runningCount > 0 && (
+                <span className="inline-flex items-center gap-2 h-9 px-3.5 rounded-full text-[13px] font-medium bg-slate-100 text-slate-600">
+                  <span className="live-dot w-2 h-2 rounded-full shrink-0" aria-hidden />
+                  <span className="font-mono tabular-nums">
+                    {runningCount} running
+                  </span>
+                </span>
+              )}
+              <button
+                type="button"
+                onClick={handleRefresh}
+                className="p-2 text-slate-400 hover:text-slate-600 rounded-full hover:bg-slate-100 transition-colors"
+                aria-label="Refresh"
+                title="Refresh"
+              >
+                <RotateCw className={clsx('w-5 h-5', refreshing && 'animate-spin')} />
+              </button>
             </div>
+          )}
+        </div>
+      }
+    >
+      {loading ? (
+        <div className="space-y-4">
+          {[1, 2, 3].map((i) => (
+            <Skeleton key={i} className="h-28 w-full rounded-xl" />
           ))}
         </div>
       ) : conversations.length === 0 ? (
-        <div className="bg-white dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded-xl p-12 text-center">
-          <Activity className="w-12 h-12 mx-auto text-stone-300 dark:text-stone-600 mb-4" />
-          <p className="text-stone-500 dark:text-stone-400 mb-4">No investigations yet.</p>
-          <button
-            onClick={() => setShowChat(true)}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-forest hover:bg-forest-dark text-white rounded-lg text-sm font-medium transition-colors"
-          >
-            <Sparkles className="w-4 h-4" />
-            New Investigation
-          </button>
-        </div>
-      ) : filtered.length === 0 ? (
-        <div className="bg-white dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded-xl p-12 text-center">
-          <p className="text-stone-500 dark:text-stone-400">No investigations match your filters.</p>
-        </div>
+        <EmptyState
+          title="No investigations yet"
+          action={
+            <Button variant="primary" onClick={openInvestigation}>
+              <Plus className="w-3.5 h-3.5" />
+              New Investigation
+            </Button>
+          }
+        />
       ) : (
-        <div className="space-y-3">
-          {filtered.map((conv) => {
-            const ep = episodeMap.get(conv.correlationId);
-            const summary = pickThreadSummary(ep, conv.latestRun, conv.firstRun);
-            const isRunning = conv.latestRun.status === 'running';
+        <div className="grid grid-cols-12 gap-10">
+          <aside className="col-span-12 lg:col-span-3">
+            <div className="sticky top-[80px] space-y-8">
+              <div>
+                <FilterSectionLabel>Status</FilterSectionLabel>
+                <ul className="space-y-1.5">
+                  {STATUS_OPTIONS.map((opt) => (
+                    <StatusFilterItem
+                      key={opt.value}
+                      label={opt.label}
+                      active={filterStatus === opt.value}
+                      onClick={() => setFilterStatus(opt.value)}
+                    />
+                  ))}
+                </ul>
+              </div>
 
-            return (
-              <button
-                key={conv.correlationId}
-                onClick={() => router.push(`/team/agent-runs/${conv.latestRun.id}`)}
-                className={`w-full text-left bg-white dark:bg-stone-800 border rounded-xl p-4 shadow-sm hover:bg-stone-50 dark:hover:bg-stone-800/50 transition-colors active:scale-[0.98] ${
-                  isRunning
-                    ? 'border-forest-light dark:border-forest'
-                    : 'border-stone-200 dark:border-stone-700'
-                }`}
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1.5 flex-wrap">
-                      <RunStatusBadge status={conv.latestRun.status} />
-                      {ep?.issue_type && (
-                        <span className="text-sm font-medium text-stone-900 dark:text-white">
-                          {ep.issue_type}
-                        </span>
-                      )}
-                      {ep && <EpisodeResolutionBadge resolved={ep.resolved ?? false} />}
-                      <span className="text-xs text-stone-400">
-                        {formatRelativeTime(conv.latestRun.startedAt)}
-                      </span>
-                    </div>
-
-                    <p className="text-sm text-stone-700 dark:text-stone-300 line-clamp-2 mb-2">
-                      {summary}
-                    </p>
-
-                    {ep?.services && ep.services.length > 0 && (
-                      <div className="flex gap-1.5 mb-2 flex-wrap">
-                        {ep.services.slice(0, 3).map((s) => (
-                          <span
-                            key={s}
-                            className="text-xs bg-stone-100 dark:bg-stone-700 text-stone-700 dark:text-stone-300 px-2 py-0.5 rounded"
-                          >
-                            {s}
-                          </span>
-                        ))}
-                      </div>
+              {issueTypeFreqs.length > 0 && (
+                <div>
+                  <FilterSectionLabel>Issue type</FilterSectionLabel>
+                  <div className="flex flex-wrap gap-1.5">
+                    {visibleIssueTypes.map(({ value, count }) => (
+                      <Chip
+                        key={value}
+                        active={selectedIssueTypes.has(value)}
+                        onClick={() => toggleIssueType(value)}
+                        className="h-auto px-2.5 py-1 font-mono normal-case"
+                      >
+                        {value}{' '}
+                        <span className="text-slate-400 tabular-nums">{count}</span>
+                      </Chip>
+                    ))}
+                    {canExpandIssueTypes && (
+                      <button
+                        type="button"
+                        onClick={expandIssueTypes}
+                        className="px-2.5 py-1 rounded-full text-xs font-medium border border-slate-200/70 bg-slate-50 text-slate-500 hover:bg-slate-100 hover:border-slate-300 hover:text-slate-600 font-mono transition"
+                        aria-label="Show more issue types"
+                        title="Show more issue types"
+                      >
+                        …
+                      </button>
                     )}
-
-                    <div className="flex items-center gap-2 text-xs text-stone-400 flex-wrap">
-                      <span className="flex items-center gap-1 capitalize">
-                        {triggerIcon(conv.latestRun.triggerSource)}
-                        {conv.latestRun.triggerSource.replace(/_/g, ' ')}
-                      </span>
-                      <span>·</span>
-                      <span>{fmtDuration(conv.latestRun.durationSeconds)}</span>
-                      {conv.turnCount > 1 && (
-                        <>
-                          <span>·</span>
-                          <span>{conv.turnCount} turns</span>
-                        </>
-                      )}
-                    </div>
                   </div>
                 </div>
-              </button>
-            );
-          })}
+              )}
+
+              <div>
+                <FilterSectionLabel>Channel</FilterSectionLabel>
+                <div className="flex flex-wrap gap-1.5">
+                  <Chip
+                    active={filterChannel === 'all'}
+                    onClick={() => setFilterChannel('all')}
+                    className="h-auto px-2.5 py-1 normal-case"
+                  >
+                    all
+                  </Chip>
+                  {channelOptions.map((ch) => (
+                    <Chip
+                      key={ch}
+                      active={filterChannel === ch}
+                      onClick={() => setFilterChannel(ch)}
+                      className="h-auto px-2.5 py-1 normal-case"
+                    >
+                      {ch.replace(/_/g, ' ')}
+                    </Chip>
+                  ))}
+                </div>
+              </div>
+
+              {hasActiveFilters && (
+                <div>
+                  <button
+                    type="button"
+                    onClick={clearAllFilters}
+                    className="text-[12px] text-slate-500 hover:text-slate-800 transition-colors"
+                  >
+                    clear all
+                  </button>
+                </div>
+              )}
+            </div>
+          </aside>
+
+          <div className="col-span-12 lg:col-span-9">
+            <div className="relative mb-6">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+              <input
+                type="text"
+                placeholder="Search investigations..."
+                value={searchText}
+                onChange={(e) => setSearchText(e.target.value)}
+                className="w-full pl-10 pr-4 py-2.5 text-sm rounded-xl border border-slate-200/70 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-400/50"
+              />
+            </div>
+
+            {filtered.length === 0 ? (
+              <EmptyState
+                title="No investigations match your filters"
+                action={
+                  hasActiveFilters ? (
+                    <Button variant="secondary" onClick={clearAllFilters}>
+                      Clear filters
+                    </Button>
+                  ) : undefined
+                }
+              />
+            ) : (
+              <Panel
+                as="ul"
+                className="rounded-[1.5rem] shadow-[0_20px_40px_-15px_rgba(15,23,42,0.05)] divide-y divide-slate-100"
+              >
+                {filtered.map((conv) => {
+                  const ep = episodeMap.get(conv.correlationId);
+                  const summary = pickThreadSummary(ep, conv.latestRun, conv.firstRun);
+                  const isRunning = conv.latestRun.status === 'running';
+                  const duration = fmtDuration(conv.latestRun.durationSeconds);
+
+                  return (
+                    <li key={conv.correlationId}>
+                      <button
+                        type="button"
+                        onClick={() => router.push(`/team/agent-runs/${conv.latestRun.id}`)}
+                        className={clsx(
+                          'w-full text-left px-5 py-4',
+                          listRowHoverClass,
+                          isRunning && 'border-l-2 border-emerald-400',
+                        )}
+                      >
+                        <div className="flex items-start gap-3">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex flex-wrap items-center gap-2 mb-1.5">
+                              <RunStatusBadge status={conv.latestRun.status} size="sm" />
+                              {ep?.issue_type && (
+                                <span className="font-mono text-[12px] text-slate-500">
+                                  {ep.issue_type}
+                                </span>
+                              )}
+                              {ep && (
+                                <EpisodeResolutionBadge
+                                  resolved={ep.resolved ?? false}
+                                  size="sm"
+                                  showIcon={false}
+                                />
+                              )}
+                              <span className="text-xs text-slate-400 font-mono tabular-nums ml-auto">
+                                {formatRelativeTime(conv.latestRun.startedAt)}
+                              </span>
+                            </div>
+
+                            <p className="text-[14.5px] text-slate-900 leading-snug mb-2">
+                              {summary}
+                            </p>
+
+                            {ep?.services && ep.services.length > 0 && (
+                              <div className="flex gap-1.5 mb-2 flex-wrap">
+                                {ep.services.slice(0, 5).map((s) => (
+                                  <span
+                                    key={s}
+                                    className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded-md font-mono"
+                                  >
+                                    {s}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+
+                            <div className="flex items-center gap-2 text-xs text-slate-400 flex-wrap">
+                              <span className="inline-flex items-center gap-1 capitalize">
+                                {triggerIcon(conv.latestRun.triggerSource)}
+                                {conv.latestRun.triggerSource.replace(/_/g, ' ')}
+                              </span>
+                              {duration && !isRunning && (
+                                <>
+                                  <span>·</span>
+                                  <span className="font-mono tabular-nums">{duration}</span>
+                                </>
+                              )}
+                              {conv.turnCount > 1 && (
+                                <>
+                                  <span>·</span>
+                                  <span className="font-mono tabular-nums">
+                                    {conv.turnCount} turns
+                                  </span>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </button>
+                    </li>
+                  );
+                })}
+              </Panel>
+            )}
+          </div>
         </div>
       )}
-
-      {showChat && (
-        <NewInvestigationDrawer
-          open={showChat}
-          onClose={() => setShowChat(false)}
-          onComplete={() => {
-            loadRuns();
-            if (onboardingState.quickStartStep === 5) {
-              markFirstAgentRunCompleted();
-              setQuickStartStep(6);
-            }
-          }}
-        />
-      )}
-    </div>
+    </TeamPageShell>
   );
 }

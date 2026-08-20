@@ -94,6 +94,33 @@ def test_create_agent_run_uses_resolved_identity(monkeypatch):
     assert run_id is not None
     assert posted["body"]["org_id"] == "pilot"
     assert posted["body"]["team_node_id"] == "SRE"
+    assert posted["body"]["trigger_source"] == "web_ui"
+
+
+def test_create_agent_run_uses_teams_trigger_source(monkeypatch):
+    monkeypatch.setenv("OPENSRE_TENANT_ID", "local")
+    monkeypatch.setenv("OPENSRE_TEAM_ID", "default")
+    import server_simple
+
+    server_simple._team_identity_by_thread["thread-teams-src"] = ("pilot", "SRE")
+    server_simple._trigger_source_by_thread["thread-teams-src"] = "teams"
+    posted = {}
+
+    def fake_post(url, json=None, headers=None, timeout=None):
+        posted["body"] = json
+        resp = MagicMock()
+        resp.raise_for_status = MagicMock()
+        return resp
+
+    with patch.object(server_simple.httpx, "post", side_effect=fake_post):
+        run_id = server_simple._create_agent_run(
+            thread_id="thread-teams-src",
+            prompt="oc-1234",
+        )
+
+    assert run_id is not None
+    assert posted["body"]["trigger_source"] == "teams"
+    assert posted["body"]["correlation_id"] == "thread-teams-src"
 
 
 def test_memory_stats_resolves_tenancy_from_request_header(monkeypatch):

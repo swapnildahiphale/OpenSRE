@@ -13,7 +13,6 @@ import {
   Brain,
   CheckCircle,
   XCircle,
-  Loader2,
   Eye,
   Plus,
   Sparkles,
@@ -24,7 +23,7 @@ import {
 import { TreeSelector, type EffectiveTree, type TreeStats } from '@/components/knowledge/TreeSelector';
 import { CreateTreeModal } from '@/components/knowledge/CreateTreeModal';
 import { UploadDocumentModal } from '@/components/knowledge/UploadDocumentModal';
-import { HelpTip } from '@/components/onboarding/HelpTip';
+import { PageHeader, Button, Skeleton, listRowHoverClass, TeamPageShell } from '@/components/ui-flow';
 
 // Lazy load the TreeExplorer since it's heavy
 const TreeExplorer = lazy(() =>
@@ -55,6 +54,52 @@ interface ProposedKBChange {
 }
 
 type TabType = 'explorer' | 'documents' | 'proposed';
+
+/** Segmented tabs — same position/style for Explorer, Documents, and Proposed. */
+function KnowledgeTabs({
+  activeTab,
+  onTabChange,
+  documentsCount,
+  proposedCount,
+}: {
+  activeTab: TabType;
+  onTabChange: (tab: TabType) => void;
+  documentsCount: number;
+  proposedCount: number;
+}) {
+  const tabClass = (tab: TabType) =>
+    `px-4 py-2 text-sm font-medium rounded-lg transition-all flex items-center gap-2 ${
+      activeTab === tab
+        ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm'
+        : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-white'
+    }`;
+
+  return (
+    <div
+      className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 rounded-xl p-1 w-fit"
+      role="tablist"
+      aria-label="Knowledge sections"
+    >
+      <button type="button" role="tab" aria-selected={activeTab === 'explorer'} onClick={() => onTabChange('explorer')} className={tabClass('explorer')}>
+        <Network className="w-4 h-4 shrink-0" />
+        Explorer
+      </button>
+      <button type="button" role="tab" aria-selected={activeTab === 'documents'} onClick={() => onTabChange('documents')} className={tabClass('documents')}>
+        <FileText className="w-4 h-4 shrink-0" />
+        Documents ({documentsCount})
+      </button>
+      <button type="button" role="tab" aria-selected={activeTab === 'proposed'} onClick={() => onTabChange('proposed')} className={tabClass('proposed')}>
+        <Sparkles className="w-4 h-4 shrink-0" />
+        Proposed
+        {proposedCount > 0 && (
+          <span className="w-5 h-5 rounded-full bg-emerald-100/60 text-emerald-700 text-xs flex items-center justify-center font-medium">
+            {proposedCount}
+          </span>
+        )}
+      </button>
+    </div>
+  );
+}
 
 export default function TeamKnowledgePage() {
   const { identity } = useIdentity();
@@ -349,441 +394,341 @@ export default function TeamKnowledgePage() {
     }
   };
 
-  // Full-page layout for Tree Explorer
-  if (activeTab === 'explorer') {
-    return (
-      <div className="h-[calc(100vh-64px)] flex flex-col">
-        {/* Header */}
-        <div className="flex-shrink-0 px-6 py-4 bg-white dark:bg-stone-800 border-b border-stone-200 dark:border-stone-700">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-forest flex items-center justify-center">
-                <Layers className="w-5 h-5 text-white" />
-              </div>
-              <div>
-                <h1 className="text-xl font-semibold text-stone-900 dark:text-white flex items-center gap-2">
-                  Knowledge Base
-                  <HelpTip id="knowledge-base" position="right">
-                    <strong>Knowledge Base</strong> stores your team's documentation, runbooks, and learned patterns. The AI uses this to provide context-aware incident investigations.
-                  </HelpTip>
-                </h1>
-                <p className="text-xs text-stone-500 flex items-center gap-1">
-                  RAPTOR Tree Explorer • Semantic Search & Q&A
-                  <HelpTip id="raptor-tree" position="right">
-                    <strong>RAPTOR</strong> organizes knowledge hierarchically using AI clustering. Higher nodes summarize groups of related documents, enabling fast semantic search across large knowledge bases.
-                  </HelpTip>
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-3">
-              {/* Add Document Button */}
-              {selectedTree && (
-                <button
-                  onClick={() => setShowUploadModal(true)}
-                  className="flex items-center gap-2 px-4 py-2 bg-forest text-white text-sm rounded-lg hover:bg-forest-dark transition-colors"
-                >
-                  <Upload className="w-4 h-4" />
-                  Add Document
-                </button>
-              )}
-
-              {/* Tab switcher */}
-              <div className="flex items-center bg-stone-100 dark:bg-stone-700 rounded-lg p-1">
-                <button
-                  onClick={() => setActiveTab('explorer')}
-                className={`px-4 py-2 text-sm font-medium rounded-md transition-all flex items-center gap-2 ${
-                  activeTab === 'explorer'
-                    ? 'bg-white dark:bg-stone-700 text-stone-900 dark:text-white shadow-sm'
-                    : 'text-stone-600 dark:text-stone-400 hover:text-stone-900 dark:hover:text-white'
-                }`}
-              >
-                <Network className="w-4 h-4" />
-                Explorer
-              </button>
-              <button
-                onClick={() => setActiveTab('documents')}
-                className={`px-4 py-2 text-sm font-medium rounded-md transition-all flex items-center gap-2 ${
-                  (activeTab as TabType) === 'documents'
-                    ? 'bg-white dark:bg-stone-700 text-stone-900 dark:text-white shadow-sm'
-                    : 'text-stone-600 dark:text-stone-400 hover:text-stone-900 dark:hover:text-white'
-                }`}
-              >
-                <FileText className="w-4 h-4" />
-                Documents
-              </button>
-              <button
-                onClick={() => setActiveTab('proposed')}
-                className={`px-4 py-2 text-sm font-medium rounded-md transition-all flex items-center gap-2 ${
-                  (activeTab as TabType) === 'proposed'
-                    ? 'bg-white dark:bg-stone-700 text-stone-900 dark:text-white shadow-sm'
-                    : 'text-stone-600 dark:text-stone-400 hover:text-stone-900 dark:hover:text-white'
-                }`}
-              >
-                <Sparkles className="w-4 h-4" />
-                AI Proposed
-                {proposedChanges.length > 0 && (
-                  <span className="w-5 h-5 rounded-full bg-stone-500 text-white text-xs flex items-center justify-center">
-                    {proposedChanges.length}
-                  </span>
-                )}
-                <HelpTip id="ai-proposed" position="bottom">
-                  AI learns from your incidents and proposes new knowledge entries. Review and approve them to improve future investigations.
-                </HelpTip>
-              </button>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Tree Cards Section */}
-        <div className="flex-shrink-0 px-6 py-4 bg-stone-50 dark:bg-stone-800/50 border-b border-stone-200 dark:border-stone-700">
-          <TreeSelector
-            trees={effectiveTrees}
-            treeStats={treeStats}
-            selectedTree={selectedTree}
-            onSelectTree={setSelectedTree}
-            loading={treesLoading}
-            onCreateTree={() => setShowCreateTreeModal(true)}
-          />
-        </div>
-
-        {/* Tree Explorer */}
-        <div className="flex-1 min-h-0">
-          {selectedTree ? (
-            <Suspense
-              fallback={
-                <div className="h-full flex items-center justify-center bg-stone-50 dark:bg-stone-800">
-                  <div className="text-center">
-                    <Loader2 className="w-8 h-8 animate-spin text-stone-400 mx-auto mb-3" />
-                    <p className="text-stone-500">Loading Tree Explorer...</p>
-                  </div>
-                </div>
-              }
-            >
-              <TreeExplorer treeName={selectedTree} />
-            </Suspense>
-          ) : (
-            <div className="h-full flex items-center justify-center bg-stone-50 dark:bg-stone-800">
-              <div className="text-center">
-                <Layers className="w-12 h-12 text-stone-300 dark:text-stone-600 mx-auto mb-3" />
-                <p className="text-stone-500">Select a tree to explore</p>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Create Tree Modal */}
-        {showCreateTreeModal && (
-          <CreateTreeModal
-            onClose={() => setShowCreateTreeModal(false)}
-            onCreated={handleTreeCreated}
-          />
-        )}
-
-        {/* Upload Document Modal */}
-        {showUploadModal && selectedTree && (
-          <UploadDocumentModal
-            treeName={selectedTree}
-            onClose={() => setShowUploadModal(false)}
-            onUploaded={handleDocumentUploaded}
-          />
-        )}
+  // Shared chrome: PageHeader + tabs stay fixed; only the body swaps.
+  // Explorer used to put tabs in header actions (right) while Documents used
+  // Chip pills below — switching tabs jumped and misaligned the control.
+  const headerActions =
+    activeTab === 'explorer' ? (
+      selectedTree ? (
+        <Button variant="primary" onClick={() => setShowUploadModal(true)}>
+          <Upload className="w-4 h-4" />
+          Upload
+        </Button>
+      ) : null
+    ) : (
+      <div className="flex items-center gap-3">
+        <input
+          type="file"
+          ref={fileInputRef}
+          onChange={handleFileUpload}
+          className="hidden"
+          accept=".pdf,.md,.txt,.doc,.docx"
+        />
+        <Button
+          variant="secondary"
+          onClick={() => fileInputRef.current?.click()}
+          disabled={uploading}
+        >
+          <Upload className={`w-4 h-4 ${uploading ? 'animate-pulse' : ''}`} />
+          {uploading ? 'Uploading...' : 'Upload'}
+        </Button>
+        <Button variant="primary" onClick={() => setShowAddModal(true)}>
+          <Plus className="w-4 h-4" />
+          Add Entry
+        </Button>
       </div>
     );
-  }
 
-  // Standard layout for Documents and Proposed tabs
   return (
-    <div className="p-8 max-w-5xl mx-auto">
-      <div className="flex items-center justify-between mb-8">
-        <div>
-          <h1 className="text-2xl font-semibold text-stone-900 dark:text-white flex items-center gap-3">
-            <BookOpen className="w-7 h-7 text-stone-500" />
-            Knowledge Base
-          </h1>
-          <p className="text-sm text-stone-500 mt-1">
-            Manage your team's knowledge for AI-powered incident resolution.
-          </p>
-        </div>
-        <div className="flex items-center gap-3">
-          <input
-            type="file"
-            ref={fileInputRef}
-            onChange={handleFileUpload}
-            className="hidden"
-            accept=".pdf,.md,.txt,.doc,.docx"
-          />
-          <button
-            onClick={() => fileInputRef.current?.click()}
-            disabled={uploading}
-            className="flex items-center gap-2 px-4 py-2 bg-stone-100 dark:bg-stone-700 text-stone-700 dark:text-stone-300 rounded-lg hover:bg-stone-200 dark:hover:bg-stone-700"
-          >
-            <Upload className={`w-4 h-4 ${uploading ? 'animate-pulse' : ''}`} />
-            {uploading ? 'Uploading...' : 'Upload'}
-          </button>
-          <button
-            onClick={() => setShowAddModal(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-forest text-white rounded-lg hover:bg-forest-dark"
-          >
-            <Plus className="w-4 h-4" />
-            Add Entry
-          </button>
-        </div>
-      </div>
-
-      {/* Message */}
-      {message && (
-        <div
-          className={`mb-6 p-4 rounded-xl flex items-center gap-3 ${
-            message.type === 'success'
-              ? 'bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 text-green-700 dark:text-green-400'
-              : 'bg-clay-light/10 dark:bg-clay/20 border border-clay-light dark:border-clay text-clay-dark dark:text-clay-light'
-          }`}
-        >
-          {message.type === 'success' ? <CheckCircle className="w-5 h-5" /> : <XCircle className="w-5 h-5" />}
-          {message.text}
-        </div>
-      )}
-
-      {/* Tabs */}
-      <div className="flex items-center gap-4 mb-6 border-b border-stone-200 dark:border-stone-700">
-        <button
-          onClick={() => setActiveTab('explorer')}
-          className={`pb-3 px-1 text-sm font-medium border-b-2 transition-colors flex items-center gap-2 ${
-            (activeTab as TabType) === 'explorer'
-              ? 'border-stone-900 dark:border-white text-stone-900 dark:text-white'
-              : 'border-transparent text-stone-500 hover:text-stone-700 dark:hover:text-stone-300'
-          }`}
-        >
-          <Network className="w-4 h-4" />
-          Tree Explorer
-        </button>
-        <button
-          onClick={() => setActiveTab('documents')}
-          className={`pb-3 px-1 text-sm font-medium border-b-2 transition-colors ${
-            (activeTab as TabType) === 'documents'
-              ? 'border-stone-900 dark:border-white text-stone-900 dark:text-white'
-              : 'border-transparent text-stone-500 hover:text-stone-700 dark:hover:text-stone-300'
-          }`}
-        >
-          Documents ({documents.length})
-        </button>
-        <button
-          onClick={() => setActiveTab('proposed')}
-          className={`pb-3 px-1 text-sm font-medium border-b-2 transition-colors flex items-center gap-2 ${
-            (activeTab as TabType) === 'proposed'
-              ? 'border-stone-900 dark:border-white text-stone-900 dark:text-white'
-              : 'border-transparent text-stone-500 hover:text-stone-700 dark:hover:text-stone-300'
-          }`}
-        >
-          <Sparkles className="w-4 h-4" />
-          AI Proposed ({proposedChanges.length})
-          {proposedChanges.length > 0 && (
-            <span className="w-2 h-2 rounded-full bg-stone-500 animate-pulse" />
-          )}
-        </button>
-      </div>
-
-      {loading && (activeTab as TabType) !== 'explorer' ? (
-        <div className="flex items-center justify-center py-12">
-          <Loader2 className="w-6 h-6 animate-spin text-stone-400" />
-        </div>
-      ) : (
+    <>
+    <TeamPageShell
+      variant="fixedHeader"
+      header={
         <>
-          {activeTab === 'documents' && (
-            <>
-              {/* Search */}
-              <div className="relative mb-6">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400" />
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search knowledge base..."
-                  className="w-full pl-10 pr-4 py-2 rounded-lg border border-stone-200 dark:border-stone-600 bg-white dark:bg-stone-800"
-                />
-              </div>
-
-              {/* Documents List */}
-              {filteredDocs.length === 0 ? (
-                <div className="bg-stone-50 dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded-xl p-12 text-center">
-                  <BookOpen className="w-12 h-12 mx-auto text-stone-300 dark:text-stone-600 mb-4" />
-                  <p className="text-stone-500">No knowledge documents found.</p>
-                  <p className="text-sm text-stone-400 mt-2">
-                    Try the <button onClick={() => setActiveTab('explorer')} className="text-stone-600 dark:text-stone-400 hover:underline">Tree Explorer</button> to search the RAPTOR knowledge base.
-                  </p>
-                </div>
+          <PageHeader
+            eyebrow="Team console"
+            title="Knowledge"
+            subtitle="Team docs and RAPTOR knowledge trees for semantic search and Q&A"
+            actions={headerActions}
+          />
+          <KnowledgeTabs
+            activeTab={activeTab}
+            onTabChange={setActiveTab}
+            documentsCount={documents.length}
+            proposedCount={proposedChanges.length}
+          />
+          {message && (
+            <div
+              className={`p-4 rounded-xl flex items-center gap-3 ${
+                message.type === 'success'
+                  ? 'bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 text-green-700 dark:text-green-400'
+                  : 'bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-500 text-rose-700 dark:text-rose-400'
+              }`}
+            >
+              {message.type === 'success' ? (
+                <CheckCircle className="w-5 h-5" />
               ) : (
-                <div className="space-y-3">
-                  {filteredDocs.map((doc) => (
-                    <div
-                      key={doc.id}
-                      className="bg-white dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded-xl p-4"
-                    >
-                      <div className="flex items-start justify-between">
-                        <div className="flex items-start gap-3 flex-1">
-                          <div
-                            className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${
-                              doc.type === 'learned'
-                                ? 'bg-stone-100 dark:bg-stone-700 text-stone-600'
-                                : 'bg-stone-100 dark:bg-stone-700 text-stone-600'
-                            }`}
-                          >
-                            {getTypeIcon(doc.type)}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 mb-1">
-                              <h3 className="font-medium text-stone-900 dark:text-white truncate">
-                                {doc.title}
-                              </h3>
-                              {doc.type === 'learned' && doc.confidence && (
-                                <span className="text-xs bg-stone-100 dark:bg-stone-700 text-stone-600 px-2 py-0.5 rounded-full">
-                                  {doc.confidence}% confidence
-                                </span>
-                              )}
+                <XCircle className="w-5 h-5" />
+              )}
+              {message.text}
+            </div>
+          )}
+        </>
+      }
+      bleed={
+        activeTab === 'explorer' ? (
+        <>
+          <div className="shrink-0 px-10 py-4 bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200/70">
+            <div className="max-w-[1240px] mx-auto w-full">
+              <TreeSelector
+                trees={effectiveTrees}
+                treeStats={treeStats}
+                selectedTree={selectedTree}
+                onSelectTree={setSelectedTree}
+                loading={treesLoading}
+                onCreateTree={() => setShowCreateTreeModal(true)}
+              />
+            </div>
+          </div>
+
+          <div className="flex-1 min-h-0">
+            {selectedTree ? (
+              <Suspense
+                fallback={
+                  <div className="h-full flex items-center justify-center bg-slate-50 dark:bg-slate-800">
+                    <div className="text-center space-y-3 w-48 mx-auto">
+                      <Skeleton className="h-8 w-8 rounded-full mx-auto" />
+                      <p className="text-slate-500">Loading Tree Explorer...</p>
+                    </div>
+                  </div>
+                }
+              >
+                <TreeExplorer treeName={selectedTree} />
+              </Suspense>
+            ) : (
+              <div className="h-full flex items-center justify-center bg-slate-50 dark:bg-slate-800">
+                <div className="text-center">
+                  <Layers className="w-12 h-12 text-slate-300 dark:text-slate-600 mx-auto mb-3" />
+                  <p className="text-slate-500">Select a tree to explore</p>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {showCreateTreeModal && (
+            <CreateTreeModal
+              onClose={() => setShowCreateTreeModal(false)}
+              onCreated={handleTreeCreated}
+            />
+          )}
+
+          {showUploadModal && selectedTree && (
+            <UploadDocumentModal
+              treeName={selectedTree}
+              onClose={() => setShowUploadModal(false)}
+              onUploaded={handleDocumentUploaded}
+            />
+          )}
+        </>
+        ) : undefined
+      }
+    >
+      {activeTab !== 'explorer' && (
+        <>
+          {loading ? (
+            <div className="flex flex-col items-center justify-center py-12 gap-3 w-full max-w-md mx-auto">
+              <Skeleton className="h-24 w-full rounded-xl" />
+              <Skeleton className="h-24 w-full rounded-xl" />
+            </div>
+          ) : (
+            <>
+              {activeTab === 'documents' && (
+                <>
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                    <input
+                      type="text"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      placeholder="Search knowledge base..."
+                      className="w-full pl-10 pr-4 py-2 rounded-full border border-slate-200/70 bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500"
+                    />
+                  </div>
+
+                  {filteredDocs.length === 0 ? (
+                    <div className="rounded-[1.5rem] border border-slate-200/70 bg-white dark:bg-slate-800 p-12 text-center">
+                      <BookOpen className="w-12 h-12 mx-auto text-slate-300 dark:text-slate-600 mb-4" />
+                      <p className="text-slate-500">No knowledge documents found.</p>
+                      <p className="text-sm text-slate-400 mt-2">
+                        Try the{' '}
+                        <button
+                          type="button"
+                          onClick={() => setActiveTab('explorer')}
+                          className="text-slate-600 dark:text-slate-400 hover:underline"
+                        >
+                          Tree Explorer
+                        </button>{' '}
+                        to search the RAPTOR knowledge base.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {filteredDocs.map((doc) => (
+                        <div
+                          key={doc.id}
+                          className={`rounded-[1.5rem] border border-slate-200/70 bg-white dark:bg-slate-800 p-4 ${listRowHoverClass}`}
+                        >
+                          <div className="flex items-start justify-between">
+                            <div className="flex items-start gap-3 flex-1">
+                              <div className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 bg-slate-100 dark:bg-slate-700 text-slate-600">
+                                {getTypeIcon(doc.type)}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2 mb-1">
+                                  <h3 className="text-[14.5px] text-slate-900 dark:text-white truncate">
+                                    {doc.title}
+                                  </h3>
+                                  {doc.type === 'learned' && doc.confidence && (
+                                    <span className="text-xs bg-slate-100 dark:bg-slate-700 text-slate-600 px-2 py-0.5 rounded-full">
+                                      {doc.confidence}% confidence
+                                    </span>
+                                  )}
+                                </div>
+                                <p className="text-sm text-slate-500 line-clamp-2">{doc.summary}</p>
+                                <div className="flex items-center gap-3 mt-2 text-xs text-slate-400">
+                                  <span className="flex items-center gap-1">
+                                    <Clock className="w-3 h-3" />
+                                    {new Date(doc.createdAt).toLocaleDateString()}
+                                  </span>
+                                  <span>by {doc.createdBy}</span>
+                                  {doc.source && (
+                                    <span className="text-slate-500 truncate max-w-[200px]">
+                                      {doc.source}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
                             </div>
-                            <p className="text-sm text-stone-500 line-clamp-2">{doc.summary}</p>
-                            <div className="flex items-center gap-3 mt-2 text-xs text-stone-400">
-                              <span className="flex items-center gap-1">
-                                <Clock className="w-3 h-3" />
-                                {new Date(doc.createdAt).toLocaleDateString()}
-                              </span>
-                              <span>by {doc.createdBy}</span>
-                              {doc.source && (
-                                <span className="text-stone-500 truncate max-w-[200px]">{doc.source}</span>
-                              )}
+                            <div className="flex items-center gap-2 ml-4">
+                              <button
+                                type="button"
+                                onClick={() => setViewingDoc(doc)}
+                                className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
+                                title="View"
+                              >
+                                <Eye className="w-4 h-4" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleDelete(doc.id)}
+                                className="p-2 text-slate-400 hover:text-rose-600"
+                                title="Delete"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
                             </div>
                           </div>
                         </div>
-                        <div className="flex items-center gap-2 ml-4">
-                          <button
-                            onClick={() => setViewingDoc(doc)}
-                            className="p-2 text-stone-400 hover:text-stone-600 dark:hover:text-stone-300"
-                            title="View"
-                          >
-                            <Eye className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => handleDelete(doc.id)}
-                            className="p-2 text-stone-400 hover:text-clay"
-                            title="Delete"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
+                      ))}
+                    </div>
+                  )}
+                </>
+              )}
+
+              {activeTab === 'proposed' && (
+                <div className="space-y-4">
+                  {proposedChanges.length === 0 ? (
+                    <div className="rounded-[1.5rem] border border-slate-200/70 bg-white dark:bg-slate-800 p-12 text-center">
+                      <Sparkles className="w-12 h-12 mx-auto text-slate-300 dark:text-slate-600 mb-4" />
+                      <p className="text-slate-500">No pending AI-proposed changes.</p>
+                      <p className="text-xs text-slate-400 mt-2">
+                        The AI Pipeline will propose knowledge updates based on incident patterns.
+                      </p>
+                    </div>
+                  ) : (
+                    proposedChanges.map((change) => (
+                      <div
+                        key={change.id}
+                        className={`rounded-[1.5rem] border border-slate-200/70 bg-slate-50 dark:bg-slate-700/50 p-5 ${listRowHoverClass}`}
+                      >
+                        <div className="flex items-start justify-between">
+                          <div className="flex items-start gap-3">
+                            <div className="w-10 h-10 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-600 flex items-center justify-center">
+                              <Sparkles className="w-5 h-5" />
+                            </div>
+                            <div>
+                              <div className="flex items-center gap-2 mb-1">
+                                <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400">
+                                  + Add
+                                </span>
+                                <h3 className="text-[14.5px] text-slate-900 dark:text-white">
+                                  {change.document.title}
+                                </h3>
+                              </div>
+                              <p className="text-sm text-slate-600 dark:text-slate-400 mb-2">
+                                {change.document.summary}
+                              </p>
+                              <p className="text-xs text-slate-500">
+                                <span className="font-medium">Reason:</span> {change.reason}
+                              </p>
+                              {change.learnedFrom && (
+                                <p className="text-xs text-slate-500 mt-1">
+                                  Learned from: {change.learnedFrom}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Button
+                              variant="secondary"
+                              onClick={() => handleRejectChange(change.id)}
+                              className="text-rose-600 border-rose-200 hover:bg-rose-50"
+                            >
+                              Reject
+                            </Button>
+                            <Button variant="primary" onClick={() => handleApproveChange(change.id)}>
+                              Approve
+                            </Button>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
+                    ))
+                  )}
                 </div>
               )}
             </>
           )}
 
-          {activeTab === 'proposed' && (
-            <div className="space-y-4">
-              {proposedChanges.length === 0 ? (
-                <div className="bg-stone-50 dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded-xl p-12 text-center">
-                  <Sparkles className="w-12 h-12 mx-auto text-stone-300 dark:text-stone-600 mb-4" />
-                  <p className="text-stone-500">No pending AI-proposed changes.</p>
-                  <p className="text-xs text-stone-400 mt-2">
-                    The AI Pipeline will propose knowledge updates based on incident patterns.
-                  </p>
-                </div>
-              ) : (
-                proposedChanges.map((change) => (
-                  <div
-                    key={change.id}
-                    className="bg-stone-50 dark:bg-stone-700/50 border border-stone-200 dark:border-stone-600 rounded-xl p-5"
-                  >
-                    <div className="flex items-start justify-between">
-                      <div className="flex items-start gap-3">
-                        <div className="w-10 h-10 rounded-lg bg-stone-100 dark:bg-stone-700 text-stone-600 flex items-center justify-center">
-                          <Sparkles className="w-5 h-5" />
-                        </div>
-                        <div>
-                          <div className="flex items-center gap-2 mb-1">
-                            <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400">
-                              + Add
-                            </span>
-                            <h3 className="font-medium text-stone-900 dark:text-white">
-                              {change.document.title}
-                            </h3>
-                          </div>
-                          <p className="text-sm text-stone-600 dark:text-stone-400 mb-2">
-                            {change.document.summary}
-                          </p>
-                          <p className="text-xs text-stone-500">
-                            <span className="font-medium">Reason:</span> {change.reason}
-                          </p>
-                          {change.learnedFrom && (
-                            <p className="text-xs text-stone-500 mt-1">
-                              Learned from: {change.learnedFrom}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => handleRejectChange(change.id)}
-                          className="px-3 py-1.5 text-sm border border-stone-300 dark:border-stone-600 rounded-lg hover:bg-stone-100 dark:hover:bg-stone-800"
-                        >
-                          Reject
-                        </button>
-                        <button
-                          onClick={() => handleApproveChange(change.id)}
-                          className="px-3 py-1.5 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700"
-                        >
-                          Approve
-                        </button>
-                      </div>
-                    </div>
+          {showAddModal && (
+            <AddKnowledgeModal
+              onClose={() => setShowAddModal(false)}
+              onSave={handleAddManual}
+            />
+          )}
+
+          {viewingDoc && (
+            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+              <div className="bg-white dark:bg-slate-800 rounded-2xl w-full max-w-2xl p-6 max-h-[80vh] overflow-y-auto">
+                <div className="flex items-start justify-between mb-4">
+                  <div className="flex items-center gap-3">
+                    {getTypeIcon(viewingDoc.type)}
+                    <h2 className="text-lg font-semibold text-slate-900 dark:text-white">
+                      {viewingDoc.title}
+                    </h2>
                   </div>
-                ))
-              )}
+                  <button
+                    type="button"
+                    onClick={() => setViewingDoc(null)}
+                    className="text-slate-400 hover:text-slate-600"
+                  >
+                    <XCircle className="w-5 h-5" />
+                  </button>
+                </div>
+                <div className="prose dark:prose-invert max-w-none">
+                  {viewingDoc.content || viewingDoc.summary}
+                </div>
+                <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-600 text-xs text-slate-500">
+                  <p>Created: {new Date(viewingDoc.createdAt).toLocaleString()}</p>
+                  <p>By: {viewingDoc.createdBy}</p>
+                  {viewingDoc.source && <p>Source: {viewingDoc.source}</p>}
+                </div>
+              </div>
             </div>
           )}
         </>
       )}
-
-      {/* Add Manual Entry Modal */}
-      {showAddModal && (
-        <AddKnowledgeModal
-          onClose={() => setShowAddModal(false)}
-          onSave={handleAddManual}
-        />
-      )}
-
-      {/* View Document Modal */}
-      {viewingDoc && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-stone-800 rounded-2xl w-full max-w-2xl p-6 max-h-[80vh] overflow-y-auto">
-            <div className="flex items-start justify-between mb-4">
-              <div className="flex items-center gap-3">
-                {getTypeIcon(viewingDoc.type)}
-                <h2 className="text-lg font-semibold text-stone-900 dark:text-white">
-                  {viewingDoc.title}
-                </h2>
-              </div>
-              <button
-                onClick={() => setViewingDoc(null)}
-                className="text-stone-400 hover:text-stone-600"
-              >
-                <XCircle className="w-5 h-5" />
-              </button>
-            </div>
-            <div className="prose dark:prose-invert max-w-none">
-              {viewingDoc.content || viewingDoc.summary}
-            </div>
-            <div className="mt-4 pt-4 border-t border-stone-200 dark:border-stone-600 text-xs text-stone-500">
-              <p>Created: {new Date(viewingDoc.createdAt).toLocaleString()}</p>
-              <p>By: {viewingDoc.createdBy}</p>
-              {viewingDoc.source && <p>Source: {viewingDoc.source}</p>}
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
+    </TeamPageShell>
+    </>
   );
 }
 
@@ -799,13 +744,13 @@ function AddKnowledgeModal({
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-white dark:bg-stone-800 rounded-2xl w-full max-w-lg p-6">
-        <h2 className="text-lg font-semibold text-stone-900 dark:text-white mb-4">
+      <div className="bg-white dark:bg-slate-800 rounded-2xl w-full max-w-lg p-6">
+        <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">
           Add Knowledge Entry
         </h2>
         <div className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-stone-700 dark:text-stone-300 mb-1">
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
               Title
             </label>
             <input
@@ -813,11 +758,11 @@ function AddKnowledgeModal({
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="e.g., Redis Connection Best Practices"
-              className="w-full px-3 py-2 rounded-lg border border-stone-200 dark:border-stone-600 bg-white dark:bg-stone-700"
+              className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-stone-700 dark:text-stone-300 mb-1">
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
               Content
             </label>
             <textarea
@@ -825,21 +770,21 @@ function AddKnowledgeModal({
               onChange={(e) => setContent(e.target.value)}
               rows={6}
               placeholder="Enter the knowledge content..."
-              className="w-full px-3 py-2 rounded-lg border border-stone-200 dark:border-stone-600 bg-white dark:bg-stone-700"
+              className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700"
             />
           </div>
         </div>
         <div className="flex justify-end gap-3 mt-6">
           <button
             onClick={onClose}
-            className="px-4 py-2 text-sm text-stone-600 dark:text-stone-400"
+            className="px-4 py-2 text-sm text-slate-600 dark:text-slate-400"
           >
             Cancel
           </button>
           <button
             onClick={() => onSave({ title, content })}
             disabled={!title.trim() || !content.trim()}
-            className="px-4 py-2 bg-forest text-white rounded-lg hover:bg-forest-dark disabled:opacity-50"
+            className="px-4 py-2 bg-emerald-100/50 text-emerald-700 rounded-full hover:bg-emerald-100/80 disabled:opacity-50"
           >
             Add Entry
           </button>

@@ -7,7 +7,6 @@ import {
   Clock,
   CheckCircle,
   XCircle,
-  Loader2,
   GitPullRequest,
   Sparkles,
   FileCode,
@@ -18,6 +17,7 @@ import {
   Eye,
   Plug,
 } from 'lucide-react';
+import { PageHeader, Button, Chip, Skeleton, listRowHoverClass, TeamPageShell } from '@/components/ui-flow';
 
 interface Evidence {
   source_type: string;  // 'slack_thread', 'confluence_doc', 'agent_trace', etc.
@@ -228,46 +228,48 @@ export default function TeamPendingChangesPage() {
 
   const pendingCount = changes.filter((c) => c.status === 'pending').length;
 
+  const pageHeader = (
+    <PageHeader
+      eyebrow="Team console"
+      title="Proposed Changes"
+      subtitle="Review and approve AI-proposed changes to your team's configuration."
+      actions={
+        pendingCount > 0 ? (
+          <Chip active className="pointer-events-none cursor-default">
+            <Clock className="w-3.5 h-3.5" />
+            {pendingCount} pending
+          </Chip>
+        ) : undefined
+      }
+    />
+  );
+
   if (loading) {
     return (
-      <div className="p-8 flex items-center justify-center">
-        <Loader2 className="w-6 h-6 animate-spin text-stone-400" />
-      </div>
+      <TeamPageShell
+        className="flex flex-col min-h-[calc(100dvh-57px)]"
+        header={pageHeader}
+      >
+        <div className="flex flex-col gap-3">
+          <Skeleton className="h-24 w-full rounded-xl" />
+          <Skeleton className="h-24 w-full rounded-xl" />
+        </div>
+      </TeamPageShell>
     );
   }
 
   return (
-    <div className="h-[calc(100vh-48px)] flex flex-col p-6 max-w-4xl mx-auto">
-      {/* Header - Fixed */}
-      <div className="flex items-center justify-between mb-6 flex-shrink-0">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-forest flex items-center justify-center">
-            <GitPullRequest className="w-5 h-5 text-white" />
-          </div>
-          <div>
-            <h1 className="text-2xl font-semibold text-stone-900 dark:text-white">
-              Proposed Changes
-            </h1>
-            <p className="text-sm text-stone-500">
-              Review and approve AI-proposed changes to your team's configuration.
-            </p>
-          </div>
-        </div>
-        {pendingCount > 0 && (
-          <div className="flex items-center gap-2 px-3 py-1.5 bg-stone-100 dark:bg-stone-700 text-stone-700 dark:text-stone-400 rounded-full text-sm font-medium">
-            <Clock className="w-4 h-4" />
-            {pendingCount} pending
-          </div>
-        )}
-      </div>
-
+    <TeamPageShell
+      className="flex flex-col min-h-[calc(100dvh-57px)]"
+      header={pageHeader}
+    >
       {/* Message - Fixed */}
       {message && (
         <div
           className={`mb-6 p-4 rounded-xl flex items-center gap-3 flex-shrink-0 ${
             message.type === 'success'
               ? 'bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 text-green-700 dark:text-green-400'
-              : 'bg-clay-light/10 dark:bg-clay/20 border border-clay-light dark:border-clay text-clay-dark dark:text-clay-light'
+              : 'bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-500 text-rose-700 dark:text-rose-400'
           }`}
         >
           {message.type === 'success' ? <CheckCircle className="w-5 h-5" /> : <XCircle className="w-5 h-5" />}
@@ -276,28 +278,20 @@ export default function TeamPendingChangesPage() {
       )}
 
       {/* Filter Tabs - Fixed */}
-      <div className="flex items-center gap-2 mb-6 flex-shrink-0">
+      <div className="flex items-center gap-2 flex-shrink-0">
         {(['pending', 'reviewed', 'all'] as const).map((f) => (
-          <button
-            key={f}
-            onClick={() => setFilter(f)}
-            className={`px-4 py-2 text-sm rounded-lg transition-colors ${
-              filter === f
-                ? 'bg-stone-200 dark:bg-stone-700 text-stone-900 dark:text-white'
-                : 'bg-stone-100 dark:bg-stone-700 text-stone-600 dark:text-stone-400 hover:bg-stone-200 dark:hover:bg-stone-700'
-            }`}
-          >
+          <Chip key={f} active={filter === f} onClick={() => setFilter(f)}>
             {f === 'pending' ? 'Pending' : f === 'reviewed' ? 'Reviewed' : 'All'}
-          </button>
+          </Chip>
         ))}
       </div>
 
       {/* Changes List - Scrollable */}
       <div className="flex-1 overflow-y-auto min-h-0">
         {filteredChanges.length === 0 ? (
-          <div className="bg-stone-50 dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded-xl p-12 text-center">
-            <GitPullRequest className="w-12 h-12 mx-auto text-stone-300 dark:text-stone-600 mb-4" />
-            <p className="text-stone-500">
+          <div className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-12 text-center">
+            <GitPullRequest className="w-12 h-12 mx-auto text-slate-300 dark:text-slate-600 mb-4" />
+            <p className="text-slate-500">
               {filter === 'pending' ? 'No pending changes to review.' : 'No changes found.'}
             </p>
           </div>
@@ -306,14 +300,14 @@ export default function TeamPendingChangesPage() {
             {filteredChanges.map((change) => (
             <div
               key={change.id}
-              className={`bg-white dark:bg-stone-800 border rounded-xl overflow-hidden ${
+              className={`bg-white dark:bg-slate-800 border rounded-xl overflow-hidden ${
                 change.status === 'pending'
-                  ? 'border-forest-light dark:border-forest'
-                  : 'border-stone-200 dark:border-stone-700'
+                  ? 'border-emerald-200 dark:border-emerald-500'
+                  : 'border-slate-200 dark:border-slate-700'
               }`}
             >
               <div
-                className="p-4 cursor-pointer hover:bg-stone-50 dark:hover:bg-stone-800/50"
+                className={`p-4 cursor-pointer ${listRowHoverClass}`}
                 onClick={() => setExpandedId(expandedId === change.id ? null : change.id)}
               >
                 <div className="flex items-start justify-between">
@@ -321,8 +315,8 @@ export default function TeamPendingChangesPage() {
                     <div
                       className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${
                         change.source === 'ai_pipeline'
-                          ? 'bg-stone-100 dark:bg-stone-700 text-stone-600'
-                          : 'bg-stone-100 dark:bg-stone-700 text-stone-600'
+                          ? 'bg-slate-100 dark:bg-slate-700 text-slate-600'
+                          : 'bg-slate-100 dark:bg-slate-700 text-slate-600'
                       }`}
                     >
                       {change.source === 'ai_pipeline' ? (
@@ -336,23 +330,23 @@ export default function TeamPendingChangesPage() {
                         <span
                           className={`text-xs px-2 py-0.5 rounded-full ${
                             change.status === 'pending'
-                              ? 'bg-stone-100 dark:bg-stone-700 text-stone-700 dark:text-stone-400'
+                              ? 'bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-400'
                               : change.status === 'approved'
                               ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400'
-                              : 'bg-clay-light/15 dark:bg-clay/20 text-clay-dark dark:text-clay-light'
+                              : 'bg-rose-100/60 dark:bg-rose-900/20 text-rose-700 dark:text-rose-400'
                           }`}
                         >
                           {change.status}
                         </span>
-                        <span className="text-xs text-stone-500 flex items-center gap-1">
+                        <span className="text-xs text-slate-500 flex items-center gap-1">
                           {getTypeIcon(change.changeType)}
                           {getTypeLabel(change.changeType)}
                         </span>
                         {getConfidenceBadge(change.confidence)}
                       </div>
-                      <h3 className="font-medium text-stone-900 dark:text-white">{change.title}</h3>
-                      <p className="text-sm text-stone-500 mt-1">{change.description}</p>
-                      <div className="flex items-center gap-3 mt-2 text-xs text-stone-400">
+                      <h3 className="text-[14.5px] text-slate-900 dark:text-white">{change.title}</h3>
+                      <p className="text-sm text-slate-500 mt-1">{change.description}</p>
+                      <div className="flex items-center gap-3 mt-2 text-xs text-slate-400">
                         <span>by {change.proposedBy}</span>
                         <span>{new Date(change.proposedAt).toLocaleString()}</span>
                       </div>
@@ -360,9 +354,9 @@ export default function TeamPendingChangesPage() {
                   </div>
                   <div className="flex items-center gap-2">
                     {expandedId === change.id ? (
-                      <ChevronDown className="w-5 h-5 text-stone-400" />
+                      <ChevronDown className="w-5 h-5 text-slate-400" />
                     ) : (
-                      <ChevronRight className="w-5 h-5 text-stone-400" />
+                      <ChevronRight className="w-5 h-5 text-slate-400" />
                     )}
                   </div>
                 </div>
@@ -370,16 +364,16 @@ export default function TeamPendingChangesPage() {
 
               {/* Expanded Content */}
               {expandedId === change.id && (
-                <div className="border-t border-stone-200 dark:border-stone-700 p-4 bg-stone-50 dark:bg-stone-900">
+                <div className="border-t border-slate-200 dark:border-slate-700 p-4 bg-slate-50 dark:bg-slate-900">
                   {/* Diff View */}
                   {change.diff && (
                     <div className="mb-4">
-                      <h4 className="text-sm font-medium text-stone-700 dark:text-stone-300 mb-2">Changes</h4>
-                      <div className="bg-white dark:bg-stone-800 border border-stone-200 dark:border-stone-600 rounded-lg overflow-hidden">
+                      <h4 className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Changes</h4>
+                      <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-lg overflow-hidden">
                         {change.diff.before && (
-                          <div className="p-3 border-b border-stone-200 dark:border-stone-600 bg-clay-light/10 dark:bg-clay/10">
-                            <div className="text-xs text-clay mb-1">- Before</div>
-                            <pre className="text-xs text-stone-700 dark:text-stone-300 whitespace-pre-wrap">
+                          <div className="p-3 border-b border-slate-200 dark:border-slate-600 bg-rose-50 dark:bg-rose-900/10">
+                            <div className="text-xs text-rose-600 mb-1">- Before</div>
+                            <pre className="text-xs text-slate-700 dark:text-slate-300 whitespace-pre-wrap">
                               {typeof change.diff.before === 'string'
                                 ? change.diff.before
                                 : JSON.stringify(change.diff.before, null, 2)}
@@ -389,7 +383,7 @@ export default function TeamPendingChangesPage() {
                         {change.diff.after && (
                           <div className="p-3 bg-green-50 dark:bg-green-900/10">
                             <div className="text-xs text-green-600 mb-1">+ After</div>
-                            <pre className="text-xs text-stone-700 dark:text-stone-300 whitespace-pre-wrap">
+                            <pre className="text-xs text-slate-700 dark:text-slate-300 whitespace-pre-wrap">
                               {typeof change.diff.after === 'string'
                                 ? change.diff.after
                                 : JSON.stringify(change.diff.after, null, 2)}
@@ -403,7 +397,7 @@ export default function TeamPendingChangesPage() {
                   {/* Evidence Section */}
                   {change.evidence && change.evidence.length > 0 && (
                     <div className="mb-4">
-                      <h4 className="text-sm font-medium text-stone-700 dark:text-stone-300 mb-2 flex items-center gap-2">
+                      <h4 className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2 flex items-center gap-2">
                         <Eye className="w-4 h-4" />
                         Supporting Evidence ({change.evidence.length})
                       </h4>
@@ -411,19 +405,19 @@ export default function TeamPendingChangesPage() {
                         {change.evidence.map((ev, idx) => (
                           <div
                             key={idx}
-                            className="bg-white dark:bg-stone-800 border border-stone-200 dark:border-stone-600 rounded-lg p-3"
+                            className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-lg p-3"
                           >
                             <div className="flex items-center gap-2 mb-2">
-                              <span className="text-xs px-2 py-0.5 rounded-full bg-forest-light/15 dark:bg-forest/30 text-forest-dark dark:text-forest-light">
+                              <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-100/55 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400">
                                 {getSourceTypeLabel(ev.source_type)}
                               </span>
                               {ev.link_hint && (
-                                <span className="text-xs text-stone-500">
+                                <span className="text-xs text-slate-500">
                                   {ev.link_hint}
                                 </span>
                               )}
                             </div>
-                            <blockquote className="text-sm text-stone-600 dark:text-stone-400 italic border-l-2 border-stone-300 dark:border-stone-600 pl-3">
+                            <blockquote className="text-sm text-slate-600 dark:text-slate-400 italic border-l-2 border-slate-300 dark:border-slate-600 pl-3">
                               &ldquo;{ev.quote}&rdquo;
                             </blockquote>
                             {ev.link && (
@@ -431,7 +425,7 @@ export default function TeamPendingChangesPage() {
                                 href={ev.link}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="text-xs text-forest dark:text-forest-light hover:underline mt-2 inline-block"
+                                className="text-xs text-emerald-600 dark:text-emerald-400 hover:underline mt-2 inline-block"
                               >
                                 View source →
                               </a>
@@ -444,16 +438,16 @@ export default function TeamPendingChangesPage() {
 
                   {/* Review Info */}
                   {change.reviewedBy && (
-                    <div className="mb-4 p-3 bg-white dark:bg-stone-800 border border-stone-200 dark:border-stone-600 rounded-lg">
-                      <p className="text-sm text-stone-600 dark:text-stone-400">
+                    <div className="mb-4 p-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-lg">
+                      <p className="text-sm text-slate-600 dark:text-slate-400">
                         <span className="font-medium">Reviewed by:</span> {change.reviewedBy}
                       </p>
-                      <p className="text-sm text-stone-600 dark:text-stone-400">
+                      <p className="text-sm text-slate-600 dark:text-slate-400">
                         <span className="font-medium">Date:</span>{' '}
                         {new Date(change.reviewedAt!).toLocaleString()}
                       </p>
                       {change.reviewComment && (
-                        <p className="text-sm text-stone-600 dark:text-stone-400 mt-2">
+                        <p className="text-sm text-slate-600 dark:text-slate-400 mt-2">
                           <span className="font-medium">Comment:</span> {change.reviewComment}
                         </p>
                       )}
@@ -463,31 +457,28 @@ export default function TeamPendingChangesPage() {
                   {/* Actions */}
                   {change.status === 'pending' && (
                     <div className="flex items-center justify-end gap-3">
-                      <button
+                      <Button
+                        variant="secondary"
                         onClick={() => handleReject(change.id)}
                         disabled={processing === change.id}
-                        className="px-4 py-2 text-sm border border-stone-300 dark:border-stone-600 rounded-lg hover:bg-stone-100 dark:hover:bg-stone-800 disabled:opacity-50"
+                        className="text-rose-600 border-rose-200 hover:bg-rose-50"
                       >
                         {change.changeType === 'integration_recommendation' ? 'Not now' : 'Reject'}
-                      </button>
-                      <button
+                      </Button>
+                      <Button
+                        variant="primary"
                         onClick={() => handleApprove(change.id)}
                         disabled={processing === change.id}
-                        className={`flex items-center gap-2 px-4 py-2 text-sm text-white rounded-lg disabled:opacity-50 ${
-                          change.changeType === 'integration_recommendation'
-                            ? 'bg-forest hover:bg-forest-dark'
-                            : 'bg-green-600 hover:bg-green-700'
-                        }`}
                       >
                         {processing === change.id ? (
-                          <Loader2 className="w-4 h-4 animate-spin" />
+                          <span className="live-dot w-2 h-2 rounded-full shrink-0" aria-hidden />
                         ) : change.changeType === 'integration_recommendation' ? (
                           <Plug className="w-4 h-4" />
                         ) : (
                           <CheckCircle className="w-4 h-4" />
                         )}
                         {change.changeType === 'integration_recommendation' ? 'Connect' : 'Approve'}
-                      </button>
+                      </Button>
                     </div>
                   )}
                 </div>
@@ -497,7 +488,7 @@ export default function TeamPendingChangesPage() {
           </div>
         )}
       </div>
-    </div>
+    </TeamPageShell>
   );
 }
 

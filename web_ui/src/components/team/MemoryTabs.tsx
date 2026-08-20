@@ -32,10 +32,7 @@ export function MemoryTabs() {
   const pathname = usePathname();
 
   return (
-    <nav
-      aria-label="Memory sections"
-      className="border-b border-stone-200 dark:border-stone-700 -mx-1"
-    >
+    <nav aria-label="Memory sections" className="border-b border-slate-200/80 -mt-2">
       <div className="flex gap-1 overflow-x-auto scrollbar-none">
         {TABS.map((tab) => {
           const active = tab.isActive(pathname);
@@ -46,8 +43,8 @@ export function MemoryTabs() {
               className={clsx(
                 'shrink-0 px-3 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors',
                 active
-                  ? 'border-forest text-forest dark:text-forest-light'
-                  : 'border-transparent text-stone-500 hover:text-stone-700 dark:hover:text-stone-300',
+                  ? 'border-emerald-600 text-emerald-700'
+                  : 'border-transparent text-slate-500 hover:text-slate-700',
               )}
             >
               {tab.label}

@@ -95,7 +95,7 @@ const layerColors = [
   { bg: '#f3e8ff', border: '#a855f7', text: '#7e22ce' }, // Layer 3 - purple
   { bg: '#fce7f3', border: '#ec4899', text: '#9d174d' }, // Layer 4 - pink
   { bg: '#e0f2fe', border: '#0ea5e9', text: '#0369a1' }, // Layer 5 - sky
-  { bg: '#111827', border: '#3D7B5F', text: '#3D7B5F' }, // Root - dark with forest
+  { bg: '#111827', border: '#10b981', text: '#10b981' }, // Root - dark with emerald
 ];
 
 // Custom node component
@@ -122,7 +122,7 @@ function TreeNode({ data, selected }: NodeProps) {
       className={`
         px-4 py-3 rounded-lg border-2 ${sizeClasses} cursor-pointer
         transition-all duration-200 hover:shadow-lg
-        ${selected ? 'ring-2 ring-forest ring-offset-2' : ''}
+        ${selected ? 'ring-2 ring-emerald-500 ring-offset-2' : ''}
         ${nodeData.isHighlighted ? 'ring-2 ring-yellow-400 animate-pulse' : ''}
       `}
       style={{
@@ -133,7 +133,7 @@ function TreeNode({ data, selected }: NodeProps) {
       onClick={() => nodeData.onSelect?.(nodeData.id)}
     >
       {/* Top handle for incoming edges */}
-      <Handle type="target" position={Position.Top} className="!bg-stone-400" />
+      <Handle type="target" position={Position.Top} className="!bg-slate-400" />
       
       <div className="flex items-start justify-between gap-2">
         <div className="flex-1 min-w-0">
@@ -180,7 +180,7 @@ function TreeNode({ data, selected }: NodeProps) {
       )}
       
       {/* Bottom handle for outgoing edges */}
-      <Handle type="source" position={Position.Bottom} className="!bg-stone-400" />
+      <Handle type="source" position={Position.Bottom} className="!bg-slate-400" />
     </div>
   );
 }
@@ -703,23 +703,23 @@ export function TreeExplorer({ treeName = 'mega_ultra_v2' }: TreeExplorerProps) 
 
   if (loading) {
     return (
-      <div className="h-full flex items-center justify-center bg-stone-50 dark:bg-stone-800">
+      <div className="h-full flex items-center justify-center bg-slate-50 dark:bg-slate-800">
         <div className="text-center max-w-md">
-          <Loader2 className="w-8 h-8 animate-spin text-forest mx-auto mb-3" />
+          <Loader2 className="w-8 h-8 animate-spin text-emerald-600 mx-auto mb-3" />
           {isFirstTimeLoad ? (
             <>
-              <p className="text-stone-700 dark:text-stone-200 font-medium mb-2">
+              <p className="text-slate-700 dark:text-slate-200 font-medium mb-2">
                 First-time setup for this knowledge base
               </p>
-              <p className="text-stone-500 text-sm mb-2">
+              <p className="text-slate-500 text-sm mb-2">
                 {loadingProgress || 'Preparing knowledge base...'}
               </p>
-              <p className="text-stone-400 text-xs">
+              <p className="text-slate-400 text-xs">
                 This may take 1-2 minutes. Subsequent loads will be instant.
               </p>
             </>
           ) : (
-            <p className="text-stone-500">Loading knowledge tree...</p>
+            <p className="text-slate-500">Loading knowledge tree...</p>
           )}
         </div>
       </div>
@@ -728,13 +728,13 @@ export function TreeExplorer({ treeName = 'mega_ultra_v2' }: TreeExplorerProps) 
 
   if (error) {
     return (
-      <div className="h-full flex items-center justify-center bg-stone-50 dark:bg-stone-800">
+      <div className="h-full flex items-center justify-center bg-slate-50 dark:bg-slate-800">
         <div className="text-center max-w-md">
-          <div className="w-12 h-12 rounded-full bg-clay-light/15 dark:bg-clay/20 flex items-center justify-center mx-auto mb-3">
-            <X className="w-6 h-6 text-clay" />
+          <div className="w-12 h-12 rounded-full bg-rose-100/60 dark:bg-rose-900/20 flex items-center justify-center mx-auto mb-3">
+            <X className="w-6 h-6 text-rose-600" />
           </div>
-          <p className="text-clay font-medium mb-2">Failed to load tree</p>
-          <p className="text-stone-500 text-sm">{error}</p>
+          <p className="text-rose-600 font-medium mb-2">Failed to load tree</p>
+          <p className="text-slate-500 text-sm">{error}</p>
         </div>
       </div>
     );
@@ -759,35 +759,35 @@ export function TreeExplorer({ treeName = 'mega_ultra_v2' }: TreeExplorerProps) 
           proOptions={{ hideAttribution: true }}
         >
           <Background variant={BackgroundVariant.Dots} gap={20} size={1} color="#e2e8f0" />
-          <Controls className="!bg-stone-50/90 dark:!bg-stone-800/90 !backdrop-blur-sm !shadow-md !border !border-stone-200 dark:!border-stone-600 [&_button]:!bg-stone-700 [&_button]:!text-white [&_button]:!border-stone-600 [&_button:hover]:!bg-stone-600" />
+          <Controls className="!bg-slate-50/90 dark:!bg-slate-800/90 !backdrop-blur-sm !shadow-md !border !border-slate-200 dark:!border-slate-600 [&_button]:!bg-slate-700 [&_button]:!text-white [&_button]:!border-slate-600 [&_button:hover]:!bg-slate-600" />
           <MiniMap
             nodeColor={(node) => {
               const layer = (node.data as unknown as GraphNodeData).layer || 0;
               return layerColors[Math.min(layer, layerColors.length - 2)].border;
             }}
-            className="!bg-stone-50/90 dark:!bg-stone-800/90 !backdrop-blur-sm !border !border-stone-200 dark:!border-stone-600"
+            className="!bg-slate-50/90 dark:!bg-slate-800/90 !backdrop-blur-sm !border !border-slate-200 dark:!border-slate-600"
           />
         </ReactFlow>
         
         {/* Stats overlay */}
         {stats && (
-          <div className="absolute top-4 left-4 bg-white dark:bg-stone-800 rounded-xl shadow-lg border border-stone-200 dark:border-stone-600 p-4 text-sm">
+          <div className="absolute top-4 left-4 bg-white dark:bg-slate-800 rounded-xl shadow-lg border border-slate-200 dark:border-slate-600 p-4 text-sm">
             <div className="flex items-center gap-2 mb-2">
-              <Layers className="w-4 h-4 text-forest" />
-              <span className="font-semibold text-stone-900 dark:text-white">{stats.tree}</span>
+              <Layers className="w-4 h-4 text-emerald-600" />
+              <span className="font-semibold text-slate-900 dark:text-white">{stats.tree}</span>
               <HelpTip id="tree-stats" position="right">
                 <strong>RAPTOR Tree</strong> organizes your knowledge hierarchically. <em>Leaf nodes</em> (Layer 0) contain original content. Higher layers contain AI-generated <em>summaries</em> that group related information. Click nodes to expand and explore.
               </HelpTip>
             </div>
-            <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-stone-600 dark:text-stone-400">
+            <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-slate-600 dark:text-slate-400">
               <span>Total Nodes:</span>
-              <span className="font-medium text-stone-900 dark:text-white">{stats.total_nodes.toLocaleString()}</span>
+              <span className="font-medium text-slate-900 dark:text-white">{stats.total_nodes.toLocaleString()}</span>
               <span>Layers:</span>
-              <span className="font-medium text-stone-900 dark:text-white">{stats.layers}</span>
+              <span className="font-medium text-slate-900 dark:text-white">{stats.layers}</span>
               <span>Leaf Nodes:</span>
-              <span className="font-medium text-stone-900 dark:text-white">{stats.leaf_nodes.toLocaleString()}</span>
+              <span className="font-medium text-slate-900 dark:text-white">{stats.leaf_nodes.toLocaleString()}</span>
               <span>Summaries:</span>
-              <span className="font-medium text-stone-900 dark:text-white">{stats.summary_nodes.toLocaleString()}</span>
+              <span className="font-medium text-slate-900 dark:text-white">{stats.summary_nodes.toLocaleString()}</span>
             </div>
           </div>
         )}
@@ -795,7 +795,7 @@ export function TreeExplorer({ treeName = 'mega_ultra_v2' }: TreeExplorerProps) 
         {/* Expand error toast */}
         {expandError && (
           <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-50">
-            <div className="flex items-center gap-2 px-4 py-2.5 bg-clay text-white text-sm rounded-lg shadow-lg">
+            <div className="flex items-center gap-2 px-4 py-2.5 bg-rose-500 text-white text-sm rounded-lg shadow-lg">
               <X className="w-4 h-4 flex-shrink-0" />
               <span>{expandError}</span>
               <button onClick={() => setExpandError(null)} className="ml-2 hover:opacity-80">
@@ -807,9 +807,9 @@ export function TreeExplorer({ treeName = 'mega_ultra_v2' }: TreeExplorerProps) 
 
         {/* Search bar */}
         <div className="absolute top-4 right-4 w-80">
-          <div className="bg-white dark:bg-stone-800 rounded-xl shadow-lg border border-stone-200 dark:border-stone-600 overflow-hidden">
-            <div className="flex items-center p-3 border-b border-stone-100 dark:border-stone-700">
-              <Search className="w-4 h-4 text-stone-400 mr-2" />
+          <div className="bg-white dark:bg-slate-800 rounded-xl shadow-lg border border-slate-200 dark:border-slate-600 overflow-hidden">
+            <div className="flex items-center p-3 border-b border-slate-100 dark:border-slate-700">
+              <Search className="w-4 h-4 text-slate-400 mr-2" />
               <HelpTip id="tree-search" position="left">
                 <strong>Semantic search</strong> finds relevant content across all layers. Results are ranked by similarity score. Click a result to view details, or expand nodes in the tree to see the full context.
               </HelpTip>
@@ -819,14 +819,14 @@ export function TreeExplorer({ treeName = 'mega_ultra_v2' }: TreeExplorerProps) 
                 onChange={(e) => setSearchQuery(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
                 placeholder="Search knowledge..."
-                className="flex-1 text-sm bg-transparent outline-none text-stone-900 dark:text-white placeholder-stone-400"
+                className="flex-1 text-sm bg-transparent outline-none text-slate-900 dark:text-white placeholder-slate-400"
               />
               {isSearching ? (
-                <Loader2 className="w-4 h-4 animate-spin text-forest" />
+                <Loader2 className="w-4 h-4 animate-spin text-emerald-600" />
               ) : (
                 <button
                   onClick={handleSearch}
-                  className="text-forest hover:text-forest-dark text-sm font-medium"
+                  className="text-emerald-600 hover:text-emerald-700 text-sm font-medium"
                 >
                   Search
                 </button>
@@ -835,9 +835,9 @@ export function TreeExplorer({ treeName = 'mega_ultra_v2' }: TreeExplorerProps) 
             
             {searchResults.length > 0 && (
               <div className="max-h-64 overflow-y-auto">
-                <div className="p-2 flex items-center justify-between bg-stone-50 dark:bg-stone-700">
-                  <span className="text-xs text-stone-500">{searchResults.length} results</span>
-                  <button onClick={clearHighlights} className="text-xs text-stone-500 hover:text-stone-700">
+                <div className="p-2 flex items-center justify-between bg-slate-50 dark:bg-slate-700">
+                  <span className="text-xs text-slate-500">{searchResults.length} results</span>
+                  <button onClick={clearHighlights} className="text-xs text-slate-500 hover:text-slate-700">
                     Clear
                   </button>
                 </div>
@@ -845,7 +845,7 @@ export function TreeExplorer({ treeName = 'mega_ultra_v2' }: TreeExplorerProps) 
                   <button
                     key={r.id}
                     onClick={() => handleSelectSearchResult(r)}
-                    className="w-full p-3 text-left hover:bg-stone-50 dark:hover:bg-stone-800 border-b border-stone-100 dark:border-stone-700 last:border-0"
+                    className="w-full p-3 text-left hover:bg-slate-50 dark:hover:bg-slate-800 border-b border-slate-100 dark:border-slate-700 last:border-0"
                   >
                     <div className="flex items-center gap-2 mb-1">
                       <span
@@ -854,12 +854,12 @@ export function TreeExplorer({ treeName = 'mega_ultra_v2' }: TreeExplorerProps) 
                       >
                         L{r.layer}
                       </span>
-                      <span className="text-xs text-stone-400">Score: {(r.score * 100).toFixed(0)}%</span>
+                      <span className="text-xs text-slate-400">Score: {(r.score * 100).toFixed(0)}%</span>
                       {r.source_url && (
-                        <ExternalLink className="w-3 h-3 text-stone-400" />
+                        <ExternalLink className="w-3 h-3 text-slate-400" />
                       )}
                     </div>
-                    <p className="text-sm text-stone-700 dark:text-stone-300 line-clamp-2">
+                    <p className="text-sm text-slate-700 dark:text-slate-300 line-clamp-2">
                       {r.text_preview}
                     </p>
                   </button>
@@ -874,8 +874,8 @@ export function TreeExplorer({ treeName = 'mega_ultra_v2' }: TreeExplorerProps) 
               onClick={() => setShowQA(!showQA)}
               className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-medium transition-all ${
                 showQA
-                  ? 'bg-forest text-white shadow-lg'
-                  : 'bg-white dark:bg-stone-800 text-stone-700 dark:text-stone-300 border border-stone-200 dark:border-stone-600 hover:bg-stone-50 dark:hover:bg-stone-800'
+                  ? 'bg-emerald-100/55 text-emerald-700 shadow-sm'
+                  : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-800'
               }`}
             >
               <MessageSquare className="w-4 h-4" />
@@ -890,18 +890,18 @@ export function TreeExplorer({ treeName = 'mega_ultra_v2' }: TreeExplorerProps) 
       
       {/* Side panels - only show when there's content to display */}
       {(showQA || showDetailsPanel) && (
-        <div className="w-96 border-l border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-800 flex flex-col">
+        <div className="w-96 border-l border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 flex flex-col">
           {/* Q&A Panel */}
           {showQA && (
-            <div className="border-b border-stone-200 dark:border-stone-700 p-4">
+            <div className="border-b border-slate-200 dark:border-slate-700 p-4">
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2">
-                  <Sparkles className="w-5 h-5 text-forest" />
-                  <h3 className="font-semibold text-stone-900 dark:text-white">Ask a Question</h3>
+                  <Sparkles className="w-5 h-5 text-emerald-600" />
+                  <h3 className="font-semibold text-slate-900 dark:text-white">Ask a Question</h3>
                 </div>
                 <button
                   onClick={() => setShowQA(false)}
-                  className="text-stone-400 hover:text-stone-600 p-1 hover:bg-stone-100 dark:hover:bg-stone-800 rounded"
+                  className="text-slate-400 hover:text-slate-600 p-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded"
                 >
                   <X className="w-4 h-4" />
                 </button>
@@ -914,35 +914,35 @@ export function TreeExplorer({ treeName = 'mega_ultra_v2' }: TreeExplorerProps) 
                   onChange={(e) => setQuestion(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && handleAsk()}
                   placeholder="e.g., How do I debug OOMKilled pods?"
-                  className="flex-1 px-3 py-2 text-sm rounded-lg border border-stone-200 dark:border-stone-600 bg-stone-50 dark:bg-stone-700 text-stone-900 dark:text-white"
+                  className="flex-1 px-3 py-2 text-sm rounded-lg border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 text-slate-900 dark:text-white"
                 />
                 <button
                   onClick={handleAsk}
                   disabled={isAsking || !question.trim()}
-                  className="px-3 py-2 bg-forest text-white rounded-lg hover:bg-forest-dark disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="px-3 py-2 bg-emerald-100/50 text-emerald-700 rounded-lg hover:bg-emerald-100/80 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {isAsking ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
                 </button>
               </div>
               
               {answer && (
-                <div className="bg-forest-light/10 dark:bg-forest/20 rounded-lg p-4 border border-forest-light/40 dark:border-forest-dark">
-                  <p className="text-sm text-stone-800 dark:text-stone-200 whitespace-pre-wrap">
+                <div className="bg-emerald-100/50 dark:bg-emerald-900/20 rounded-lg p-4 border border-emerald-200/40 dark:border-emerald-600">
+                  <p className="text-sm text-slate-800 dark:text-slate-200 whitespace-pre-wrap">
                     {answer.answer}
                   </p>
                   {answer.citations.length > 0 && (
-                    <div className="mt-3 pt-3 border-t border-forest-light/40 dark:border-forest-dark">
-                      <p className="text-xs font-medium text-stone-500 mb-2">Sources:</p>
+                    <div className="mt-3 pt-3 border-t border-emerald-200/40 dark:border-emerald-600">
+                      <p className="text-xs font-medium text-slate-500 mb-2">Sources:</p>
                       <div className="space-y-1">
                         {answer.citations.map((c) => (
-                          <div key={c.index} className="flex items-center gap-2 text-xs text-stone-600 dark:text-stone-400">
+                          <div key={c.index} className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-400">
                             <span className="font-bold">[{c.index}]</span>
                             {c.source ? (
                               <a
                                 href={c.source}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="truncate hover:text-forest hover:underline"
+                                className="truncate hover:text-emerald-600 hover:underline"
                                 title={c.source}
                               >
                                 {c.rel_path || c.source}
@@ -966,8 +966,8 @@ export function TreeExplorer({ treeName = 'mega_ultra_v2' }: TreeExplorerProps) 
               <div className="p-4">
                 <div className="flex items-start justify-between mb-4">
                   <div className="flex items-center gap-2">
-                    <GitBranch className="w-5 h-5 text-stone-400" />
-                    <h3 className="font-semibold text-stone-900 dark:text-white">Node Details</h3>
+                    <GitBranch className="w-5 h-5 text-slate-400" />
+                    <h3 className="font-semibold text-slate-900 dark:text-white">Node Details</h3>
                   </div>
                   <button
                     onClick={() => {
@@ -975,7 +975,7 @@ export function TreeExplorer({ treeName = 'mega_ultra_v2' }: TreeExplorerProps) 
                       setShowDetailsPanel(false);
                       setSelectedNodeText(null);
                     }}
-                    className="text-stone-400 hover:text-stone-600 p-1 hover:bg-stone-100 dark:hover:bg-stone-800 rounded"
+                    className="text-slate-400 hover:text-slate-600 p-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded"
                   >
                     <X className="w-4 h-4" />
                   </button>
@@ -989,13 +989,13 @@ export function TreeExplorer({ treeName = 'mega_ultra_v2' }: TreeExplorerProps) 
                     >
                       Layer {selectedNode.layer}
                     </span>
-                    <span className="text-xs text-stone-500">
+                    <span className="text-xs text-slate-500">
                       ID: {selectedNode.id}
                     </span>
                   </div>
                   
                   {selectedNode.children_count > 0 && (
-                    <div className="text-xs text-stone-500">
+                    <div className="text-xs text-slate-500">
                       {selectedNode.children_count} child nodes
                     </div>
                   )}
@@ -1005,21 +1005,21 @@ export function TreeExplorer({ treeName = 'mega_ultra_v2' }: TreeExplorerProps) 
                       href={selectedNode.source_url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="flex items-center gap-1 text-xs text-forest hover:text-forest-dark"
+                      className="flex items-center gap-1 text-xs text-emerald-600 hover:text-emerald-700"
                     >
                       <ExternalLink className="w-3 h-3" />
                       View Source
                     </a>
                   )}
                   
-                  <div className="bg-stone-50 dark:bg-stone-700 rounded-lg p-3 border border-stone-200 dark:border-stone-600 max-h-[60vh] overflow-y-auto">
+                  <div className="bg-slate-50 dark:bg-slate-700 rounded-lg p-3 border border-slate-200 dark:border-slate-600 max-h-[60vh] overflow-y-auto">
                     {loadingNodeText ? (
-                      <div className="flex items-center gap-2 text-stone-500">
+                      <div className="flex items-center gap-2 text-slate-500">
                         <Loader2 className="w-4 h-4 animate-spin" />
                         <span className="text-sm">Loading content...</span>
                       </div>
                     ) : (
-                      <pre className="text-sm text-stone-700 dark:text-stone-300 whitespace-pre-wrap font-mono leading-relaxed">
+                      <pre className="text-sm text-slate-700 dark:text-slate-300 whitespace-pre-wrap font-mono leading-relaxed">
                         {selectedNodeText || selectedNode.text_preview}
                       </pre>
                     )}

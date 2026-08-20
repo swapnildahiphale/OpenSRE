@@ -157,11 +157,18 @@ def _tenancy_from_request(request: Request) -> tuple[str, str]:
     return _ORG_ID, _TEAM_NODE_ID
 
 
+def _normalize_trigger_source(value: Optional[str]) -> str:
+    """Map client trigger_source to a known value. Unknown/empty → web_ui."""
+    v = (value or "").strip().lower()
+    return v if v in _ALLOWED_TRIGGER_SOURCES else "web_ui"
+
+
 def _create_agent_run(
     thread_id: str, prompt: str, agent_name: str = "sre-agent"
 ) -> Optional[str]:
     """POST to config-service to create an agent run record. Returns run_id or None."""
     org_id, team_node_id = _thread_tenancy(thread_id)
+    trigger_source = _trigger_source_by_thread.get(thread_id, "web_ui")
     try:
         run_id = uuid.uuid4().hex
         body = {
@@ -169,7 +176,7 @@ def _create_agent_run(
             "org_id": org_id,
             "team_node_id": team_node_id,
             "correlation_id": thread_id,
-            "trigger_source": "web_ui",
+            "trigger_source": trigger_source,
             "trigger_actor": None,
             "trigger_message": prompt,
             "trigger_channel_id": None,
@@ -376,6 +383,11 @@ _team_token_by_thread: Dict[str, str] = {}
 _team_identity_by_thread: Dict[str, tuple[str, str]] = {}
 # Thread ID -> agent run ID (populated at run start; consumed at finalize)
 _run_id_by_thread: Dict[str, str] = {}
+# Per-thread trigger_source from /investigate (teams-bot sends "teams")
+_ALLOWED_TRIGGER_SOURCES = frozenset(
+    {"web_ui", "teams", "slack", "api", "scheduled", "manual"}
+)
+_trigger_source_by_thread: Dict[str, str] = {}
 _active_sessions: Dict[str, object] = (
     {}
 )  # Thread ID -> agent session (for interrupt/answer)
@@ -416,6 +428,8 @@ class InvestigateRequest(BaseModel):
     images: Optional[List[ImageData]] = None
     file_attachments: Optional[List[FileAttachment]] = None
     resume_session_id: Optional[str] = None
+    # Optional. teams-bot sends "teams"; web console omits and we store web_ui.
+    trigger_source: Optional[str] = None
 
 
 class InterruptRequest(BaseModel):
@@ -954,6 +968,11 @@ async def investigate(investigate_request: InvestigateRequest, http_request: Req
     if team_token:
         _team_token_by_thread[thread_id] = team_token
         _team_identity_by_thread[thread_id] = _resolve_team_identity(team_token)
+
+    if investigate_request.trigger_source:
+        _trigger_source_by_thread[thread_id] = _normalize_trigger_source(
+            investigate_request.trigger_source
+        )
 
     print(f"🔍 Investigation: thread={thread_id}, new={is_new}")
 

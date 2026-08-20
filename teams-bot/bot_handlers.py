@@ -98,28 +98,6 @@ def register_handlers(app) -> None:
 
         thread_id = sanitize_thread_id(conversation.id)
 
-        async def stream_update(content: str) -> None:
-            ctx.stream.update(content)
-
-        async def stream_close() -> None:
-            # HttpStream.close() is synchronous; must run before sending cards.
-            ctx.stream.close()
-
-        async def send_card(card: dict):
-            sent = await ctx.send(
-                MessageActivityInput().add_card(_dict_to_adaptive_card(card))
-            )
-            return getattr(sent, "id", None)
-
-        async def update_card(activity_id: str, card: dict) -> None:
-            # v1: no SDK card-update helper — send a replacement card.
-            try:
-                await ctx.send(
-                    MessageActivityInput().add_card(_dict_to_adaptive_card(card))
-                )
-            except Exception:
-                logger.exception("failed to update/replace card %s", activity_id)
-
         if thread_id in active_investigations:
             try:
                 await queue_message(thread_id=thread_id, text=cleaned)
@@ -145,7 +123,60 @@ def register_handlers(app) -> None:
                 )
                 return
 
-        # Await runner in-handler so ctx.stream stays valid for the investigation.
+        # Channel/group threads reject Bot Framework streaming (HTTP 405).
+        # 1:1 and Azure Web Chat still use ctx.stream for live progress.
+        # Channels edit one text bubble via PUT (MessageActivityInput.with_id).
+        use_stream = is_direct_bot_chat(conv_type, channel_id)
+        progress_activity_id: str | None = None
+
+        async def stream_update(content: str) -> None:
+            nonlocal progress_activity_id
+            if use_stream:
+                ctx.stream.update(content)
+                return
+            if not progress_activity_id:
+                return
+            try:
+                # ActivitySender.send() PUTs when activity.id is set — no new toast.
+                await ctx.send(
+                    MessageActivityInput(text=content).with_id(progress_activity_id)
+                )
+            except Exception:
+                logger.exception(
+                    "failed to update channel progress %s", progress_activity_id
+                )
+
+        async def stream_close() -> None:
+            # HttpStream.close() is synchronous; must run before sending cards.
+            if use_stream:
+                ctx.stream.close()
+
+        async def send_card(card: dict):
+            sent = await ctx.send(
+                MessageActivityInput().add_card(_dict_to_adaptive_card(card))
+            )
+            return getattr(sent, "id", None)
+
+        async def update_card(activity_id: str, card: dict) -> None:
+            # PUT the existing activity so question-timeout does not spawn a new card.
+            try:
+                await ctx.send(
+                    MessageActivityInput()
+                    .with_id(activity_id)
+                    .add_card(_dict_to_adaptive_card(card))
+                )
+            except Exception:
+                logger.exception("failed to update/replace card %s", activity_id)
+
+        if not use_stream:
+            sent = await ctx.send(
+                MessageActivityInput().add_text(
+                    "Working on it — I'll reply in this thread."
+                )
+            )
+            progress_activity_id = getattr(sent, "id", None)
+
+        # Await runner in-handler so ctx.stream stays valid for 1:1 / Web Chat.
         await run_investigation(
             thread_id=thread_id,
             prompt=cleaned,

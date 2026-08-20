@@ -1,0 +1,222 @@
+{{- if .Values.services.configService.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: opensre-config-service
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "opensre.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.services.configService.replicas }}
+  selector:
+    matchLabels:
+      app: opensre-config-service
+  template:
+    metadata:
+      labels:
+        app: opensre-config-service
+    spec:
+      {{- if .Values.global.imagePullSecrets }}
+      imagePullSecrets:
+{{ toYaml .Values.global.imagePullSecrets | indent 8 }}
+      {{- end }}
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+      {{- if not (eq (toString (dig "migrations" "enabled" true .Values.services.configService)) "false") }}
+      {{- /* Alembic before main container; required when migrations.hookEnabled is false (embedded Postgres). */}}
+      initContainers:
+        - name: run-migrations
+          image: {{ required "services.configService.image is required" .Values.services.configService.image }}
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          command: ["alembic", "upgrade", "head"]
+          workingDir: /app
+          {{- if .Values.externalSecrets.enabled }}
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.global.database.databaseUrlSecretName }}
+                  key: {{ .Values.global.database.databaseUrlSecretKey }}
+          {{- else }}
+          envFrom:
+            - secretRef:
+                name: {{ .Values.secrets.configServiceEnv | quote }}
+          {{- end }}
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "256Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+      {{- end }}
+      containers:
+        - name: config-service
+          image: {{ required "services.configService.image is required" .Values.services.configService.image }}
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          ports:
+            - containerPort: {{ .Values.services.configService.servicePort }}
+          resources:
+{{ toYaml .Values.services.configService.resources | indent 12 }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          {{- if .Values.externalSecrets.enabled }}
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.global.database.databaseUrlSecretName }}
+                  key: {{ .Values.global.database.databaseUrlSecretKey }}
+            - name: ADMIN_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.externalSecrets.contract.configService.secretName }}
+                  key: {{ .Values.externalSecrets.contract.configService.adminTokenKey }}
+            - name: ADMIN_AUTH_MODE
+              value: {{ default "token" .Values.services.configService.adminAuthMode | quote }}
+            - name: TEAM_AUTH_MODE
+              value: {{ default "token" .Values.services.configService.teamAuthMode | quote }}
+            - name: TOKEN_PEPPER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.externalSecrets.contract.configService.secretName }}
+                  key: {{ .Values.externalSecrets.contract.configService.tokenPepperKey }}
+            - name: IMPERSONATION_JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.externalSecrets.contract.configService.secretName }}
+                  key: {{ .Values.externalSecrets.contract.configService.impersonationJwtSecretKey }}
+            - name: IMPERSONATION_JWT_AUDIENCE
+              value: "opensre-agent-runtime"
+            - name: ADMIN_PERMISSIONS_DEFAULT
+              value: {{ default "admin:*" .Values.services.configService.adminPermissionsDefault | quote }}
+            - name: DEFAULT_ORG_ID
+              value: {{ .Values.global.configService.orgId | quote }}
+            - name: ADMIN_GROUP_PERMISSIONS_JSON
+              value: {{ default "{}" .Values.services.configService.adminGroupPermissionsJson | quote }}
+            - name: OIDC_ENABLED
+              value: {{ (default false .Values.services.configService.oidc.enabled) | ternary "1" "0" | quote }}
+            - name: OIDC_ISSUER
+              value: {{ default "" .Values.services.configService.oidc.issuer | quote }}
+            - name: OIDC_AUDIENCE
+              value: {{ default "" .Values.services.configService.oidc.audience | quote }}
+            - name: OIDC_JWKS_URL
+              value: {{ default "" .Values.services.configService.oidc.jwksUrl | quote }}
+            - name: OIDC_JWKS_JSON
+              value: {{ default "" .Values.services.configService.oidc.jwksJson | quote }}
+            - name: OIDC_ALG
+              value: {{ default "RS256" .Values.services.configService.oidc.alg | quote }}
+            - name: OIDC_LEEWAY_SECONDS
+              value: {{ default 30 .Values.services.configService.oidc.leewaySeconds | int | quote }}
+            - name: OIDC_GROUPS_CLAIM
+              value: {{ default "groups" .Values.services.configService.oidc.groupsClaim | quote }}
+            - name: OIDC_ADMIN_GROUP
+              value: {{ default "opensre-config-admin" .Values.services.configService.oidc.adminGroup | quote }}
+            - name: OIDC_ORG_ID_CLAIM
+              value: {{ default "org_id" .Values.services.configService.oidc.orgIdClaim | quote }}
+            - name: OIDC_TEAM_NODE_ID_CLAIM
+              value: {{ default "team_node_id" .Values.services.configService.oidc.teamNodeIdClaim | quote }}
+            - name: OIDC_EMAIL_CLAIM
+              value: {{ default "email" .Values.services.configService.oidc.emailClaim | quote }}
+            - name: OIDC_SUBJECT_CLAIM
+              value: {{ default "sub" .Values.services.configService.oidc.subjectClaim | quote }}
+            {{- if .Values.services.configService.encryptionKey }}
+            - name: ENCRYPTION_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.services.configService.encryptionKey.secretName }}
+                  key: {{ .Values.services.configService.encryptionKey.secretKey }}
+            {{- end }}
+            {{- if .Values.services.configService.githubApp }}
+            {{- if .Values.services.configService.githubApp.enabled }}
+            - name: GITHUB_APP_ID
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.services.configService.githubApp.secretName }}
+                  key: {{ .Values.services.configService.githubApp.appIdKey }}
+            - name: GITHUB_APP_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.services.configService.githubApp.secretName }}
+                  key: {{ .Values.services.configService.githubApp.clientIdKey }}
+            - name: GITHUB_APP_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.services.configService.githubApp.secretName }}
+                  key: {{ .Values.services.configService.githubApp.clientSecretKey }}
+            - name: GITHUB_APP_PRIVATE_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.services.configService.githubApp.secretName }}
+                  key: {{ .Values.services.configService.githubApp.privateKeyKey }}
+            - name: GITHUB_APP_WEBHOOK_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.services.configService.githubApp.secretName }}
+                  key: {{ .Values.services.configService.githubApp.webhookSecretKey }}
+            - name: GITHUB_APP_NAME
+              value: {{ .Values.services.configService.githubApp.appName | quote }}
+            - name: GITHUB_SETUP_REDIRECT_URL
+              value: {{ .Values.services.configService.githubApp.setupRedirectUrl | quote }}
+            {{- end }}
+            {{- end }}
+            {{- if .Values.services.k8sGateway.enabled }}
+            - name: K8S_GATEWAY_PUBLIC_URL
+              value: {{ printf "https://%s/gateway" .Values.ingress.host | quote }}
+            {{- end }}
+          {{- else }}
+          envFrom:
+            - secretRef:
+                name: {{ .Values.secrets.configServiceEnv | quote }}
+          env:
+            - name: DEFAULT_ORG_ID
+              value: {{ .Values.global.configService.orgId | quote }}
+            {{- if .Values.services.k8sGateway.enabled }}
+            - name: K8S_GATEWAY_PUBLIC_URL
+              value: {{ printf "https://%s/gateway" .Values.ingress.host | quote }}
+            {{- end }}
+          {{- end }}
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: {{ .Values.services.configService.servicePort }}
+            initialDelaySeconds: {{ default 5 .Values.services.configService.readinessProbe.initialDelaySeconds }}
+            periodSeconds: {{ default 10 .Values.services.configService.readinessProbe.periodSeconds }}
+            timeoutSeconds: {{ default 5 .Values.services.configService.readinessProbe.timeoutSeconds }}
+            failureThreshold: {{ default 5 .Values.services.configService.readinessProbe.failureThreshold }}
+          {{- if .Values.services.configService.livenessProbe.enabled }}
+          livenessProbe:
+            httpGet:
+              path: {{ .Values.services.configService.livenessProbe.path | quote }}
+              port: {{ .Values.services.configService.servicePort }}
+            initialDelaySeconds: {{ .Values.services.configService.livenessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.services.configService.livenessProbe.periodSeconds }}
+            timeoutSeconds: {{ default 5 .Values.services.configService.livenessProbe.timeoutSeconds }}
+            failureThreshold: {{ default 5 .Values.services.configService.livenessProbe.failureThreshold }}
+          {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: opensre-config-service
+  namespace: {{ .Values.namespace }}
+spec:
+  selector:
+    app: opensre-config-service
+  ports:
+    - port: {{ .Values.services.configService.servicePort }}
+      targetPort: {{ .Values.services.configService.servicePort }}
+      protocol: TCP
+{{- end }}
+
+

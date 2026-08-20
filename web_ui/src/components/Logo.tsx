@@ -1,24 +1,14 @@
-import React from 'react';
 import Image from 'next/image';
 
-export const Logo = ({ className = "w-8 h-8" }: { className?: string }) => (
-  <div className={`relative ${className}`}>
+/** Admin sidebar wordmark — asset includes text; no duplicate label beside it. */
+export const LogoFull = () => (
+  <div className="relative flex h-full w-full items-center">
     <Image
-        src="/opensre-logo.png"
-        alt="OpenSRE Logo"
-        fill
-        className="object-contain"
+      src="/brand/opensre-wordmark.png"
+      alt="OpenSRE"
+      width={1584}
+      height={440}
+      className="h-7 w-auto max-w-[180px] object-contain object-left"
     />
   </div>
-);
-
-export const LogoFull = () => (
-    <div className="relative h-full w-full flex-shrink-0">
-        <Image
-            src="/opensre-logo.png"
-            alt="OpenSRE"
-            fill
-            className="object-contain object-left"
-        />
-    </div>
 );

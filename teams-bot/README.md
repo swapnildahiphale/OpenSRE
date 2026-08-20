@@ -61,7 +61,7 @@ In [Azure Bot](https://portal.azure.com) → **Configuration**, set **Messaging 
 Only needed for real Teams UI — not for Web Chat or routine code deploys.
 
 1. Copy `manifest/manifest.json` and replace `{{TEAMS_APP_ID}}` with your app ID.
-2. Add a Teams color icon as `manifest/color.png` (192×192 PNG). `outline.png` is included.
+2. Icons are already in `manifest/` (`color.png` 192×192, `outline.png` 32×32) from the OpenSRE spinner logo.
 3. Build the zip:
 
    ```bash
@@ -73,6 +73,10 @@ Only needed for real Teams UI — not for Web Chat or routine code deploys.
 
 Full onboarding checklist, licensing notes, and troubleshooting:
 [`docs/TEAMS_SETUP.md`](../docs/TEAMS_SETUP.md).
+
+## Self-hosted production
+
+Point the Azure Bot messaging endpoint at `https://<your-host>/api/messages` (POST only; GET should return 405). Helm can give the bot its own Ingress host via a private site overlay. Site hostnames and overlay paths stay in the private `deploy/` runbook, not here.
 
 ## Behavior
 

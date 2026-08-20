@@ -1,0 +1,66 @@
+{{- if and .Values.services.agent.enabled .Values.services.agent.k8sRbac.create }}
+{{- $rules := .Values.services.agent.k8sRbac.rules }}
+{{- if eq (len $rules) 0 }}
+{{- $rules = list
+  (dict "apiGroups" (list "") "resources" (list "pods" "pods/log" "events" "namespaces" "nodes" "services" "configmaps") "verbs" (list "get" "list" "watch"))
+  (dict "apiGroups" (list "apps") "resources" (list "deployments" "replicasets" "statefulsets" "daemonsets") "verbs" (list "get" "list" "watch"))
+  (dict "apiGroups" (list "batch") "resources" (list "jobs" "cronjobs") "verbs" (list "get" "list" "watch"))
+  (dict "apiGroups" (list "networking.k8s.io") "resources" (list "ingresses" "networkpolicies") "verbs" (list "get" "list" "watch"))
+-}}
+{{- end }}
+{{- $saName := .Values.services.agent.serviceAccount.name }}
+{{- if eq .Values.services.agent.k8sRbac.scope "cluster" }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ .Release.Name }}-agent-k8s-readonly
+  labels:
+    {{- include "opensre.labels" . | nindent 4 }}
+rules:
+{{ toYaml $rules | indent 2 }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ .Release.Name }}-agent-k8s-readonly
+  labels:
+    {{- include "opensre.labels" . | nindent 4 }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ $saName | quote }}
+    namespace: {{ .Values.namespace }}
+roleRef:
+  kind: ClusterRole
+  name: {{ .Release.Name }}-agent-k8s-readonly
+  apiGroup: rbac.authorization.k8s.io
+{{- else if eq .Values.services.agent.k8sRbac.scope "namespaces" }}
+{{- range .Values.services.agent.k8sRbac.namespaces }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ $.Release.Name }}-agent-k8s-readonly
+  namespace: {{ . | quote }}
+  labels:
+    {{- include "opensre.labels" $ | nindent 4 }}
+rules:
+{{ toYaml $rules | indent 2 }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ $.Release.Name }}-agent-k8s-readonly
+  namespace: {{ . | quote }}
+  labels:
+    {{- include "opensre.labels" $ | nindent 4 }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ $saName | quote }}
+    namespace: {{ $.Values.namespace }}
+roleRef:
+  kind: Role
+  name: {{ $.Release.Name }}-agent-k8s-readonly
+  apiGroup: rbac.authorization.k8s.io
+{{- end }}
+{{- end }}
+{{- end }}

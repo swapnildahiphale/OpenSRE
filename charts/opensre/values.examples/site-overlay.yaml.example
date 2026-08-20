@@ -1,0 +1,42 @@
+# Copy to my-site.yaml (local, gitignored). Do not commit secrets.
+# Simple-mode already pins Docker Hub swapnildahiphale/opensre-*:v1.2.0.
+# Set services.*.image here only when using a private registry.
+
+ingress:
+  # Example Apisix ingress — set className to match your controller (e.g. ingress-apisix, not bare "apisix")
+  className: ingress-apisix
+  host: opensre.example.com
+  annotations:
+    # Apisix-specific annotations here
+
+services:
+  agent:
+    image: <registry>/opensre-sre-agent:<tag>
+    k8sRbac:
+      scope: namespaces
+      namespaces:
+        - example-namespace-a
+        - example-namespace-b
+  configService:
+    image: <registry>/opensre-config-service:<tag>
+  webUi:
+    image: <registry>/opensre-web-ui:<tag>
+
+# External Postgres (disable embedded subchart):
+# postgresql:
+#   enabled: false
+# Then set DATABASE_URL in opensre-config-service-env secret before install.
+
+# Neo4j nightly dump (Community): short outage at 02:00 IST.
+# neo4j:
+#   backup:
+#     enabled: true
+#     clusterName: my-cluster
+#     statefulSetName: opensre-neo4j
+#     pvcName: data-opensre-neo4j-0
+#     s3:
+#       bucket: opensre-backups-example
+#       prefix: neo4j/
+#       region: us-west-1
+#     serviceAccount:
+#       roleArn: arn:aws:iam::123456789012:role/opensre-neo4j-backup

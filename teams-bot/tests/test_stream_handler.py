@@ -176,9 +176,7 @@ def test_error_clears_waiting_fields():
             },
         },
     )
-    result = handle_stream_event(
-        state, {"type": "error", "data": {"message": "boom"}}
-    )
+    result = handle_stream_event(state, {"type": "error", "data": {"message": "boom"}})
     assert result.finished is True
     assert state.background_waiting_label is None
     assert state.pending_background_count == 0

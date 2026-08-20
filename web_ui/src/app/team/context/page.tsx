@@ -19,7 +19,6 @@ import {
   Save,
   CheckCircle,
   XCircle,
-  Loader2,
   ChevronUp,
   ChevronDown,
   Trash2,
@@ -27,6 +26,7 @@ import {
   Pencil,
   AlertTriangle,
 } from 'lucide-react';
+import { PageHeader, Button, Skeleton, TeamPageShell } from '@/components/ui-flow';
 
 type PageMode = 'view' | 'edit';
 
@@ -64,10 +64,10 @@ function hasContent(sections: TeamContextSection[]): boolean {
 }
 
 const cardClass =
-  'bg-white dark:bg-stone-800 rounded-xl border border-stone-200 dark:border-stone-700 shadow-sm overflow-hidden';
+  'bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden';
 
 const ghostBtnClass =
-  'flex items-center gap-2 px-3 py-2 text-sm border border-stone-200 dark:border-stone-600 rounded-lg hover:bg-stone-50 dark:hover:bg-stone-800 text-stone-700 dark:text-stone-300';
+  'inline-flex items-center gap-2 h-9 px-3.5 rounded-full text-[13.5px] font-medium border border-slate-200/70 bg-white text-slate-900 hover:bg-slate-50 transition';
 
 export default function TeamContextPage() {
   const { identity } = useIdentity();
@@ -183,62 +183,58 @@ export default function TeamContextPage() {
     ? 'bg-red-500'
     : nearCap
       ? 'bg-amber-500'
-      : 'bg-forest';
+      : 'bg-emerald-500';
 
   if (!teamId) {
     return (
-      <div className="p-6 max-w-5xl mx-auto">
-        <p className="text-stone-500">Sign in as a team user to edit team context.</p>
-      </div>
+      <TeamPageShell>
+        <p className="text-slate-500">Sign in as a team user to edit team context.</p>
+      </TeamPageShell>
     );
   }
 
   return (
-    <div className="p-6 lg:p-8 max-w-5xl mx-auto space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-forest flex items-center justify-center">
-            <ScrollText className="w-5 h-5 text-white" />
-          </div>
-          <div>
-            <h1 className="text-2xl font-semibold text-stone-900 dark:text-white">Team Context</h1>
-            <p className="text-stone-500 text-sm">
-              Operating facts injected into every investigation&apos;s system prompt
-            </p>
-          </div>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2">
-          {mode === 'view' ? (
-            <button type="button" onClick={() => setMode('edit')} className={ghostBtnClass}>
-              <Pencil className="w-4 h-4" />
-              Edit
-            </button>
-          ) : (
-            <>
-              <button type="button" onClick={applyTemplate} className={ghostBtnClass}>
-                <LayoutTemplate className="w-4 h-4" />
-                Start from template
-              </button>
-              <button type="button" onClick={addSection} className={ghostBtnClass}>
-                <Plus className="w-4 h-4" />
-                Add section
-              </button>
-              <button
-                type="button"
-                onClick={save}
-                disabled={saving || overCap || loading}
-                className="flex items-center gap-2 px-4 py-2 text-sm bg-forest text-white rounded-lg hover:bg-forest-dark disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                Save
-              </button>
-            </>
-          )}
-        </div>
-      </div>
-
+    <TeamPageShell
+      header={
+        <PageHeader
+          eyebrow="Team console"
+          title="Context"
+          subtitle="Operating facts injected into every investigation's system prompt"
+          actions={
+            mode === 'view' ? (
+              <Button type="button" onClick={() => setMode('edit')}>
+                <Pencil className="w-4 h-4" />
+                Edit
+              </Button>
+            ) : (
+              <>
+                <Button type="button" variant="secondary" onClick={applyTemplate}>
+                  <LayoutTemplate className="w-4 h-4" />
+                  Start from template
+                </Button>
+                <Button type="button" variant="secondary" onClick={addSection}>
+                  <Plus className="w-4 h-4" />
+                  Add section
+                </Button>
+                <Button
+                  type="button"
+                  variant="primary"
+                  onClick={save}
+                  disabled={saving || overCap || loading}
+                >
+                  {saving ? (
+                    <span className="live-dot w-2 h-2 rounded-full shrink-0" aria-hidden />
+                  ) : (
+                    <Save className="w-4 h-4" />
+                  )}
+                  Save
+                </Button>
+              </>
+            )
+          }
+        />
+      }
+    >
       {message && (
         <div
           className={`flex items-center gap-2 px-4 py-3 rounded-lg text-sm ${
@@ -264,7 +260,7 @@ export default function TeamContextPage() {
               ? 'border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-900/20'
               : nearCap
                 ? 'border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/20'
-                : 'border-stone-200 dark:border-stone-600 bg-white dark:bg-stone-800'
+                : 'border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800'
           }`}
         >
           <div className="flex flex-wrap items-center justify-between gap-2 mb-2 text-sm">
@@ -272,7 +268,7 @@ export default function TeamContextPage() {
               {overCap && (
                 <AlertTriangle className="w-4 h-4 text-red-600 dark:text-red-400 shrink-0" />
               )}
-              <span className="text-stone-600 dark:text-stone-400">
+              <span className="text-slate-600 dark:text-slate-400">
                 Injected prompt size:{' '}
                 <span
                   className={`font-semibold ${
@@ -280,7 +276,7 @@ export default function TeamContextPage() {
                       ? 'text-red-600 dark:text-red-400'
                       : nearCap
                         ? 'text-amber-600 dark:text-amber-400'
-                        : 'text-stone-900 dark:text-white'
+                        : 'text-slate-900 dark:text-white'
                   }`}
                 >
                   {renderedChars.toLocaleString()}
@@ -295,7 +291,7 @@ export default function TeamContextPage() {
               </span>
             )}
           </div>
-          <div className="h-1.5 rounded-full bg-stone-200 dark:bg-stone-700 overflow-hidden">
+          <div className="h-1.5 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden">
             <div
               className={`h-full rounded-full transition-all ${progressBarColor}`}
               style={{ width: `${budgetPct}%` }}
@@ -305,15 +301,15 @@ export default function TeamContextPage() {
       )}
 
       {loading ? (
-        <div className="flex items-center gap-2 text-stone-500 py-12">
-          <Loader2 className="w-5 h-5 animate-spin" />
-          Loading team context…
+        <div className="py-12 space-y-3 max-w-3xl">
+          <Skeleton className="h-24 w-full rounded-xl" />
+          <Skeleton className="h-24 w-full rounded-xl" />
         </div>
       ) : sections.length === 0 ? (
-        <div className="text-center py-16 border border-dashed border-stone-300 dark:border-stone-600 rounded-xl bg-stone-50 dark:bg-stone-800/50">
-          <ScrollText className="w-10 h-10 text-stone-400 mx-auto mb-3" />
-          <p className="text-stone-600 dark:text-stone-400 mb-1">No sections yet</p>
-          <p className="text-stone-500 text-sm mb-6">
+        <div className="text-center py-16 border border-dashed border-slate-300 dark:border-slate-600 rounded-xl bg-slate-50 dark:bg-slate-800/50">
+          <ScrollText className="w-10 h-10 text-slate-400 mx-auto mb-3" />
+          <p className="text-slate-600 dark:text-slate-400 mb-1">No sections yet</p>
+          <p className="text-slate-500 text-sm mb-6">
             Add custom sections or start from the suggested template
           </p>
           <div className="flex justify-center gap-2">
@@ -327,7 +323,7 @@ export default function TeamContextPage() {
                 setSections(applyStarterTemplate());
                 setMode('edit');
               }}
-              className="flex items-center gap-2 px-4 py-2 text-sm bg-forest text-white rounded-lg hover:bg-forest-dark"
+              className="inline-flex items-center gap-2 h-9 px-3.5 rounded-full text-[13.5px] font-medium bg-emerald-100/50 text-emerald-700 hover:bg-emerald-100/80 transition"
             >
               <LayoutTemplate className="w-4 h-4" />
               Use starter template
@@ -339,7 +335,7 @@ export default function TeamContextPage() {
           {renderedPreview ? (
             <MarkdownFallback content={renderedPreview} bare />
           ) : (
-            <p className="text-sm text-stone-500">
+            <p className="text-sm text-slate-500">
               All sections are empty — nothing will be injected into the agent prompt.
             </p>
           )}
@@ -350,12 +346,12 @@ export default function TeamContextPage() {
             const hint = hintForSection(section.id);
             return (
               <div key={`${section.id}-${index}`} className={cardClass}>
-                <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 border-b border-stone-100 dark:border-stone-700 bg-stone-50 dark:bg-stone-800/80">
+                <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 border-b border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80">
                   <input
                     type="text"
                     value={section.title}
                     onChange={(e) => updateSection(index, { title: e.target.value })}
-                    className="flex-1 min-w-0 text-sm font-semibold bg-transparent border-b border-transparent hover:border-stone-300 focus:border-forest focus:outline-none text-stone-900 dark:text-white"
+                    className="flex-1 min-w-0 text-sm font-semibold bg-transparent border-b border-transparent hover:border-slate-300 focus:border-emerald-500 focus:outline-none text-slate-900 dark:text-white"
                     placeholder="Section title"
                   />
                   <div className="flex items-center gap-1 shrink-0">
@@ -363,7 +359,7 @@ export default function TeamContextPage() {
                       type="button"
                       onClick={() => moveSection(index, 'up')}
                       disabled={index === 0}
-                      className="p-1.5 rounded-lg hover:bg-stone-200 dark:hover:bg-stone-700 disabled:opacity-30 text-stone-500"
+                      className="p-1.5 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 disabled:opacity-30 text-slate-500"
                       title="Move up"
                     >
                       <ChevronUp className="w-4 h-4" />
@@ -372,7 +368,7 @@ export default function TeamContextPage() {
                       type="button"
                       onClick={() => moveSection(index, 'down')}
                       disabled={index === sections.length - 1}
-                      className="p-1.5 rounded-lg hover:bg-stone-200 dark:hover:bg-stone-700 disabled:opacity-30 text-stone-500"
+                      className="p-1.5 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 disabled:opacity-30 text-slate-500"
                       title="Move down"
                     >
                       <ChevronDown className="w-4 h-4" />
@@ -380,7 +376,7 @@ export default function TeamContextPage() {
                     <button
                       type="button"
                       onClick={() => deleteSection(index)}
-                      className="p-1.5 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/30 text-stone-500 hover:text-red-600 dark:hover:text-red-400"
+                      className="p-1.5 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/30 text-slate-500 hover:text-red-600 dark:hover:text-red-400"
                       title="Delete section"
                     >
                       <Trash2 className="w-4 h-4" />
@@ -388,15 +384,15 @@ export default function TeamContextPage() {
                   </div>
                 </div>
                 <div className="p-4">
-                  {hint ? <p className="text-xs text-stone-500 mb-2">{hint}</p> : null}
+                  {hint ? <p className="text-xs text-slate-500 mb-2">{hint}</p> : null}
                   <textarea
                     value={section.content}
                     onChange={(e) => updateSection(index, { content: e.target.value })}
                     rows={8}
-                    className="w-full text-sm font-mono bg-stone-50 dark:bg-stone-900 border border-stone-200 dark:border-stone-600 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-forest/30 focus:border-forest text-stone-800 dark:text-stone-200 resize-y min-h-[160px]"
+                    className="w-full text-sm font-mono bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 text-slate-800 dark:text-slate-200 resize-y min-h-[160px]"
                     placeholder="Markdown content for this section…"
                   />
-                  <div className="mt-2 text-xs text-stone-400 text-right">
+                  <div className="mt-2 text-xs text-slate-400 text-right">
                     {(section.content?.length || 0).toLocaleString()} chars
                   </div>
                 </div>
@@ -408,11 +404,11 @@ export default function TeamContextPage() {
 
       {showTemplateConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
-          <div className="bg-white dark:bg-stone-800 rounded-xl border border-stone-200 dark:border-stone-600 shadow-xl max-w-md w-full p-6">
-            <h3 className="text-lg font-semibold text-stone-900 dark:text-white mb-2">
+          <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-600 shadow-xl max-w-md w-full p-6">
+            <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">
               Replace existing sections?
             </h3>
-            <p className="text-sm text-stone-600 dark:text-stone-400 mb-6">
+            <p className="text-sm text-slate-600 dark:text-slate-400 mb-6">
               Starting from the template will replace all {sections.length} current section
               {sections.length === 1 ? '' : 's'} with the suggested starter set.
             </p>
@@ -420,14 +416,14 @@ export default function TeamContextPage() {
               <button
                 type="button"
                 onClick={() => setShowTemplateConfirm(false)}
-                className="px-4 py-2 text-sm border border-stone-200 dark:border-stone-600 rounded-lg hover:bg-stone-50 dark:hover:bg-stone-700"
+                className="px-4 py-2 text-sm border border-slate-200 dark:border-slate-600 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700"
               >
                 Cancel
               </button>
               <button
                 type="button"
                 onClick={confirmApplyTemplate}
-                className="px-4 py-2 text-sm bg-forest text-white rounded-lg hover:bg-forest-dark"
+                className="px-4 py-2 text-sm bg-emerald-100/50 text-emerald-700 rounded-lg hover:bg-emerald-100/80"
               >
                 Replace with template
               </button>
@@ -435,6 +431,6 @@ export default function TeamContextPage() {
           </div>
         </div>
       )}
-    </div>
+    </TeamPageShell>
   );
 }

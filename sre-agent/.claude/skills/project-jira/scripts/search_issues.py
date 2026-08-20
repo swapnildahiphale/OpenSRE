@@ -10,7 +10,7 @@ import argparse
 import json
 import sys
 
-from jira_client import extract_adf_text, get_browse_url, jira_request
+from jira_client import extract_adf_text, get_browse_url, search_jql
 
 
 def main():
@@ -23,14 +23,11 @@ def main():
     args = parser.parse_args()
 
     try:
-        data = jira_request(
-            "GET",
-            "/search",
-            params={
-                "jql": args.jql,
-                "maxResults": args.max_results,
-                "fields": "summary,status,issuetype,priority,assignee,reporter,created,updated,labels,description",
-            },
+        # Cloud uses POST /search/jql; Data Center keeps GET /search (see search_jql).
+        data = search_jql(
+            args.jql,
+            max_results=args.max_results,
+            fields="summary,status,issuetype,priority,assignee,reporter,created,updated,labels,description",
         )
 
         browse_url = get_browse_url()

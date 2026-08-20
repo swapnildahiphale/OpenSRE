@@ -80,37 +80,32 @@ export function UploadDocumentModal({
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-white dark:bg-stone-800 rounded-2xl w-full max-w-lg p-6 shadow-xl">
+      <div className="bg-white dark:bg-slate-800 rounded-[1.5rem] w-full max-w-lg p-6 shadow-xl border border-slate-200/70">
         <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-forest flex items-center justify-center">
-              <Upload className="w-5 h-5 text-white" />
-            </div>
-            <div>
-              <h2 className="text-lg font-semibold text-stone-900 dark:text-white">
-                Add Document
-              </h2>
-              <p className="text-xs text-stone-500">
-                to <span className="font-medium">{treeName}</span>
-              </p>
-            </div>
+          <div>
+            <h2 className="text-lg font-semibold text-slate-900 dark:text-white">
+              Add Document
+            </h2>
+            <p className="text-xs text-slate-500">
+              to <span className="font-medium">{treeName}</span>
+            </p>
           </div>
           <button
             onClick={onClose}
-            className="text-stone-400 hover:text-stone-600 dark:hover:text-stone-300"
+            className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Mode Toggle */}
-        <div className="flex items-center gap-2 mb-4 p-1 bg-stone-100 dark:bg-stone-700 rounded-lg">
+        <div className="flex items-center gap-2 mb-4 p-1 bg-slate-100 dark:bg-slate-700 rounded-lg">
           <button
             onClick={() => setMode('file')}
             className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium rounded-md transition-all ${
               mode === 'file'
-                ? 'bg-white dark:bg-stone-700 text-stone-900 dark:text-white shadow-sm'
-                : 'text-stone-600 dark:text-stone-400'
+                ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm'
+                : 'text-slate-600 dark:text-slate-400'
             }`}
           >
             <FileText className="w-4 h-4" />
@@ -120,8 +115,8 @@ export function UploadDocumentModal({
             onClick={() => setMode('text')}
             className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium rounded-md transition-all ${
               mode === 'text'
-                ? 'bg-white dark:bg-stone-700 text-stone-900 dark:text-white shadow-sm'
-                : 'text-stone-600 dark:text-stone-400'
+                ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm'
+                : 'text-slate-600 dark:text-slate-400'
             }`}
           >
             <Type className="w-4 h-4" />
@@ -141,26 +136,26 @@ export function UploadDocumentModal({
               />
               <div
                 onClick={() => fileInputRef.current?.click()}
-                className="border-2 border-dashed border-stone-200 dark:border-stone-600 rounded-xl p-8 text-center cursor-pointer hover:border-forest dark:hover:border-forest transition-colors"
+                className="border-2 border-dashed border-slate-200 dark:border-slate-600 rounded-xl p-8 text-center cursor-pointer hover:border-emerald-500 dark:hover:border-emerald-500 transition-colors"
               >
                 {selectedFile ? (
                   <div>
-                    <FileText className="w-8 h-8 mx-auto text-forest mb-2" />
-                    <p className="text-sm font-medium text-stone-900 dark:text-white">
+                    <FileText className="w-8 h-8 mx-auto text-emerald-600 mb-2" />
+                    <p className="text-sm font-medium text-slate-900 dark:text-white">
                       {selectedFile.name}
                     </p>
-                    <p className="text-xs text-stone-500 mt-1">
+                    <p className="text-xs text-slate-500 mt-1">
                       {(selectedFile.size / 1024).toFixed(1)} KB
                     </p>
-                    <p className="text-xs text-forest mt-2">Click to change</p>
+                    <p className="text-xs text-emerald-600 mt-2">Click to change</p>
                   </div>
                 ) : (
                   <div>
-                    <Upload className="w-8 h-8 mx-auto text-stone-400 mb-2" />
-                    <p className="text-sm text-stone-600 dark:text-stone-400">
+                    <Upload className="w-8 h-8 mx-auto text-slate-400 mb-2" />
+                    <p className="text-sm text-slate-600 dark:text-slate-400">
                       Click to select a file
                     </p>
-                    <p className="text-xs text-stone-400 mt-1">
+                    <p className="text-xs text-slate-400 mt-1">
                       Supports .md, .txt, .json, .yaml
                     </p>
                   </div>
@@ -169,7 +164,7 @@ export function UploadDocumentModal({
             </div>
           ) : (
             <div>
-              <label className="block text-sm font-medium text-stone-700 dark:text-stone-300 mb-1">
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
                 Content
               </label>
               <textarea
@@ -177,16 +172,16 @@ export function UploadDocumentModal({
                 onChange={(e) => setTextContent(e.target.value)}
                 rows={8}
                 placeholder="Paste your knowledge content here..."
-                className="w-full px-3 py-2 rounded-lg border border-stone-200 dark:border-stone-600 bg-white dark:bg-stone-700 focus:outline-none focus:ring-2 focus:ring-forest font-mono text-sm"
+                className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 font-mono text-sm"
               />
-              <p className="text-xs text-stone-500 mt-1">
+              <p className="text-xs text-slate-500 mt-1">
                 {textContent.length} characters
               </p>
             </div>
           )}
 
           {error && (
-            <div className="p-3 rounded-lg bg-clay-light/10 dark:bg-clay/20 border border-clay-light/40 dark:border-clay-dark text-clay-dark dark:text-clay-light text-sm">
+            <div className="p-3 rounded-lg bg-rose-50 dark:bg-rose-900/20 border border-rose-200/40 dark:border-rose-700 text-rose-700 dark:text-rose-400 text-sm">
               {error}
             </div>
           )}
@@ -195,14 +190,14 @@ export function UploadDocumentModal({
         <div className="flex justify-end gap-3 mt-6">
           <button
             onClick={onClose}
-            className="px-4 py-2 text-sm text-stone-600 dark:text-stone-400 hover:text-stone-900 dark:hover:text-white"
+            className="px-4 py-2 text-sm text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
           >
             Cancel
           </button>
           <button
             onClick={handleUpload}
             disabled={uploading || (mode === 'file' ? !selectedFile : !textContent.trim())}
-            className="px-4 py-2 bg-forest text-white rounded-lg hover:bg-forest-dark disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+            className="px-4 py-2 bg-emerald-100/50 text-emerald-700 rounded-lg hover:bg-emerald-100/80 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
           >
             {uploading && <Loader2 className="w-4 h-4 animate-spin" />}
             {uploading ? 'Uploading...' : 'Add to Tree'}

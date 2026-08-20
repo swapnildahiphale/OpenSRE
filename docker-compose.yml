@@ -144,6 +144,10 @@ services:
       dockerfile: Dockerfile
     container_name: opensre-sre-agent
     restart: unless-stopped
+    # Anthropic DNS now points at 160.79.104.10, which fails TLS from some
+    # networks (e.g. India). Cloudflare edge still works — temporary workaround.
+    extra_hosts:
+      - "api.anthropic.com:104.18.19.125"
     env_file:
       - .env
     environment:
@@ -211,7 +215,11 @@ services:
     # But we limit writable locations with tmpfs
     tmpfs:
       - /tmp:rw,noexec,nosuid,size=500m
-      - /home/agent/.cache:rw,noexec,nosuid,size=200m
+      # Must be uid/gid 1000 — without that the mount is root:root and
+      # FastEmbed/HuggingFace cannot write model files under
+      # /home/agent/.cache/huggingface (MEMORY-ERROR: Permission denied).
+      # Size bumped: bge-small-en-v1.5 ONNX + HF hub metadata exceeds 200m.
+      - /home/agent/.cache:rw,noexec,nosuid,size=500m,uid=1000,gid=1000
       - /home/agent/.claude:rw,nosuid,size=500m,uid=1000,gid=1000
     # Docker default pids.max=100 is too low for parallel subagents + Bash forks + bkt.
     pids_limit: 4096
@@ -364,10 +372,19 @@ networks:
   default:
     driver: bridge  # Default network with external access
 
+# Named volumes are shared across worktrees via COMPOSE_PROJECT_NAME=opensre.
+# Mark external so `docker compose down -v` / `make clean` from ANY worktree
+# cannot wipe investigation/memory data. Create once if missing:
+#   docker volume create opensre-postgres-data
+#   docker volume create opensre-neo4j-data
+#   docker volume create opensre-agent-sessions
 volumes:
   postgres-data:
     name: opensre-postgres-data
+    external: true
   neo4j-data:
     name: opensre-neo4j-data
+    external: true
   agent-sessions:
     name: opensre-agent-sessions
+    external: true

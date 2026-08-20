@@ -21,14 +21,6 @@ def is_plan_tool(name: str) -> bool:
     return name in PLAN_TOOLS
 
 
-def _closes_skill(tool_name: str) -> bool:
-    return (
-        tool_name in {"Skill", "Task", "Agent", "Read", "Write", "Edit", "Grep", "Glob"}
-        or tool_name.startswith("Todo")
-        or tool_name.startswith("Task")
-    )
-
-
 @dataclass
 class DisplayTool:
     """Top-level tool row after nesting. nested_bash held for count only."""
@@ -123,7 +115,11 @@ def humanize_tool_summary(tool: ToolCall) -> Optional[str]:
 
 
 def nest_bash_under_skills(tools: list[ToolCall]) -> list[DisplayTool]:
-    """Proximity nest: while a Skill is open, Bash rows nest under it."""
+    """Nest Bash under the latest Skill in this thought.
+
+    Do not close the skill on Agent/Read. Channel k8s runs often do
+    Skill then kubectl Bash; listing every command filled the updating bubble.
+    """
     out: list[DisplayTool] = []
     open_skill: Optional[DisplayTool] = None
 
@@ -135,8 +131,6 @@ def nest_bash_under_skills(tools: list[ToolCall]) -> list[DisplayTool]:
         if tool.name == "Bash" and open_skill is not None:
             open_skill.nested_bash.append(tool)
             continue
-        if _closes_skill(tool.name):
-            open_skill = None
         out.append(DisplayTool(tool=tool, nested_bash=[]))
 
     return out

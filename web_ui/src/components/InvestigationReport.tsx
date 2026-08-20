@@ -178,7 +178,7 @@ export default function InvestigationReport({ report }: { report: InvestigationR
   const visibleTimeline = timelineExpanded ? timeline : timeline.slice(0, 5);
 
   return (
-    <div className={`border-l-4 ${sevColors.border} rounded-r-lg bg-white dark:bg-stone-800 border border-stone-200 dark:border-stone-700 overflow-hidden`}>
+    <div className={`border-l-4 ${sevColors.border} rounded-xl bg-white dark:bg-stone-800 border border-slate-200/80 dark:border-stone-700 overflow-hidden`}>
       {/* Header */}
       <div className="p-4 pb-3">
         <div className="flex items-start justify-between gap-3 mb-2">

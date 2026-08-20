@@ -1,0 +1,134 @@
+{{- /*
+Migration Jobs.
+
+Enterprise contract:
+- DB migrations should run explicitly as Jobs (not via create_all on startup).
+- Jobs are idempotent and safe to rerun.
+
+Config-service hook vs initContainer (services.configService.migrations):
+- hookEnabled (default true): pre-install/pre-upgrade Job in this file. Use when the DB
+  already exists before helm install (e.g. external RDS).
+- enabled (default true): initContainer on the config-service Deployment (config-service.yaml).
+  Use when Postgres is deployed in the same release (embedded subchart); hook Jobs run
+  before subchart pods exist, so set hookEnabled: false and rely on the initContainer.
+  See values.self-hosted-simple.yaml and docs/SELF_HOSTED_SIMPLE_INSTALL.md.
+*/ -}}
+
+{{- if and .Values.services.configService.enabled (ne (toString (dig "migrations" "hookEnabled" true .Values.services.configService)) "false") }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: opensre-config-service-migrate
+  namespace: {{ .Values.namespace }}
+  annotations:
+    "helm.sh/hook": pre-install,pre-upgrade
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: 3
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: migrate
+          image: {{ required "services.configService.image is required" .Values.services.configService.image }}
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          command: ["sh", "-lc", "alembic upgrade head"]
+          {{- if not .Values.externalSecrets.enabled }}
+          envFrom:
+            - secretRef:
+                name: {{ .Values.secrets.configServiceEnv | quote }}
+          {{- else }}
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.global.database.databaseUrlSecretName }}
+                  key: {{ .Values.global.database.databaseUrlSecretKey }}
+            - name: ADMIN_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.externalSecrets.contract.configService.secretName }}
+                  key: {{ .Values.externalSecrets.contract.configService.adminTokenKey }}
+            - name: TOKEN_PEPPER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.externalSecrets.contract.configService.secretName }}
+                  key: {{ .Values.externalSecrets.contract.configService.tokenPepperKey }}
+          {{- end }}
+{{- end }}
+
+{{- if .Values.services.orchestrator.enabled }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: opensre-orchestrator-migrate
+  namespace: {{ .Values.namespace }}
+  annotations:
+    "helm.sh/hook": pre-install,pre-upgrade
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: 3
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: migrate
+          image: {{ required "services.orchestrator.image is required" .Values.services.orchestrator.image }}
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          command: ["python3", "-m", "opensre_orchestrator.db_migrate"]
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.global.database.databaseUrlSecretName }}
+                  key: {{ .Values.global.database.databaseUrlSecretKey }}
+            # Orchestrator settings currently require these; they are not used by db_migrate,
+            # but we provide them to satisfy Settings validation.
+            - name: CONFIG_SERVICE_URL
+              value: {{ .Values.global.configService.url | quote }}
+            - name: AI_PIPELINE_API_URL
+              value: {{ printf "http://opensre-ai-pipeline-api.%s.svc.cluster.local:%d" .Values.namespace (.Values.services.aiPipelineApi.servicePort | default 8080 | int) | quote }}
+            - name: AGENT_API_URL
+              value: {{ printf "http://opensre-agent.%s.svc.cluster.local:%d" .Values.namespace (.Values.services.agent.servicePort | default 8080 | int) | quote }}
+{{- end }}
+
+{{- if .Values.services.aiPipelineApi.enabled }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: opensre-ai-pipeline-migrate
+  namespace: {{ .Values.namespace }}
+  annotations:
+    "helm.sh/hook": pre-install,pre-upgrade
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: 3
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: migrate
+          image: {{ required "services.aiPipelineApi.image is required" .Values.services.aiPipelineApi.image }}
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          # ai_pipeline keeps "base schema" (create_all) separate from incremental SQL migrations.
+          # For fresh DBs, ensure base schema exists first to avoid index/alter steps failing.
+          #
+          # Note: scripts/init_db.py is oriented for local dev imports; use the package entrypoint instead.
+          command:
+            [
+              "sh",
+              "-lc",
+              "python3 -c 'from ai_learning_pipeline.storage.rds_client import init_database; init_database()' && python3 scripts/db_migrate.py",
+            ]
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.global.database.databaseUrlSecretName }}
+                  key: {{ .Values.global.database.databaseUrlSecretKey }}
+{{- end }}
+
+

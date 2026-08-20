@@ -4,6 +4,7 @@ import { useState, useMemo, useEffect } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { Search } from 'lucide-react';
+import { Button, Panel, Skeleton, listRowHoverClass } from '@/components/ui-flow';
 
 interface Component {
   type: string;
@@ -30,11 +31,25 @@ const EXAMPLE_QUERIES = [
   'high database query latency',
 ];
 
-const cardClass =
-  'bg-white dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded-xl shadow-sm p-4';
+const NEUTRAL_CHIP =
+  'inline-flex items-center h-6 px-2.5 rounded-full text-[11px] font-medium bg-slate-50 text-slate-600 border border-slate-200/80';
 
 const inputClass =
-  'w-full border border-stone-200 dark:border-stone-600 rounded-lg p-2.5 text-sm bg-white dark:bg-stone-800';
+  'w-full border border-slate-200/70 rounded-xl bg-white text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-300';
+
+function ResolutionPill({ resolved }: { resolved: boolean }) {
+  return (
+    <span
+      className={
+        resolved
+          ? 'inline-flex items-center h-5 px-2 rounded-full text-[10px] font-medium tracking-wide bg-emerald-100/70 text-emerald-800'
+          : 'inline-flex items-center h-5 px-2 rounded-full text-[10px] font-medium tracking-wide bg-amber-100/80 text-amber-900'
+      }
+    >
+      {resolved ? 'resolved' : 'open'}
+    </span>
+  );
+}
 
 export default function MemorySearchPage() {
   const searchParams = useSearchParams();
@@ -61,9 +76,7 @@ export default function MemorySearchPage() {
       let hits: SearchResult[] = data.results || [];
       if (issueTypeFilter) {
         const needle = issueTypeFilter.toLowerCase();
-        hits = hits.filter((h) =>
-          (h.issue_type || '').toLowerCase().includes(needle),
-        );
+        hits = hits.filter((h) => (h.issue_type || '').toLowerCase().includes(needle));
       }
       setResults(hits);
     } catch {
@@ -98,206 +111,182 @@ export default function MemorySearchPage() {
   };
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Left: search form */}
-        <div className={cardClass}>
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-stone-700 dark:text-stone-300 mb-1.5">
-                Incident description
-              </label>
-              <textarea
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                onKeyDown={handleKeyDown}
-                placeholder="Describe the incident symptoms, affected services, and error patterns..."
-                className={`${inputClass} resize-none`}
-                rows={4}
-              />
-            </div>
-
-            <div>
-              <p className="text-xs text-stone-500 mb-2">Try an example:</p>
-              <div className="flex flex-wrap gap-2">
-                {EXAMPLE_QUERIES.map((example) => (
-                  <button
-                    key={example}
-                    type="button"
-                    onClick={() => setQuery(example)}
-                    className="text-xs px-2.5 py-1 rounded-full border border-stone-200 dark:border-stone-600 text-stone-600 dark:text-stone-300 hover:border-clay hover:text-clay transition-colors"
-                  >
-                    {example}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-stone-700 dark:text-stone-300 mb-1.5">
-                Issue type filter{' '}
-                <span className="font-normal text-stone-400">(optional)</span>
-              </label>
-              <input
-                value={issueTypeFilter}
-                onChange={(e) => setIssueTypeFilter(e.target.value)}
-                placeholder="e.g., http_error"
-                className={inputClass}
-              />
-            </div>
-
-            <button
-              type="button"
-              onClick={() => handleSearch()}
-              disabled={loading || !query.trim()}
-              className="w-full flex items-center justify-center gap-2 bg-forest hover:bg-forest-dark text-white px-4 py-2.5 rounded-lg text-sm font-medium disabled:opacity-50 transition-colors active:scale-[0.98]"
-            >
-              <Search className="w-4 h-4" />
-              {loading ? 'Searching...' : 'Search memory'}
-            </button>
-
-            <p className="text-xs text-stone-400 text-center">
-              Press Enter to search
-            </p>
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+      <div className="rounded-[2rem] bg-white border border-slate-200/70 p-6 shadow-[0_20px_40px_-15px_rgba(15,23,42,0.05)]">
+        <div className="space-y-5">
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-2">
+              Incident description
+            </label>
+            <textarea
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder="Describe the incident symptoms, affected services, and error patterns…"
+              className={`${inputClass} p-3 resize-none`}
+              rows={4}
+            />
           </div>
-        </div>
 
-        {/* Right: results area */}
-        <div className="space-y-3">
-          {!searched && !loading && (
-            <div className={`${cardClass} text-sm text-stone-500 space-y-3`}>
-              <p className="font-medium text-stone-700 dark:text-stone-300">
+          <div>
+            <p className="text-xs text-slate-500 mb-2">Try an example:</p>
+            <div className="flex flex-wrap gap-2">
+              {EXAMPLE_QUERIES.map((example) => (
+                <button
+                  key={example}
+                  type="button"
+                  onClick={() => setQuery(example)}
+                  className="text-xs px-2.5 py-1 rounded-full border border-slate-200 text-slate-600 hover:border-emerald-300 hover:text-emerald-700 transition"
+                >
+                  {example}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-2">
+              Pattern filter{' '}
+              <span className="font-normal text-slate-400">(optional)</span>
+            </label>
+            <input
+              value={issueTypeFilter}
+              onChange={(e) => setIssueTypeFilter(e.target.value)}
+              placeholder="e.g., connection-pool-exhaustion"
+              className={`${inputClass} h-9 px-3`}
+            />
+          </div>
+
+          <Button
+            variant="primary"
+            onClick={() => handleSearch()}
+            disabled={loading || !query.trim()}
+            className="w-full justify-center h-10 rounded-xl"
+          >
+            <Search className="w-4 h-4" />
+            {loading ? 'Searching…' : 'Search memory'}
+          </Button>
+          <p className="text-xs text-slate-400 text-center">Press Enter to search</p>
+        </div>
+      </div>
+
+      <div className="space-y-4">
+        {!searched && !loading && (
+          <details className="rounded-xl border border-slate-200/60 bg-slate-50/50 px-4 py-3 text-sm text-slate-500">
+            <summary className="cursor-pointer font-medium text-slate-600">
+              How similarity search works
+            </summary>
+            <ul className="list-disc list-inside mt-2 space-y-1 text-xs">
+              <li>Describe symptoms, affected services, and error patterns</li>
+              <li>More specific queries yield better matches</li>
+              <li>Results ranked by semantic similarity to past episodes</li>
+              <li>Use the pattern filter to narrow results after searching</li>
+            </ul>
+          </details>
+        )}
+
+        {loading && (
+          <>
+            {[1, 2].map((i) => (
+              <Skeleton key={i} className="h-48 w-full rounded-[1.5rem]" />
+            ))}
+          </>
+        )}
+
+        {searched && !loading && sortedResults.length === 0 && (
+          <Panel className="rounded-[1.5rem] p-8 text-center shadow-[0_12px_30px_-12px_rgba(15,23,42,0.06)]">
+            <p className="text-slate-700 font-medium mb-2">No similar investigations found</p>
+            <p className="text-sm text-slate-500 mb-3">
+              Try broadening your description or removing the pattern filter.
+            </p>
+            <ul className="text-sm text-slate-400 space-y-1">
+              <li>Include service names and error codes when possible</li>
+              <li>Check that past investigations have been stored as episodes</li>
+            </ul>
+          </Panel>
+        )}
+
+        {searched && !loading && sortedResults.length > 0 && (
+          <>
+            <p className="text-sm text-slate-500">
+              {sortedResults.length} similar investigation
+              {sortedResults.length !== 1 ? 's' : ''} found
+            </p>
+            {sortedResults.map((r) => {
+              const matchPct = Math.round(r.score * 100);
+              return (
+                <div
+                  key={r.episode_id}
+                  className={`rounded-[1.5rem] bg-white border border-slate-200/70 p-5 shadow-[0_12px_30px_-12px_rgba(15,23,42,0.06)] ${listRowHoverClass}`}
+                >
+                  <div className="flex items-start justify-between gap-3 mb-2">
+                    <span className="text-2xl font-semibold text-emerald-600 font-mono tabular-nums">
+                      {matchPct}%
+                    </span>
+                    <span className="text-xs text-slate-400">match</span>
+                  </div>
+
+                  <div className="h-1 bg-slate-100 rounded-full mb-4 overflow-hidden">
+                    <div
+                      className="h-full bg-emerald-500 rounded-full"
+                      style={{ width: `${matchPct}%` }}
+                    />
+                  </div>
+
+                  <div className="flex items-center gap-2 mb-2 flex-wrap">
+                    <ResolutionPill resolved={r.resolved} />
+                    <span className="text-[14.5px] text-slate-900">
+                      {r.issue_type || 'unknown'}
+                    </span>
+                  </div>
+
+                  {r.issue_description && (
+                    <p className="text-sm text-slate-600 mb-3">{r.issue_description}</p>
+                  )}
+
+                  {r.services?.length > 0 && (
+                    <div className="flex gap-1.5 flex-wrap mb-2">
+                      {r.services.map((s) => (
+                        <span key={s} className={NEUTRAL_CHIP}>
+                          {s}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+
+                  {r.skills_used?.length > 0 && (
+                    <div className="flex gap-1.5 flex-wrap mb-4">
+                      {r.skills_used.map((s) => (
+                        <span key={s} className={NEUTRAL_CHIP}>
+                          {s}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+
+                  <Link
+                    href={`/team/memory/episodes?episode=${encodeURIComponent(r.episode_id)}`}
+                    className="text-sm text-emerald-700 font-medium hover:underline"
+                  >
+                    Open episode →
+                  </Link>
+                </div>
+              );
+            })}
+
+            <details className="rounded-xl border border-slate-200/60 bg-slate-50/50 px-4 py-3 text-sm text-slate-500">
+              <summary className="cursor-pointer font-medium text-slate-600">
                 How similarity search works
-              </p>
-              <ul className="list-disc list-inside space-y-1.5 text-stone-500">
+              </summary>
+              <ul className="list-disc list-inside mt-2 space-y-1 text-xs">
                 <li>Describe symptoms, affected services, and error patterns</li>
                 <li>More specific queries yield better matches</li>
-                <li>Results are ranked by semantic similarity to past episodes</li>
-                <li>Use the issue type filter to narrow results after searching</li>
+                <li>Results ranked by semantic similarity to past episodes</li>
               </ul>
-              <p className="text-stone-400">
-                Click an example chip or type your own description, then search.
-              </p>
-            </div>
-          )}
-
-          {loading && (
-            <>
-              {[1, 2].map((i) => (
-                <div
-                  key={i}
-                  className={`${cardClass} animate-pulse space-y-3`}
-                >
-                  <div className="h-8 w-20 bg-stone-200 dark:bg-stone-700 rounded" />
-                  <div className="h-1 w-full bg-stone-200 dark:bg-stone-700 rounded" />
-                  <div className="flex gap-2">
-                    <div className="h-5 w-16 bg-stone-200 dark:bg-stone-700 rounded-full" />
-                    <div className="h-5 w-24 bg-stone-200 dark:bg-stone-700 rounded-full" />
-                  </div>
-                  <div className="h-4 w-full bg-stone-200 dark:bg-stone-700 rounded" />
-                  <div className="h-4 w-3/4 bg-stone-200 dark:bg-stone-700 rounded" />
-                </div>
-              ))}
-            </>
-          )}
-
-          {searched && !loading && sortedResults.length === 0 && (
-            <div className={`${cardClass} text-center py-8 space-y-3`}>
-              <p className="text-stone-700 dark:text-stone-300 font-medium">
-                No similar investigations found
-              </p>
-              <p className="text-sm text-stone-500">
-                Try broadening your description or removing the issue type filter.
-              </p>
-              <ul className="text-sm text-stone-400 space-y-1">
-                <li>Include service names and error codes when possible</li>
-                <li>Check that past investigations have been stored as episodes</li>
-              </ul>
-            </div>
-          )}
-
-          {searched && !loading && sortedResults.length > 0 && (
-            <>
-              <p className="text-sm text-stone-500">
-                {sortedResults.length} similar investigation
-                {sortedResults.length !== 1 ? 's' : ''} found
-              </p>
-              {sortedResults.map((r) => {
-                const matchPct = Math.round(r.score * 100);
-                return (
-                  <div key={r.episode_id} className={cardClass}>
-                    <div className="flex items-start justify-between gap-3 mb-2">
-                      <span className="text-2xl font-semibold text-forest">
-                        {matchPct}%
-                      </span>
-                      <span className="text-xs text-stone-400">match</span>
-                    </div>
-
-                    <div className="h-1 bg-stone-100 dark:bg-stone-700 rounded-full mb-3 overflow-hidden">
-                      <div
-                        className="h-full bg-forest rounded-full"
-                        style={{ width: `${matchPct}%` }}
-                      />
-                    </div>
-
-                    <div className="flex items-center gap-2 mb-2 flex-wrap">
-                      <span
-                        className={`text-xs px-2 py-0.5 rounded-full ${
-                          r.resolved
-                            ? 'bg-forest-light/15 text-forest-dark dark:bg-forest/30 dark:text-forest-light'
-                            : 'bg-clay-light/15 text-clay-dark dark:bg-clay/20 dark:text-clay-light'
-                        }`}
-                      >
-                        {r.resolved ? 'resolved' : 'unresolved'}
-                      </span>
-                      <span className="text-sm font-medium text-stone-900 dark:text-white">
-                        {r.issue_type || 'unknown'}
-                      </span>
-                    </div>
-
-                    {r.issue_description && (
-                      <p className="text-sm text-stone-600 dark:text-stone-300 mb-2">
-                        {r.issue_description}
-                      </p>
-                    )}
-
-                    {r.services?.length > 0 && (
-                      <div className="flex gap-1.5 flex-wrap mb-2">
-                        {r.services.map((s) => (
-                          <span
-                            key={s}
-                            className="text-xs bg-stone-100 dark:bg-stone-700 text-stone-700 dark:text-stone-300 px-2 py-0.5 rounded"
-                          >
-                            {s}
-                          </span>
-                        ))}
-                      </div>
-                    )}
-
-                    {r.skills_used?.length > 0 && (
-                      <div className="flex gap-1.5 flex-wrap mb-3">
-                        {r.skills_used.map((s) => (
-                          <span
-                            key={s}
-                            className="text-xs bg-forest-light/15 text-forest-dark dark:bg-forest/30 dark:text-forest-light px-2 py-0.5 rounded"
-                          >
-                            {s}
-                          </span>
-                        ))}
-                      </div>
-                    )}
-
-                    <Link
-                      href={`/team/memory/episodes?episode=${encodeURIComponent(r.episode_id)}`}
-                      className="text-sm text-forest hover:text-forest-dark font-medium"
-                    >
-                      Open episode
-                    </Link>
-                  </div>
-                );
-              })}
-            </>
-          )}
-        </div>
+            </details>
+          </>
+        )}
+      </div>
     </div>
   );
 }

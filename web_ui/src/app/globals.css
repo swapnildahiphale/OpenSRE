@@ -1,11 +1,10 @@
 @import "tailwindcss";
 
-/* Configure class-based dark mode for Tailwind v4 */
 @variant dark (&:where(.dark, .dark *));
 
 :root {
-  --background: #FAFAF7;
-  --foreground: #1A1A18;
+  --background: #f9fafb;
+  --foreground: #0f172a; /* slate-900 */
 }
 
 @theme inline {
@@ -14,7 +13,7 @@
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 
-  /* Stone palette */
+  /* Keep legacy stone/forest/clay for admin until cleanup */
   --color-stone-50:  #FAFAF7;
   --color-stone-100: #F5F3EF;
   --color-stone-200: #E8E5DE;
@@ -25,35 +24,56 @@
   --color-stone-700: #3D3B35;
   --color-stone-800: #2D2D2D;
   --color-stone-900: #1A1A18;
-
-  /* Forest palette */
   --color-forest: #3D7B5F;
   --color-forest-light: #4E9B77;
   --color-forest-dark: #2D5B47;
-
-  /* Clay palette */
   --color-clay: #c25e4c;
   --color-clay-light: #d67665;
   --color-clay-dark: #a34a3a;
-}
 
-/* Apply dark mode styles when .dark class is present */
-:root.dark {
-  --background: #2D2D2D;
-  --foreground: #E8E5DE;
+  /* flow-ui accent aliases */
+  --color-accent: #10b981;
+  --color-accent-soft: #d1fae5;
+  --color-accent-deep: #059669;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-geist-sans), system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
 }
 
-/* Brand card shadow utility */
-.card-opensre {
-  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.05);
-  transition: box-shadow 0.2s ease;
+@keyframes livepulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgb(16 185 129 / 0.45); }
+  50% { box-shadow: 0 0 0 6px rgb(16 185 129 / 0); }
 }
-.card-opensre:hover {
-  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+@keyframes breath {
+  0%, 100% { opacity: 0.6; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.08); }
+}
+
+.live-dot {
+  background-color: rgb(16 185 129);
+  animation: livepulse 1.8s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+.shimmer {
+  background: linear-gradient(110deg, transparent 25%, rgb(241 245 249 / 0.9) 50%, transparent 75%);
+  background-size: 200% 100%;
+  animation: shimmer 2.6s linear infinite;
+}
+.breath {
+  animation: breath 4s ease-in-out infinite;
+  transform-origin: center;
+}
+@keyframes carouselX {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+.carousel-track {
+  animation: carouselX 22s linear infinite;
 }

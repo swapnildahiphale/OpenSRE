@@ -45,6 +45,7 @@ import {
   HelpCircle,
   LogOut
 } from 'lucide-react';
+import { PageHeader } from '@/components/ui-flow';
 
 // Tab type
 type SettingsTab = 'general' | 'routing' | 'notifications' | 'telemetry' | 'features' | 'advanced';
@@ -121,9 +122,7 @@ export default function SettingsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { identity, loading: identityLoading } = useIdentity();
-  // Visitors use localStorage only for onboarding state
-  const isVisitor = identity?.auth_kind === 'visitor';
-  const { resetOnboarding } = useOnboarding({ isVisitor });
+  const { resetOnboarding } = useOnboarding();
 
   // Tab state - synced with URL query param
   const [activeTab, setActiveTab] = useState<SettingsTab>('general');
@@ -210,7 +209,7 @@ export default function SettingsPage() {
   const [newRoutingValue, setNewRoutingValue] = useState('');
 
   const isAdmin = identity?.role === 'admin';
-  const canWrite = !isVisitor;
+  const canWrite = identity?.can_write ?? false;
 
   // Theme toggle
   useEffect(() => {
@@ -557,68 +556,51 @@ export default function SettingsPage() {
 
   return (
     <div className="p-8 max-w-6xl mx-auto">
-      {/* Visitor Read-Only Banner */}
-      {isVisitor && (
-        <div className="mb-6 bg-forest-light/10 dark:bg-forest/20 border border-forest-light/30 dark:border-forest/30 rounded-xl p-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-forest-light/15 dark:bg-forest/20 rounded-lg">
-              <Info className="w-5 h-5 text-forest dark:text-forest-light" />
-            </div>
-            <div>
-              <h3 className="font-medium text-forest dark:text-forest-light">Visitor Mode</h3>
-              <p className="text-sm text-forest dark:text-forest-light">
-                You&apos;re exploring the playground in read-only mode. Configuration changes are disabled.
-                <a href="mailto:hello@opensre.io?subject=OpenSRE Demo Interest" className="ml-1 underline hover:no-underline">
-                  Contact us
-                </a> to set up your own team.
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
+      <PageHeader
+        eyebrow="Team console"
+        title="Settings"
+        subtitle={
+          isAdmin
+            ? 'Manage preferences and run ad-hoc agents.'
+            : 'Manage your preferences.'
+        }
+      />
 
-      <div className="mb-8">
-        <h1 className="text-2xl font-semibold text-stone-900 dark:text-white">Settings</h1>
-        <p className="text-sm text-stone-500 mt-1">
-          {isAdmin ? 'Manage preferences and run ad-hoc agents.' : isVisitor ? 'Explore settings (read-only in visitor mode).' : 'Manage your preferences.'}
-        </p>
-      </div>
-
-      <div className="flex gap-8">
+      <div className="flex gap-8 mt-8">
         {/* Sidebar */}
-        <div className="w-56 flex-shrink-0">
+        <div className="w-64 flex-shrink-0">
           <nav className="space-y-1">
             {filteredTabs.map((tab) => (
             <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg transition-colors ${
+                className={`w-full flex items-center gap-2.5 px-3 py-2.5 text-sm font-medium rounded-full transition-colors ${
                   activeTab === tab.id
-                    ? 'bg-forest-light/10 text-forest dark:bg-forest/20 dark:text-forest-light'
-                    : 'text-stone-700 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-stone-800'
+                    ? 'bg-emerald-100/55 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400'
+                    : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
                 }`}
               >
-                <tab.icon className="w-4 h-4" />
-                {tab.name}
-                <ChevronRight className={`w-4 h-4 ml-auto transition-transform ${activeTab === tab.id ? 'rotate-90' : ''}`} />
+                <tab.icon className="w-4 h-4 shrink-0" />
+                <span className="flex-1 text-left whitespace-nowrap">{tab.name}</span>
+                <ChevronRight className={`w-4 h-4 shrink-0 transition-transform ${activeTab === tab.id ? 'rotate-90' : ''}`} />
             </button>
           ))}
           
           {/* Admin Links Section */}
           {isAdmin && (
             <>
-              <div className="pt-4 mt-4 border-t border-stone-200 dark:border-stone-700">
-                <p className="px-3 text-xs font-medium text-stone-400 uppercase tracking-wider mb-2">Admin</p>
+              <div className="pt-4 mt-4 border-t border-slate-200 dark:border-slate-700">
+                <p className="px-3 text-xs font-medium text-slate-400 uppercase tracking-wider mb-2">Admin</p>
               </div>
               {adminLinks.map((link) => (
                 <button
                   key={link.href}
                   onClick={() => router.push(link.href)}
-                  className="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg transition-colors text-stone-700 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-stone-800"
+                  className="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg transition-colors text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
                 >
                   <link.icon className="w-4 h-4" />
                   {link.name}
-                  <ExternalLink className="w-3 h-3 ml-auto text-stone-400" />
+                  <ExternalLink className="w-3 h-3 ml-auto text-slate-400" />
                 </button>
               ))}
             </>
@@ -631,18 +613,18 @@ export default function SettingsPage() {
           {/* General Tab */}
           {activeTab === 'general' && (
             <div className="space-y-6">
-              <div className="bg-white dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded-xl p-6 shadow-sm">
-                <h2 className="text-lg font-semibold text-stone-900 dark:text-white mb-4">Preferences</h2>
+              <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-6 shadow-sm">
+                <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">Preferences</h2>
 
                 <div className="space-y-4">
                   <div className="flex items-center justify-between py-3">
                     <div>
-                      <div className="font-medium text-stone-900 dark:text-white">Theme</div>
-                      <div className="text-sm text-stone-500">Toggle dark/light mode</div>
+                      <div className="font-medium text-slate-900 dark:text-white">Theme</div>
+                      <div className="text-sm text-slate-500">Toggle dark/light mode</div>
                     </div>
                     <button
                       onClick={toggleTheme}
-                      className="flex items-center gap-2 px-4 py-2 bg-stone-100 dark:bg-stone-700 rounded-lg hover:bg-stone-200 dark:hover:bg-stone-700"
+                      className="flex items-center gap-2 px-4 py-2 bg-slate-100 dark:bg-slate-700 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700"
                     >
                       {theme === 'dark' ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
                       {theme === 'dark' ? 'Dark' : 'Light'}
@@ -651,30 +633,30 @@ export default function SettingsPage() {
                 </div>
               </div>
 
-              <div className="bg-white dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded-xl p-6 shadow-sm">
-                <h2 className="text-lg font-semibold text-stone-900 dark:text-white mb-4">Session</h2>
+              <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-6 shadow-sm">
+                <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">Session</h2>
                 
                 <div className="space-y-3 text-sm">
                   <div className="flex justify-between py-2">
-                    <span className="text-stone-500">Signed in as</span>
-                    <span className="font-mono text-stone-900 dark:text-white">{identity?.auth_kind || 'unknown'}</span>
+                    <span className="text-slate-500">Signed in as</span>
+                    <span className="font-mono text-slate-900 dark:text-white">{identity?.auth_kind || 'unknown'}</span>
                   </div>
                   <div className="flex justify-between py-2">
-                    <span className="text-stone-500">Role</span>
-                    <span className="font-medium text-stone-900 dark:text-white">{identity?.role || 'unknown'}</span>
+                    <span className="text-slate-500">Role</span>
+                    <span className="font-medium text-slate-900 dark:text-white">{identity?.role || 'unknown'}</span>
                   </div>
                   {identity?.org_id && (
                     <div className="flex justify-between py-2">
-                      <span className="text-stone-500">Organization</span>
-                      <span className="font-mono text-stone-900 dark:text-white">{identity.org_id}</span>
+                      <span className="text-slate-500">Organization</span>
+                      <span className="font-mono text-slate-900 dark:text-white">{identity.org_id}</span>
                     </div>
                   )}
                 </div>
 
-                <div className="pt-3 mt-3 border-t border-stone-100 dark:border-stone-700">
+                <div className="pt-3 mt-3 border-t border-slate-100 dark:border-slate-700">
                   <button
                     onClick={signOut}
-                    className="flex items-center gap-1.5 text-sm text-stone-500 hover:text-clay dark:text-stone-400 dark:hover:text-clay-light transition-colors"
+                    className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-rose-600 dark:text-slate-400 dark:hover:text-rose-600 transition-colors"
                   >
                     <LogOut className="w-3.5 h-3.5" />
                     Sign out
@@ -683,16 +665,16 @@ export default function SettingsPage() {
             </div>
 
               {/* Quick Start Guide */}
-              <div className="bg-white dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded-xl p-6 shadow-sm">
-                <h2 className="text-lg font-semibold text-stone-900 dark:text-white mb-2 flex items-center gap-2">
+              <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-6 shadow-sm">
+                <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-2 flex items-center gap-2">
                   <BookOpen className="w-5 h-5" /> Quick Start Guide
                 </h2>
-                <p className="text-sm text-stone-500 mb-4">
+                <p className="text-sm text-slate-500 mb-4">
                   Learn how OpenSRE works and get started with AI-powered investigations.
                 </p>
                 <button
                   onClick={() => setShowQuickStart(true)}
-                  className="flex items-center gap-2 px-4 py-2 bg-forest text-white rounded-lg hover:bg-forest-dark transition-colors"
+                  className="flex items-center gap-2 px-4 py-2 bg-emerald-100/50 text-emerald-700 rounded-lg hover:bg-emerald-100/80 transition-colors"
                 >
                   <BookOpen className="w-4 h-4" />
                   View Guide
@@ -704,26 +686,26 @@ export default function SettingsPage() {
           {/* Webhook Routing Tab */}
           {activeTab === 'routing' && (
             <div className="space-y-6">
-              <div className="bg-white dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded-xl p-6 shadow-sm">
+              <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-6 shadow-sm">
                 <div className="flex items-center justify-between mb-6">
                   <div>
-                    <h2 className="text-lg font-semibold text-stone-900 dark:text-white flex items-center gap-1">
+                    <h2 className="text-lg font-semibold text-slate-900 dark:text-white flex items-center gap-1">
                       Webhook Routing
                       <HelpTip id="webhook-routing" position="right">
                         <strong>Webhook Routing</strong> determines which incoming webhooks are directed to your team. Configure identifiers from your integrations (Slack channels, GitHub repos, PagerDuty services, etc.) so that alerts and events from those sources are routed to your team's agent.
                       </HelpTip>
                     </h2>
-                    <p className="text-sm text-stone-500 mt-1">
+                    <p className="text-sm text-slate-500 mt-1">
                       Configure which webhooks should route to your team
                     </p>
                   </div>
                 </div>
 
                 {/* Info Banner */}
-                <div className="bg-stone-50 dark:bg-stone-700/50 border border-stone-200 dark:border-stone-600 rounded-lg p-4 mb-6">
+                <div className="bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-600 rounded-lg p-4 mb-6">
                   <div className="flex items-start gap-3">
-                    <Info className="w-5 h-5 text-stone-500 dark:text-stone-400 flex-shrink-0 mt-0.5" />
-                    <div className="text-sm text-stone-600 dark:text-stone-300">
+                    <Info className="w-5 h-5 text-slate-500 dark:text-slate-400 flex-shrink-0 mt-0.5" />
+                    <div className="text-sm text-slate-600 dark:text-slate-300">
                       <p className="font-medium mb-1">How routing works:</p>
                       <p>When a webhook arrives from Slack, GitHub, PagerDuty, or other integrations, the system checks these identifiers to determine which team should handle the event. Add all the IDs and names that belong to your team.</p>
                     </div>
@@ -732,19 +714,19 @@ export default function SettingsPage() {
 
                 {routingLoading ? (
                   <div className="flex items-center justify-center py-12">
-                    <Loader2 className="w-6 h-6 animate-spin text-stone-400" />
-                    <span className="ml-2 text-stone-500">Loading routing configuration...</span>
+                    <Loader2 className="w-6 h-6 animate-spin text-slate-400" />
+                    <span className="ml-2 text-slate-500">Loading routing configuration...</span>
                   </div>
                 ) : (
                   <div className="space-y-4">
                     {/* Add Routing Form */}
                     {editingRoutingField ? (
-                      <div className="border border-stone-200 dark:border-stone-600 rounded-lg p-4 bg-stone-50 dark:bg-stone-700/50">
+                      <div className="border border-slate-200 dark:border-slate-600 rounded-lg p-4 bg-slate-50 dark:bg-slate-700/50">
                         <div className="flex flex-col sm:flex-row gap-3">
                           <select
                             value={editingRoutingField}
                             onChange={(e) => setEditingRoutingField(e.target.value as keyof RoutingConfig)}
-                            className="px-3 py-2 text-sm rounded-lg border border-stone-200 dark:border-stone-600 bg-white dark:bg-stone-700 text-stone-900 dark:text-white"
+                            className="px-3 py-2 text-sm rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white"
                           >
                             <option value="slack_channel_ids">Slack Channel ID</option>
                             <option value="github_repos">GitHub Repository</option>
@@ -767,20 +749,20 @@ export default function SettingsPage() {
                               editingRoutingField === 'coralogix_team_names' ? 'team-name' :
                               'service-name'
                             }
-                            className="flex-1 px-3 py-2 text-sm rounded-lg border border-stone-200 dark:border-stone-600 bg-white dark:bg-stone-700 text-stone-900 dark:text-white"
+                            className="flex-1 px-3 py-2 text-sm rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white"
                             onKeyDown={(e) => e.key === 'Enter' && addRoutingValue(editingRoutingField)}
                             autoFocus
                           />
                           <div className="flex gap-2">
                             <button
                               onClick={() => addRoutingValue(editingRoutingField)}
-                              className="px-4 py-2 bg-stone-600 text-white text-sm rounded-lg hover:bg-stone-700"
+                              className="px-4 py-2 bg-slate-600 text-white text-sm rounded-lg hover:bg-slate-700"
                             >
                               Add
                             </button>
                             <button
                               onClick={() => { setEditingRoutingField(null); setNewRoutingValue(''); }}
-                              className="px-4 py-2 text-stone-600 dark:text-stone-400 text-sm hover:bg-stone-100 dark:hover:bg-stone-800 rounded-lg border border-stone-200 dark:border-stone-600"
+                              className="px-4 py-2 text-slate-600 dark:text-slate-400 text-sm hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-600"
                             >
                               Cancel
                             </button>
@@ -790,7 +772,7 @@ export default function SettingsPage() {
                     ) : (
                       <button
                         onClick={() => setEditingRoutingField('slack_channel_ids')}
-                        className="flex items-center gap-2 px-4 py-2 text-sm text-stone-600 dark:text-stone-400 hover:text-stone-900 dark:hover:text-stone-200 border border-dashed border-stone-300 dark:border-stone-600 rounded-lg hover:border-stone-400 dark:hover:border-stone-600 transition-colors"
+                        className="flex items-center gap-2 px-4 py-2 text-sm text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 border border-dashed border-slate-300 dark:border-slate-600 rounded-lg hover:border-slate-400 dark:hover:border-slate-600 transition-colors"
                       >
                         <Plus className="w-4 h-4" />
                         Add Routing Rule
@@ -810,28 +792,28 @@ export default function SettingsPage() {
 
                       if (allRoutes.length === 0) {
                         return (
-                          <div className="text-sm text-stone-500 py-8 text-center border border-dashed border-stone-200 dark:border-stone-700 rounded-lg">
+                          <div className="text-sm text-slate-500 py-8 text-center border border-dashed border-slate-200 dark:border-slate-700 rounded-lg">
                             No routing rules configured. Webhooks won&apos;t be routed to this team.
                           </div>
                         );
                       }
 
                       return (
-                        <div className="border border-stone-200 dark:border-stone-700 rounded-lg divide-y divide-stone-200 dark:divide-stone-700">
+                        <div className="border border-slate-200 dark:border-slate-700 rounded-lg divide-y divide-slate-200 dark:divide-slate-700">
                           {allRoutes.map((route, idx) => (
                             <div
                               key={`${route.type}-${route.value}-${idx}`}
-                              className="flex items-center justify-between p-3 hover:bg-stone-50 dark:hover:bg-stone-800/50"
+                              className="flex items-center justify-between p-3 hover:bg-slate-50 dark:hover:bg-slate-800/50"
                             >
                               <div className="flex items-center gap-3">
-                                <span className="px-2 py-0.5 text-xs font-medium bg-stone-100 dark:bg-stone-700 text-stone-600 dark:text-stone-400 rounded">
+                                <span className="px-2 py-0.5 text-xs font-medium bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-400 rounded">
                                   {route.label}
                                 </span>
-                                <code className="text-sm text-stone-900 dark:text-stone-100">{route.value}</code>
+                                <code className="text-sm text-slate-900 dark:text-slate-100">{route.value}</code>
                               </div>
                               <button
                                 onClick={() => removeRoutingValue(route.type, route.value)}
-                                className="p-1 text-stone-400 hover:text-stone-600 dark:hover:text-stone-300"
+                                className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
                               >
                                 <X className="w-4 h-4" />
                               </button>
@@ -842,12 +824,12 @@ export default function SettingsPage() {
                     })()}
 
                     {/* Save Button */}
-                    <div className="pt-4 border-t border-stone-200 dark:border-stone-700">
+                    <div className="pt-4 border-t border-slate-200 dark:border-slate-700">
                       <button
                         onClick={saveRoutingConfig}
                         disabled={routingSaving || !canWrite}
-                        title={!canWrite ? 'Visitors cannot modify routing configuration' : undefined}
-                        className="flex items-center gap-2 px-4 py-2 bg-stone-600 text-white rounded-lg hover:bg-stone-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                        title={!canWrite ? 'You do not have write access' : undefined}
+                        className="flex items-center gap-2 px-4 py-2 bg-slate-600 text-white rounded-lg hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         {routingSaving ? (
                           <>
@@ -862,8 +844,8 @@ export default function SettingsPage() {
                         )}
                       </button>
                       {!canWrite && (
-                        <p className="text-xs text-forest dark:text-forest-light mt-2">
-                          Configuration changes are disabled in visitor mode.
+                        <p className="text-xs text-emerald-600 dark:text-emerald-400 mt-2">
+                          Configuration changes are disabled for your account.
                         </p>
                       )}
                     </div>
@@ -876,16 +858,16 @@ export default function SettingsPage() {
           {/* Delivery & Notifications Tab */}
           {activeTab === 'notifications' && (
             <div className="space-y-6">
-              <div className="bg-white dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded-xl p-6 shadow-sm">
+              <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-6 shadow-sm">
                 <div className="flex items-center justify-between mb-6">
                   <div>
-                    <h2 className="text-lg font-semibold text-stone-900 dark:text-white flex items-center gap-1">
+                    <h2 className="text-lg font-semibold text-slate-900 dark:text-white flex items-center gap-1">
                       Output Destinations
                       <HelpTip id="output-destinations" position="right">
                         <strong>Output Destinations</strong> control where agent investigation results are posted. You can set default destinations (like a Slack channel) and override behavior based on how the agent was triggered.
                       </HelpTip>
                     </h2>
-                    <p className="text-sm text-stone-500 mt-1">
+                    <p className="text-sm text-slate-500 mt-1">
                       Configure where agent results are delivered
                     </p>
                   </div>
@@ -894,15 +876,15 @@ export default function SettingsPage() {
                 {/* Default Destinations */}
                 <div className="space-y-4">
                   <div>
-                    <h3 className="text-sm font-medium text-stone-900 dark:text-white mb-3">
+                    <h3 className="text-sm font-medium text-slate-900 dark:text-white mb-3">
                       Default Destinations
                     </h3>
-                    <p className="text-xs text-stone-500 mb-4">
+                    <p className="text-xs text-slate-500 mb-4">
                       Agent results will be posted to these destinations by default
                     </p>
 
                     {outputConfig.default_destinations.length === 0 ? (
-                      <div className="text-sm text-stone-500 py-8 text-center border-2 border-dashed border-stone-200 dark:border-stone-700 rounded-lg">
+                      <div className="text-sm text-slate-500 py-8 text-center border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-lg">
                         No default destinations configured. Results will only be posted to trigger-specific locations.
                       </div>
                     ) : (
@@ -910,26 +892,26 @@ export default function SettingsPage() {
                         {outputConfig.default_destinations.map((dest, idx) => (
                           <div
                             key={idx}
-                            className="flex items-center justify-between p-3 bg-stone-50 dark:bg-stone-700 rounded-lg"
+                            className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-700 rounded-lg"
                           >
                             <div className="flex items-center gap-3">
-                              <div className="px-2 py-1 bg-forest-light/15 dark:bg-forest/20 text-forest dark:text-forest-light text-xs font-medium rounded">
+                              <div className="px-2 py-1 bg-emerald-100/55 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 text-xs font-medium rounded">
                                 {dest.type}
                               </div>
                               {dest.type === 'slack' && (
-                                <span className="text-sm text-stone-700 dark:text-stone-300">
+                                <span className="text-sm text-slate-700 dark:text-slate-300">
                                   {dest.channel_name || dest.channel_id || 'Unknown channel'}
                                 </span>
                               )}
                               {dest.type === 'github' && (
-                                <span className="text-sm text-stone-700 dark:text-stone-300">
+                                <span className="text-sm text-slate-700 dark:text-slate-300">
                                   {dest.repo || 'Unknown repo'}
                                 </span>
                               )}
                             </div>
                             <button
                               onClick={() => removeDestination(idx)}
-                              className="text-clay hover:text-clay-dark dark:text-clay-light"
+                              className="text-rose-600 hover:text-rose-700 dark:text-rose-400"
                             >
                               <X className="w-4 h-4" />
                             </button>
@@ -941,21 +923,21 @@ export default function SettingsPage() {
                     {!showAddDestination ? (
                       <button
                         onClick={() => setShowAddDestination(true)}
-                        className="mt-3 flex items-center gap-2 px-3 py-2 text-sm text-forest dark:text-forest-light hover:bg-forest-light/10 dark:hover:bg-forest/20 rounded-lg"
+                        className="mt-3 flex items-center gap-2 px-3 py-2 text-sm text-emerald-600 dark:text-emerald-400 hover:bg-emerald-100/50 dark:hover:bg-emerald-900/20 rounded-lg"
                       >
                         <Plus className="w-4 h-4" />
                         Add Destination
                       </button>
                     ) : (
-                      <div className="mt-3 p-4 bg-stone-50 dark:bg-stone-700 rounded-lg space-y-3">
+                      <div className="mt-3 p-4 bg-slate-50 dark:bg-slate-700 rounded-lg space-y-3">
                         <div>
-                          <label className="block text-xs text-stone-600 dark:text-stone-400 mb-1">
+                          <label className="block text-xs text-slate-600 dark:text-slate-400 mb-1">
                             Destination Type
                           </label>
                           <select
                             value={newDestinationType}
                             onChange={(e) => setNewDestinationType(e.target.value)}
-                            className="w-full px-3 py-2 text-sm rounded-lg border border-stone-200 dark:border-stone-600 bg-white dark:bg-stone-800"
+                            className="w-full px-3 py-2 text-sm rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800"
                           >
                             <option value="slack">Slack</option>
                             <option value="github">GitHub</option>
@@ -966,7 +948,7 @@ export default function SettingsPage() {
                         {newDestinationType === 'slack' && (
                           <>
                             <div>
-                              <label className="block text-xs text-stone-600 dark:text-stone-400 mb-1">
+                              <label className="block text-xs text-slate-600 dark:text-slate-400 mb-1">
                                 Channel Name
                               </label>
                               <input
@@ -976,11 +958,11 @@ export default function SettingsPage() {
                                 onChange={(e) =>
                                   setNewDestinationConfig({ ...newDestinationConfig, channel_name: e.target.value })
                                 }
-                                className="w-full px-3 py-2 text-sm rounded-lg border border-stone-200 dark:border-stone-600 bg-white dark:bg-stone-800"
+                                className="w-full px-3 py-2 text-sm rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800"
                               />
                             </div>
                             <div>
-                              <label className="block text-xs text-stone-600 dark:text-stone-400 mb-1">
+                              <label className="block text-xs text-slate-600 dark:text-slate-400 mb-1">
                                 Channel ID
                               </label>
                               <input
@@ -990,7 +972,7 @@ export default function SettingsPage() {
                                 onChange={(e) =>
                                   setNewDestinationConfig({ ...newDestinationConfig, channel_id: e.target.value })
                                 }
-                                className="w-full px-3 py-2 text-sm rounded-lg border border-stone-200 dark:border-stone-600 bg-white dark:bg-stone-800"
+                                className="w-full px-3 py-2 text-sm rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800"
                               />
                             </div>
                           </>
@@ -1003,7 +985,7 @@ export default function SettingsPage() {
                               newDestinationType === 'slack' &&
                               (!newDestinationConfig.channel_id || !newDestinationConfig.channel_name)
                             }
-                            className="flex items-center gap-2 px-3 py-2 text-sm bg-forest text-white rounded-lg hover:bg-forest-dark disabled:opacity-50"
+                            className="flex items-center gap-2 px-3 py-2 text-sm bg-emerald-100/50 text-emerald-700 rounded-lg hover:bg-emerald-100/80 disabled:opacity-50"
                           >
                             <Check className="w-4 h-4" />
                             Add
@@ -1013,7 +995,7 @@ export default function SettingsPage() {
                               setShowAddDestination(false);
                               setNewDestinationConfig({ channel_name: '', channel_id: '' });
                             }}
-                            className="px-3 py-2 text-sm text-stone-600 dark:text-stone-400 hover:bg-stone-100 dark:hover:bg-stone-700 rounded-lg"
+                            className="px-3 py-2 text-sm text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg"
                           >
                             Cancel
                           </button>
@@ -1023,21 +1005,21 @@ export default function SettingsPage() {
                   </div>
 
                   {/* Trigger Overrides */}
-                  <div className="border-t border-stone-200 dark:border-stone-700 pt-4 mt-6">
-                    <h3 className="text-sm font-medium text-stone-900 dark:text-white mb-3">
+                  <div className="border-t border-slate-200 dark:border-slate-700 pt-4 mt-6">
+                    <h3 className="text-sm font-medium text-slate-900 dark:text-white mb-3">
                       Trigger-Specific Rules
                     </h3>
-                    <p className="text-xs text-stone-500 mb-4">
+                    <p className="text-xs text-slate-500 mb-4">
                       Override behavior for specific trigger sources
                     </p>
 
                     <div className="space-y-3">
                       <div className="flex items-center justify-between py-2">
                         <div>
-                          <div className="text-sm font-medium text-stone-900 dark:text-white">
+                          <div className="text-sm font-medium text-slate-900 dark:text-white">
                             When triggered from Slack
                           </div>
-                          <div className="text-xs text-stone-500">Choose where to post results</div>
+                          <div className="text-xs text-slate-500">Choose where to post results</div>
                         </div>
                         <select
                           value={outputConfig.trigger_overrides.slack || 'reply_in_thread'}
@@ -1047,7 +1029,7 @@ export default function SettingsPage() {
                               trigger_overrides: { ...outputConfig.trigger_overrides, slack: e.target.value },
                             })
                           }
-                          className="px-3 py-1.5 text-sm rounded-lg border border-stone-200 dark:border-stone-600 bg-white dark:bg-stone-800"
+                          className="px-3 py-1.5 text-sm rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800"
                         >
                           <option value="reply_in_thread">Reply in thread</option>
                           <option value="use_default">Use default destinations</option>
@@ -1056,10 +1038,10 @@ export default function SettingsPage() {
 
                       <div className="flex items-center justify-between py-2">
                         <div>
-                          <div className="text-sm font-medium text-stone-900 dark:text-white">
+                          <div className="text-sm font-medium text-slate-900 dark:text-white">
                             When triggered from GitHub
                           </div>
-                          <div className="text-xs text-stone-500">Choose where to post results</div>
+                          <div className="text-xs text-slate-500">Choose where to post results</div>
                         </div>
                         <select
                           value={outputConfig.trigger_overrides.github || 'comment_on_pr'}
@@ -1069,7 +1051,7 @@ export default function SettingsPage() {
                               trigger_overrides: { ...outputConfig.trigger_overrides, github: e.target.value },
                             })
                           }
-                          className="px-3 py-1.5 text-sm rounded-lg border border-stone-200 dark:border-stone-600 bg-white dark:bg-stone-800"
+                          className="px-3 py-1.5 text-sm rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800"
                         >
                           <option value="comment_on_pr">Comment on PR/issue</option>
                           <option value="use_default">Use default destinations</option>
@@ -1078,10 +1060,10 @@ export default function SettingsPage() {
 
                       <div className="flex items-center justify-between py-2">
                         <div>
-                          <div className="text-sm font-medium text-stone-900 dark:text-white">
+                          <div className="text-sm font-medium text-slate-900 dark:text-white">
                             When triggered from API
                           </div>
-                          <div className="text-xs text-stone-500">Choose where to post results</div>
+                          <div className="text-xs text-slate-500">Choose where to post results</div>
                         </div>
                         <select
                           value={outputConfig.trigger_overrides.api || 'use_default'}
@@ -1091,7 +1073,7 @@ export default function SettingsPage() {
                               trigger_overrides: { ...outputConfig.trigger_overrides, api: e.target.value },
                             })
                           }
-                          className="px-3 py-1.5 text-sm rounded-lg border border-stone-200 dark:border-stone-600 bg-white dark:bg-stone-800"
+                          className="px-3 py-1.5 text-sm rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800"
                         >
                           <option value="use_default">Use default destinations</option>
                           <option value="no_output">No output (silent)</option>
@@ -1101,18 +1083,18 @@ export default function SettingsPage() {
                   </div>
 
                   {/* Save Button */}
-                  <div className="border-t border-stone-200 dark:border-stone-700 pt-4 mt-6">
+                  <div className="border-t border-slate-200 dark:border-slate-700 pt-4 mt-6">
                     <button
                       onClick={saveOutputConfig}
                       disabled={outputConfigLoading || !canWrite}
-                      title={!canWrite ? 'Visitors cannot modify output configuration' : undefined}
-                      className="px-4 py-2 bg-forest text-white rounded-lg hover:bg-forest-dark disabled:opacity-50 disabled:cursor-not-allowed"
+                      title={!canWrite ? 'You do not have write access' : undefined}
+                      className="px-4 py-2 bg-emerald-100/50 text-emerald-700 rounded-lg hover:bg-emerald-100/80 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       {outputConfigLoading ? 'Saving...' : 'Save Configuration'}
                     </button>
                     {!canWrite && (
-                      <p className="text-xs text-forest dark:text-forest-light mt-2">
-                        Configuration changes are disabled in visitor mode.
+                      <p className="text-xs text-emerald-600 dark:text-emerald-400 mt-2">
+                        Configuration changes are disabled for your account.
                       </p>
                     )}
                   </div>
@@ -1124,24 +1106,24 @@ export default function SettingsPage() {
           {/* Telemetry Tab */}
           {activeTab === 'telemetry' && (
             <div className="space-y-6">
-              <div className="bg-white dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded-xl p-6 shadow-sm">
+              <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-6 shadow-sm">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <div className="p-2 bg-forest-light/15 dark:bg-forest/20 rounded-lg">
-                      <Activity className="w-5 h-5 text-forest dark:text-forest-light" />
+                    <div className="p-2 bg-emerald-100/55 dark:bg-emerald-900/20 rounded-lg">
+                      <Activity className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
                     </div>
                     <div>
-                      <h2 className="text-lg font-semibold text-stone-900 dark:text-white flex items-center gap-2">
+                      <h2 className="text-lg font-semibold text-slate-900 dark:text-white flex items-center gap-2">
                         Telemetry
                         <button
                           onClick={() => setShowTelemetryInfo(true)}
-                          className="p-0.5 text-stone-400 hover:text-stone-600 dark:hover:text-stone-300 transition-colors"
+                          className="p-0.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
                           aria-label="Learn more about telemetry"
                         >
                           <HelpCircle className="w-4 h-4" />
                         </button>
                       </h2>
-                      <p className="text-sm text-stone-500 dark:text-stone-400">
+                      <p className="text-sm text-slate-500 dark:text-slate-400">
                         Share anonymous usage metrics to help improve OpenSRE
                       </p>
                     </div>
@@ -1150,7 +1132,7 @@ export default function SettingsPage() {
                     onClick={toggleTelemetry}
                     disabled={telemetryLoading}
                     className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                      telemetryEnabled ? 'bg-forest' : 'bg-stone-300 dark:bg-stone-700'
+                      telemetryEnabled ? 'bg-emerald-500' : 'bg-slate-300 dark:bg-slate-700'
                     } ${telemetryLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
                   >
                     <span
@@ -1161,7 +1143,7 @@ export default function SettingsPage() {
                   </button>
                 </div>
 
-                <p className="mt-4 text-sm text-stone-500 dark:text-stone-400">
+                <p className="mt-4 text-sm text-slate-500 dark:text-slate-400">
                   {telemetryEnabled
                     ? 'Telemetry is enabled. Anonymous metrics are being collected.'
                     : 'Telemetry is disabled. No data is being collected.'}
@@ -1179,20 +1161,20 @@ export default function SettingsPage() {
           {activeTab === 'features' && (
             <div className="space-y-6">
               {/* AI Pipeline Section */}
-              <div className="bg-white dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded-xl p-6 shadow-sm">
+              <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-6 shadow-sm">
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-3">
-                    <div className="p-2 bg-stone-100 dark:bg-stone-700 rounded-lg">
-                      <Zap className="w-5 h-5 text-stone-600 dark:text-stone-400" />
+                    <div className="p-2 bg-slate-100 dark:bg-slate-700 rounded-lg">
+                      <Zap className="w-5 h-5 text-slate-600 dark:text-slate-400" />
                     </div>
                     <div>
-                      <h2 className="text-lg font-semibold text-stone-900 dark:text-white flex items-center gap-1">
+                      <h2 className="text-lg font-semibold text-slate-900 dark:text-white flex items-center gap-1">
                         AI Pipeline
                         <HelpTip id="ai-pipeline" position="right">
                           <strong>AI Pipeline</strong> automatically processes your incident data (Slack discussions, Confluence runbooks, Google Docs) on a schedule and extracts learnings to build your Knowledge Base. This enables agents to reference past incidents and solutions.
                         </HelpTip>
                       </h2>
-                      <p className="text-sm text-stone-500">
+                      <p className="text-sm text-slate-500">
                         Automatically learn from incidents and build knowledge base
                       </p>
                     </div>
@@ -1201,7 +1183,7 @@ export default function SettingsPage() {
                     onClick={() => setPipelineConfig({ ...pipelineConfig, enabled: !pipelineConfig.enabled })}
                     disabled={featuresLoading}
                     className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                      pipelineConfig.enabled ? 'bg-stone-600' : 'bg-stone-300 dark:bg-stone-700'
+                      pipelineConfig.enabled ? 'bg-slate-600' : 'bg-slate-300 dark:bg-slate-700'
                     } ${featuresLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
                   >
                     <span
@@ -1213,10 +1195,10 @@ export default function SettingsPage() {
                 </div>
 
                 {pipelineConfig.enabled && (
-                  <div className="mt-4 pt-4 border-t border-stone-200 dark:border-stone-700 space-y-4">
+                  <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700 space-y-4">
                     {/* Schedule */}
                     <div className="flex items-center gap-4">
-                      <div className="flex items-center gap-2 text-sm text-stone-600 dark:text-stone-400">
+                      <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
                         <Clock className="w-4 h-4" />
                         Schedule (cron):
                       </div>
@@ -1225,24 +1207,24 @@ export default function SettingsPage() {
                         value={pipelineConfig.schedule}
                         onChange={(e) => setPipelineConfig({ ...pipelineConfig, schedule: e.target.value })}
                         placeholder="0 2 * * *"
-                        className="flex-1 max-w-xs px-3 py-1.5 text-sm rounded-lg border border-stone-200 dark:border-stone-600 bg-white dark:bg-stone-700 font-mono"
+                        className="flex-1 max-w-xs px-3 py-1.5 text-sm rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 font-mono"
                       />
-                      <span className="text-xs text-stone-500">
+                      <span className="text-xs text-slate-500">
                         Default: 2:00 AM daily
                       </span>
                     </div>
 
                     {/* Data Sources / Ingestors */}
                     <div className="space-y-4">
-                      <div className="text-sm font-medium text-stone-700 dark:text-stone-300">
+                      <div className="text-sm font-medium text-slate-700 dark:text-slate-300">
                         Data Sources
                       </div>
 
                       {/* Slack Ingestor */}
                       <div className={`p-4 rounded-lg border ${
                         pipelineConfig.ingestors.slack.enabled
-                          ? 'border-stone-400 bg-stone-50 dark:bg-stone-700/50'
-                          : 'border-stone-200 dark:border-stone-600'
+                          ? 'border-slate-400 bg-slate-50 dark:bg-slate-700/50'
+                          : 'border-slate-200 dark:border-slate-600'
                       }`}>
                         <label className="flex items-center gap-3 cursor-pointer">
                           <input
@@ -1262,20 +1244,20 @@ export default function SettingsPage() {
                           <div
                             className={`w-4 h-4 rounded border flex items-center justify-center ${
                               pipelineConfig.ingestors.slack.enabled
-                                ? 'bg-stone-600 border-stone-600'
-                                : 'border-stone-300 dark:border-stone-600'
+                                ? 'bg-slate-600 border-slate-600'
+                                : 'border-slate-300 dark:border-slate-600'
                             }`}
                           >
                             {pipelineConfig.ingestors.slack.enabled && <Check className="w-3 h-3 text-white" />}
                           </div>
                           <div>
-                            <div className="text-sm font-medium text-stone-900 dark:text-white">Slack</div>
-                            <div className="text-xs text-stone-500">Incident discussions & resolutions</div>
+                            <div className="text-sm font-medium text-slate-900 dark:text-white">Slack</div>
+                            <div className="text-xs text-slate-500">Incident discussions & resolutions</div>
                           </div>
                         </label>
                         {pipelineConfig.ingestors.slack.enabled && (
                           <div className="mt-3 pl-7">
-                            <label className="block text-xs text-stone-600 dark:text-stone-400 mb-1">
+                            <label className="block text-xs text-slate-600 dark:text-slate-400 mb-1">
                               Channels to monitor (comma-separated)
                             </label>
                             <input
@@ -1294,9 +1276,9 @@ export default function SettingsPage() {
                                 })
                               }
                               placeholder="#incidents, #oncall, #postmortems"
-                              className="w-full px-3 py-1.5 text-sm rounded-lg border border-stone-200 dark:border-stone-600 bg-white dark:bg-stone-700"
+                              className="w-full px-3 py-1.5 text-sm rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700"
                             />
-                            <p className="text-xs text-stone-400 mt-1">Leave empty to monitor all bot-accessible channels</p>
+                            <p className="text-xs text-slate-400 mt-1">Leave empty to monitor all bot-accessible channels</p>
                           </div>
                         )}
                       </div>
@@ -1304,8 +1286,8 @@ export default function SettingsPage() {
                       {/* Confluence Ingestor */}
                       <div className={`p-4 rounded-lg border ${
                         pipelineConfig.ingestors.confluence.enabled
-                          ? 'border-stone-400 bg-stone-50 dark:bg-stone-700/50'
-                          : 'border-stone-200 dark:border-stone-600'
+                          ? 'border-slate-400 bg-slate-50 dark:bg-slate-700/50'
+                          : 'border-slate-200 dark:border-slate-600'
                       }`}>
                         <label className="flex items-center gap-3 cursor-pointer">
                           <input
@@ -1325,21 +1307,21 @@ export default function SettingsPage() {
                           <div
                             className={`w-4 h-4 rounded border flex items-center justify-center ${
                               pipelineConfig.ingestors.confluence.enabled
-                                ? 'bg-stone-600 border-stone-600'
-                                : 'border-stone-300 dark:border-stone-600'
+                                ? 'bg-slate-600 border-slate-600'
+                                : 'border-slate-300 dark:border-slate-600'
                             }`}
                           >
                             {pipelineConfig.ingestors.confluence.enabled && <Check className="w-3 h-3 text-white" />}
                           </div>
                           <div>
-                            <div className="text-sm font-medium text-stone-900 dark:text-white">Confluence</div>
-                            <div className="text-xs text-stone-500">Runbooks & documentation</div>
+                            <div className="text-sm font-medium text-slate-900 dark:text-white">Confluence</div>
+                            <div className="text-xs text-slate-500">Runbooks & documentation</div>
                           </div>
                         </label>
                         {pipelineConfig.ingestors.confluence.enabled && (
                           <div className="mt-3 pl-7 space-y-3">
                             <div>
-                              <label className="block text-xs text-stone-600 dark:text-stone-400 mb-1">
+                              <label className="block text-xs text-slate-600 dark:text-slate-400 mb-1">
                                 Confluence Base URL
                               </label>
                               <input
@@ -1355,11 +1337,11 @@ export default function SettingsPage() {
                                   })
                                 }
                                 placeholder="https://company.atlassian.net"
-                                className="w-full px-3 py-1.5 text-sm rounded-lg border border-stone-200 dark:border-stone-600 bg-white dark:bg-stone-700"
+                                className="w-full px-3 py-1.5 text-sm rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700"
                               />
                             </div>
                             <div>
-                              <label className="block text-xs text-stone-600 dark:text-stone-400 mb-1">
+                              <label className="block text-xs text-slate-600 dark:text-slate-400 mb-1">
                                 Space Keys (comma-separated)
                               </label>
                               <input
@@ -1378,9 +1360,9 @@ export default function SettingsPage() {
                                   })
                                 }
                                 placeholder="ENG, OPS, RUNBOOKS"
-                                className="w-full px-3 py-1.5 text-sm rounded-lg border border-stone-200 dark:border-stone-600 bg-white dark:bg-stone-700"
+                                className="w-full px-3 py-1.5 text-sm rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700"
                               />
-                              <p className="text-xs text-stone-400 mt-1">Leave empty to include all accessible spaces</p>
+                              <p className="text-xs text-slate-400 mt-1">Leave empty to include all accessible spaces</p>
                             </div>
                           </div>
                         )}
@@ -1389,8 +1371,8 @@ export default function SettingsPage() {
                       {/* Google Docs Ingestor */}
                       <div className={`p-4 rounded-lg border ${
                         pipelineConfig.ingestors.gdocs.enabled
-                          ? 'border-stone-400 bg-stone-50 dark:bg-stone-700/50'
-                          : 'border-stone-200 dark:border-stone-600'
+                          ? 'border-slate-400 bg-slate-50 dark:bg-slate-700/50'
+                          : 'border-slate-200 dark:border-slate-600'
                       }`}>
                         <label className="flex items-center gap-3 cursor-pointer">
                           <input
@@ -1410,20 +1392,20 @@ export default function SettingsPage() {
                           <div
                             className={`w-4 h-4 rounded border flex items-center justify-center ${
                               pipelineConfig.ingestors.gdocs.enabled
-                                ? 'bg-stone-600 border-stone-600'
-                                : 'border-stone-300 dark:border-stone-600'
+                                ? 'bg-slate-600 border-slate-600'
+                                : 'border-slate-300 dark:border-slate-600'
                             }`}
                           >
                             {pipelineConfig.ingestors.gdocs.enabled && <Check className="w-3 h-3 text-white" />}
                           </div>
                           <div>
-                            <div className="text-sm font-medium text-stone-900 dark:text-white">Google Docs</div>
-                            <div className="text-xs text-stone-500">Postmortems & procedures</div>
+                            <div className="text-sm font-medium text-slate-900 dark:text-white">Google Docs</div>
+                            <div className="text-xs text-slate-500">Postmortems & procedures</div>
                           </div>
                         </label>
                         {pipelineConfig.ingestors.gdocs.enabled && (
                           <div className="mt-3 pl-7">
-                            <label className="block text-xs text-stone-600 dark:text-stone-400 mb-1">
+                            <label className="block text-xs text-slate-600 dark:text-slate-400 mb-1">
                               Folder IDs (comma-separated, optional)
                             </label>
                             <input
@@ -1442,9 +1424,9 @@ export default function SettingsPage() {
                                 })
                               }
                               placeholder="1abc123..., 2def456..."
-                              className="w-full px-3 py-1.5 text-sm rounded-lg border border-stone-200 dark:border-stone-600 bg-white dark:bg-stone-700"
+                              className="w-full px-3 py-1.5 text-sm rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700"
                             />
-                            <p className="text-xs text-stone-400 mt-1">Leave empty to include all shared drive docs</p>
+                            <p className="text-xs text-slate-400 mt-1">Leave empty to include all shared drive docs</p>
                           </div>
                         )}
                       </div>
@@ -1452,8 +1434,8 @@ export default function SettingsPage() {
                       {/* Agent Traces Ingestor */}
                       <div className={`p-4 rounded-lg border ${
                         pipelineConfig.ingestors.agent_traces.enabled
-                          ? 'border-stone-400 bg-stone-50 dark:bg-stone-700/50'
-                          : 'border-stone-200 dark:border-stone-600'
+                          ? 'border-slate-400 bg-slate-50 dark:bg-slate-700/50'
+                          : 'border-slate-200 dark:border-slate-600'
                       }`}>
                         <label className="flex items-center gap-3 cursor-pointer">
                           <input
@@ -1473,15 +1455,15 @@ export default function SettingsPage() {
                           <div
                             className={`w-4 h-4 rounded border flex items-center justify-center ${
                               pipelineConfig.ingestors.agent_traces.enabled
-                                ? 'bg-stone-600 border-stone-600'
-                                : 'border-stone-300 dark:border-stone-600'
+                                ? 'bg-slate-600 border-slate-600'
+                                : 'border-slate-300 dark:border-slate-600'
                             }`}
                           >
                             {pipelineConfig.ingestors.agent_traces.enabled && <Check className="w-3 h-3 text-white" />}
                           </div>
                           <div>
-                            <div className="text-sm font-medium text-stone-900 dark:text-white">Agent Traces</div>
-                            <div className="text-xs text-stone-500">Tool calls, errors & decisions (auto-configured)</div>
+                            <div className="text-sm font-medium text-slate-900 dark:text-white">Agent Traces</div>
+                            <div className="text-xs text-slate-500">Tool calls, errors & decisions (auto-configured)</div>
                           </div>
                         </label>
                       </div>
@@ -1491,20 +1473,20 @@ export default function SettingsPage() {
               </div>
 
               {/* Dependency Discovery Section */}
-              <div className="bg-white dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded-xl p-6 shadow-sm">
+              <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-6 shadow-sm">
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-3">
-                    <div className="p-2 bg-stone-100 dark:bg-stone-700 rounded-lg">
-                      <Network className="w-5 h-5 text-stone-600 dark:text-stone-400" />
+                    <div className="p-2 bg-slate-100 dark:bg-slate-700 rounded-lg">
+                      <Network className="w-5 h-5 text-slate-600 dark:text-slate-400" />
                     </div>
                     <div>
-                      <h2 className="text-lg font-semibold text-stone-900 dark:text-white flex items-center gap-1">
+                      <h2 className="text-lg font-semibold text-slate-900 dark:text-white flex items-center gap-1">
                         Service Dependency Discovery
                         <HelpTip id="dependency-discovery" position="right">
                           <strong>Dependency Discovery</strong> analyzes your observability data (traces, metrics) to automatically map service relationships. This helps agents understand how services connect and identify cascading failures during incidents.
                         </HelpTip>
                       </h2>
-                      <p className="text-sm text-stone-500">
+                      <p className="text-sm text-slate-500">
                         Automatically discover service dependencies from observability data
                       </p>
                     </div>
@@ -1513,7 +1495,7 @@ export default function SettingsPage() {
                     onClick={() => setDependencyConfig({ ...dependencyConfig, enabled: !dependencyConfig.enabled })}
                     disabled={featuresLoading}
                     className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                      dependencyConfig.enabled ? 'bg-stone-600' : 'bg-stone-300 dark:bg-stone-700'
+                      dependencyConfig.enabled ? 'bg-slate-600' : 'bg-slate-300 dark:bg-slate-700'
                     } ${featuresLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
                   >
                     <span
@@ -1525,10 +1507,10 @@ export default function SettingsPage() {
                 </div>
 
                 {dependencyConfig.enabled && (
-                  <div className="mt-4 pt-4 border-t border-stone-200 dark:border-stone-700 space-y-4">
+                  <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700 space-y-4">
                     {/* Schedule */}
                     <div className="flex items-center gap-4">
-                      <div className="flex items-center gap-2 text-sm text-stone-600 dark:text-stone-400">
+                      <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
                         <Clock className="w-4 h-4" />
                         Schedule (cron):
                       </div>
@@ -1537,16 +1519,16 @@ export default function SettingsPage() {
                         value={dependencyConfig.schedule}
                         onChange={(e) => setDependencyConfig({ ...dependencyConfig, schedule: e.target.value })}
                         placeholder="0 */2 * * *"
-                        className="flex-1 max-w-xs px-3 py-1.5 text-sm rounded-lg border border-stone-200 dark:border-stone-600 bg-white dark:bg-stone-700 font-mono"
+                        className="flex-1 max-w-xs px-3 py-1.5 text-sm rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 font-mono"
                       />
-                      <span className="text-xs text-stone-500">
+                      <span className="text-xs text-slate-500">
                         Default: Every 2 hours
                       </span>
                     </div>
 
                     {/* Data Sources */}
                     <div>
-                      <div className="text-sm font-medium text-stone-700 dark:text-stone-300 mb-3">
+                      <div className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-3">
                         Discovery Sources
                       </div>
                       <div className="grid grid-cols-2 gap-3">
@@ -1560,8 +1542,8 @@ export default function SettingsPage() {
                             key={source.key}
                             className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
                               dependencyConfig.sources[source.key as keyof typeof dependencyConfig.sources]
-                                ? 'border-stone-400 bg-stone-50 dark:bg-stone-700/50'
-                                : 'border-stone-200 dark:border-stone-600 hover:bg-stone-50 dark:hover:bg-stone-800'
+                                ? 'border-slate-400 bg-slate-50 dark:bg-slate-700/50'
+                                : 'border-slate-200 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-800'
                             }`}
                           >
                             <input
@@ -1581,8 +1563,8 @@ export default function SettingsPage() {
                             <div
                               className={`w-4 h-4 rounded border flex items-center justify-center ${
                                 dependencyConfig.sources[source.key as keyof typeof dependencyConfig.sources]
-                                  ? 'bg-stone-600 border-stone-600'
-                                  : 'border-stone-300 dark:border-stone-600'
+                                  ? 'bg-slate-600 border-slate-600'
+                                  : 'border-slate-300 dark:border-slate-600'
                               }`}
                             >
                               {dependencyConfig.sources[source.key as keyof typeof dependencyConfig.sources] && (
@@ -1590,10 +1572,10 @@ export default function SettingsPage() {
                               )}
                             </div>
                             <div>
-                              <div className="text-sm font-medium text-stone-900 dark:text-white">
+                              <div className="text-sm font-medium text-slate-900 dark:text-white">
                                 {source.name}
                               </div>
-                              <div className="text-xs text-stone-500">{source.desc}</div>
+                              <div className="text-xs text-slate-500">{source.desc}</div>
                             </div>
                           </label>
                         ))}
@@ -1604,20 +1586,20 @@ export default function SettingsPage() {
               </div>
 
               {/* Alert Correlation Section */}
-              <div className="bg-white dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded-xl p-6 shadow-sm">
+              <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-6 shadow-sm">
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-3">
-                    <div className="p-2 bg-stone-100 dark:bg-stone-700 rounded-lg">
-                      <Link2 className="w-5 h-5 text-stone-600 dark:text-stone-400" />
+                    <div className="p-2 bg-slate-100 dark:bg-slate-700 rounded-lg">
+                      <Link2 className="w-5 h-5 text-slate-600 dark:text-slate-400" />
                     </div>
                     <div>
-                      <h2 className="text-lg font-semibold text-stone-900 dark:text-white flex items-center gap-1">
+                      <h2 className="text-lg font-semibold text-slate-900 dark:text-white flex items-center gap-1">
                         Alert Correlation
                         <HelpTip id="alert-correlation" position="right">
                           <strong>Alert Correlation</strong> groups related alerts together to reduce noise. It uses three methods: <em>temporal</em> (alerts within a time window), <em>topology</em> (alerts from related services), and <em>semantic</em> (alerts with similar descriptions).
                         </HelpTip>
                       </h2>
-                      <p className="text-sm text-stone-500">
+                      <p className="text-sm text-slate-500">
                         Automatically correlate related alerts using temporal, topology, and semantic analysis
                       </p>
                     </div>
@@ -1626,7 +1608,7 @@ export default function SettingsPage() {
                     onClick={() => setCorrelationConfig({ ...correlationConfig, enabled: !correlationConfig.enabled })}
                     disabled={featuresLoading}
                     className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                      correlationConfig.enabled ? 'bg-stone-600' : 'bg-stone-300 dark:bg-stone-700'
+                      correlationConfig.enabled ? 'bg-slate-600' : 'bg-slate-300 dark:bg-slate-700'
                     } ${featuresLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
                   >
                     <span
@@ -1638,10 +1620,10 @@ export default function SettingsPage() {
                 </div>
 
                 {correlationConfig.enabled && (
-                  <div className="mt-4 pt-4 border-t border-stone-200 dark:border-stone-700 space-y-4">
+                  <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700 space-y-4">
                     {/* Temporal Window */}
                     <div className="flex items-center gap-4">
-                      <div className="flex items-center gap-2 text-sm text-stone-600 dark:text-stone-400">
+                      <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
                         <Clock className="w-4 h-4" />
                         Temporal Window:
                       </div>
@@ -1651,16 +1633,16 @@ export default function SettingsPage() {
                         onChange={(e) => setCorrelationConfig({ ...correlationConfig, temporal_window_seconds: parseInt(e.target.value) || 300 })}
                         min={60}
                         max={3600}
-                        className="w-24 px-3 py-1.5 text-sm rounded-lg border border-stone-200 dark:border-stone-600 bg-white dark:bg-stone-700 font-mono"
+                        className="w-24 px-3 py-1.5 text-sm rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 font-mono"
                       />
-                      <span className="text-xs text-stone-500">
+                      <span className="text-xs text-slate-500">
                         seconds (default: 300 = 5 min)
                       </span>
                     </div>
 
                     {/* Semantic Threshold */}
                     <div className="flex items-center gap-4">
-                      <div className="flex items-center gap-2 text-sm text-stone-600 dark:text-stone-400">
+                      <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
                         <Activity className="w-4 h-4" />
                         Semantic Threshold:
                       </div>
@@ -1671,14 +1653,14 @@ export default function SettingsPage() {
                         min={0}
                         max={1}
                         step={0.05}
-                        className="w-24 px-3 py-1.5 text-sm rounded-lg border border-stone-200 dark:border-stone-600 bg-white dark:bg-stone-700 font-mono"
+                        className="w-24 px-3 py-1.5 text-sm rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 font-mono"
                       />
-                      <span className="text-xs text-stone-500">
+                      <span className="text-xs text-slate-500">
                         0.0 - 1.0 (default: 0.75)
                       </span>
                     </div>
 
-                    <div className="mt-3 text-xs text-stone-500">
+                    <div className="mt-3 text-xs text-slate-500">
                       When enabled, incoming alerts are correlated with recent alerts based on:
                       <ul className="list-disc list-inside mt-2 space-y-1">
                         <li><strong>Temporal:</strong> Alerts within the time window</li>
@@ -1695,8 +1677,8 @@ export default function SettingsPage() {
                 <button
                   onClick={saveFeatureConfigs}
                   disabled={featuresSaving || !canWrite}
-                  title={!canWrite ? 'Visitors cannot modify feature configuration' : undefined}
-                  className="flex items-center gap-2 px-4 py-2 bg-stone-600 text-white rounded-lg hover:bg-stone-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  title={!canWrite ? 'You do not have write access' : undefined}
+                  className="flex items-center gap-2 px-4 py-2 bg-slate-600 text-white rounded-lg hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {featuresSaving ? (
                     <>
@@ -1713,8 +1695,8 @@ export default function SettingsPage() {
                 <button
                   onClick={syncCronJobs}
                   disabled={syncingCronJobs || !canWrite}
-                  title={!canWrite ? 'Visitors cannot sync scheduled jobs' : undefined}
-                  className="flex items-center gap-2 px-4 py-2 bg-stone-100 dark:bg-stone-700 text-stone-700 dark:text-stone-300 rounded-lg hover:bg-stone-200 dark:hover:bg-stone-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  title={!canWrite ? 'You do not have write access' : undefined}
+                  className="flex items-center gap-2 px-4 py-2 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {syncingCronJobs ? (
                     <>
@@ -1728,14 +1710,14 @@ export default function SettingsPage() {
                     </>
                   )}
                 </button>
-                <span className="text-xs text-stone-500">
-                  {!canWrite ? 'Configuration changes are disabled in visitor mode.' : 'Save config first, then apply to activate scheduled jobs'}
+                <span className="text-xs text-slate-500">
+                  {!canWrite ? 'Configuration changes are disabled for your account.' : 'Save config first, then apply to activate scheduled jobs'}
                 </span>
               </div>
 
               {/* Info Box */}
-              <div className="bg-stone-50 dark:bg-stone-700/50 border border-stone-200 dark:border-stone-600 rounded-lg p-4">
-                <p className="text-sm text-stone-700 dark:text-stone-300">
+              <div className="bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-600 rounded-lg p-4">
+                <p className="text-sm text-slate-700 dark:text-slate-300">
                   <span className="font-medium">How it works:</span> When enabled, these features run as scheduled Kubernetes CronJobs.
                   The AI Pipeline processes incident data to build your knowledge base. Dependency Discovery analyzes
                   observability data to map service relationships, helping agents understand your architecture during incidents.
@@ -1758,11 +1740,11 @@ export default function SettingsPage() {
               </div>
 
               {/* Quick Start Guide Section */}
-              <div className="bg-white dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded-xl p-6 shadow-sm">
-                <h2 className="text-lg font-semibold text-stone-900 dark:text-white mb-4 flex items-center gap-2">
+              <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-6 shadow-sm">
+                <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
                   <BookOpen className="w-5 h-5" /> Quick Start Guide
                 </h2>
-                <p className="text-sm text-stone-600 dark:text-stone-400 mb-4">
+                <p className="text-sm text-slate-600 dark:text-slate-400 mb-4">
                   Review the onboarding guide or reset it for testing purposes.
                 </p>
                 <div className="flex flex-wrap gap-3">
@@ -1771,7 +1753,7 @@ export default function SettingsPage() {
                       setQuickStartInitialStep(1);
                       setShowQuickStart(true);
                     }}
-                    className="flex items-center gap-2 px-4 py-2 bg-forest text-white rounded-lg hover:bg-forest-dark transition-colors"
+                    className="flex items-center gap-2 px-4 py-2 bg-emerald-100/50 text-emerald-700 rounded-lg hover:bg-emerald-100/80 transition-colors"
                   >
                     <BookOpen className="w-4 h-4" />
                     View Quick Start Guide
@@ -1781,7 +1763,7 @@ export default function SettingsPage() {
                       resetOnboarding();
                       alert('Onboarding state reset. Refresh the page to see the welcome modal again.');
                     }}
-                    className="flex items-center gap-2 px-4 py-2 border border-stone-300 dark:border-stone-600 text-stone-700 dark:text-stone-300 rounded-lg hover:bg-stone-100 dark:hover:bg-stone-800 transition-colors"
+                    className="flex items-center gap-2 px-4 py-2 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
                   >
                     <RotateCcw className="w-4 h-4" />
                     Reset Onboarding

@@ -1,0 +1,134 @@
+{{- if and .Values.neo4j.enabled .Values.neo4j.backup.enabled }}
+{{- $ns := .Values.namespace | default .Release.Namespace }}
+{{- /* serviceAccount is optional until values.yaml defaults land; dig avoids nil pointer. */}}
+{{- $saCfg := .Values.neo4j.backup.serviceAccount | default dict }}
+{{- $sa := dig "name" "opensre-neo4j-backup" $saCfg }}
+{{- $roleArn := dig "roleArn" "" $saCfg }}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ $sa }}
+  namespace: {{ $ns }}
+  labels:
+    {{- include "opensre.labels" . | nindent 4 }}
+    app.kubernetes.io/component: neo4j-backup
+  {{- if $roleArn }}
+  annotations:
+    eks.amazonaws.com/role-arn: {{ $roleArn | quote }}
+  {{- end }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: opensre-neo4j-backup
+  namespace: {{ $ns }}
+  labels:
+    {{- include "opensre.labels" . | nindent 4 }}
+rules:
+  - apiGroups: ["apps"]
+    resources: ["statefulsets", "statefulsets/scale"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["apps"]
+    resources: ["statefulsets", "statefulsets/scale"]
+    verbs: ["patch", "update"]
+    resourceNames: [{{ required "neo4j.backup.statefulSetName is required when backup is enabled" .Values.neo4j.backup.statefulSetName }}]
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch", "delete"]
+  - apiGroups: ["batch"]
+    resources: ["jobs"]
+    verbs: ["get", "list", "watch", "create", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: opensre-neo4j-backup
+  namespace: {{ $ns }}
+  labels:
+    {{- include "opensre.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: opensre-neo4j-backup
+subjects:
+  - kind: ServiceAccount
+    name: {{ $sa }}
+    namespace: {{ $ns }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: opensre-neo4j-backup
+  namespace: {{ $ns }}
+  labels:
+    {{- include "opensre.labels" . | nindent 4 }}
+data:
+  neo4j-s3-backup.sh: |
+{{ .Files.Get "files/neo4j-s3-backup.sh" | indent 4 }}
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: opensre-neo4j-backup
+  namespace: {{ $ns }}
+  labels:
+    {{- include "opensre.labels" . | nindent 4 }}
+    app.kubernetes.io/component: neo4j-backup
+spec:
+  schedule: {{ .Values.neo4j.backup.schedule | quote }}
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      activeDeadlineSeconds: {{ .Values.neo4j.backup.activeDeadlineSeconds | default 1500 }}
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/component: neo4j-backup
+        spec:
+          restartPolicy: Never
+          serviceAccountName: {{ $sa }}
+          volumes:
+            - name: script
+              configMap:
+                name: opensre-neo4j-backup
+                defaultMode: 0755
+          containers:
+            - name: backup
+              image: {{ .Values.neo4j.backup.kubectlImage | quote }}
+              imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+              command: ["/bin/bash", "/scripts/neo4j-s3-backup.sh"]
+              env:
+                - name: NAMESPACE
+                  value: {{ $ns | quote }}
+                - name: STATEFULSET_NAME
+                  value: {{ required "neo4j.backup.statefulSetName is required when backup is enabled" .Values.neo4j.backup.statefulSetName | quote }}
+                - name: PVC_NAME
+                  value: {{ required "neo4j.backup.pvcName is required when backup is enabled" .Values.neo4j.backup.pvcName | quote }}
+                - name: S3_BUCKET
+                  value: {{ required "neo4j.backup.s3.bucket is required when backup is enabled" .Values.neo4j.backup.s3.bucket | quote }}
+                - name: S3_PREFIX
+                  value: {{ .Values.neo4j.backup.s3.prefix | default "neo4j/" | quote }}
+                - name: AWS_REGION
+                  value: {{ required "neo4j.backup.s3.region is required when backup is enabled" .Values.neo4j.backup.s3.region | quote }}
+                - name: AWS_CLI_IMAGE
+                  value: {{ .Values.neo4j.backup.awsCliImage | quote }}
+                - name: CLUSTER_NAME
+                  value: {{ .Values.neo4j.backup.clusterName | default "cluster" | quote }}
+                - name: SERVICE_ACCOUNT
+                  value: {{ $sa | quote }}
+                - name: DUMP_TIMEOUT_SECONDS
+                  value: {{ .Values.neo4j.backup.dumpTimeoutSeconds | default "1200" | quote }}
+              volumeMounts:
+                - name: script
+                  mountPath: /scripts
+              resources:
+                requests:
+                  cpu: "50m"
+                  memory: "64Mi"
+                limits:
+                  cpu: "200m"
+                  memory: "128Mi"
+{{- end }}

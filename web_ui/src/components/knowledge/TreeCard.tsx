@@ -23,7 +23,7 @@ export function TreeCard({
   onSelect,
 }: TreeCardProps) {
   const levelColors: Record<string, string> = {
-    org: 'bg-forest-light/15 text-forest-dark dark:bg-forest/20 dark:text-forest-light',
+    org: 'bg-emerald-100/55 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400',
     group: 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400',
     team: 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400',
   };
@@ -32,11 +32,11 @@ export function TreeCard({
     <button
       onClick={onSelect}
       className={`
-        w-full text-left p-4 rounded-xl border transition-all
+        w-full text-left p-4 rounded-[1.5rem] border transition-all
         ${
           isSelected
-            ? 'border-forest bg-forest-light/10 dark:bg-forest/20 ring-2 ring-forest/20'
-            : 'border-stone-200 dark:border-stone-600 bg-white dark:bg-stone-800 hover:border-stone-300 dark:hover:border-stone-600'
+            ? 'border-emerald-500 bg-emerald-100/50 dark:bg-emerald-900/20 ring-2 ring-emerald-500/20'
+            : 'border-slate-200/70 dark:border-slate-600 bg-white dark:bg-slate-800 hover:border-slate-300 dark:hover:border-slate-600'
         }
       `}
     >
@@ -44,7 +44,7 @@ export function TreeCard({
         <div
           className={`
             w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0
-            ${isSelected ? 'bg-forest text-white' : 'bg-stone-100 dark:bg-stone-700 text-stone-600 dark:text-stone-400'}
+            ${isSelected ? 'bg-emerald-100/55 text-emerald-700' : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-400'}
           `}
         >
           <Database className="w-5 h-5" />
@@ -52,7 +52,7 @@ export function TreeCard({
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1 flex-wrap">
             {inherited && (
-              <span className="text-xs px-1.5 py-0.5 rounded bg-stone-100 dark:bg-stone-700 text-stone-500">
+              <span className="text-xs px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-700 text-slate-500">
                 Inherited
               </span>
             )}
@@ -60,12 +60,12 @@ export function TreeCard({
               {level}
             </span>
           </div>
-          <h3 className="font-medium text-stone-900 dark:text-white truncate">{treeName}</h3>
-          <p className="text-xs text-stone-500 dark:text-stone-400 truncate">
+          <h3 className="font-medium text-slate-900 dark:text-white truncate">{treeName}</h3>
+          <p className="text-xs text-slate-500 dark:text-slate-400 truncate">
             From {nodeName}
           </p>
           {stats && (
-            <div className="flex items-center gap-3 mt-2 text-xs text-stone-400">
+            <div className="flex items-center gap-3 mt-2 text-xs text-slate-400">
               <span className="flex items-center gap-1">
                 <GitBranch className="w-3 h-3" />
                 {stats.nodes.toLocaleString()} nodes

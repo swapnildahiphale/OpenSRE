@@ -1,0 +1,205 @@
+{{- if .Values.services.webUi.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: opensre-web-ui
+  namespace: {{ .Values.namespace }}
+spec:
+  replicas: {{ .Values.services.webUi.replicas }}
+  selector:
+    matchLabels:
+      app: opensre-web-ui
+  template:
+    metadata:
+      labels:
+        app: opensre-web-ui
+    spec:
+      {{- if .Values.global.imagePullSecrets }}
+      imagePullSecrets:
+{{ toYaml .Values.global.imagePullSecrets | indent 8 }}
+      {{- end }}
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+      containers:
+        - name: web-ui
+          image: {{ required "services.webUi.image is required" .Values.services.webUi.image }}
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          ports:
+            - containerPort: {{ .Values.services.webUi.servicePort }}
+          resources:
+{{ toYaml .Values.services.webUi.resources | indent 12 }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          {{- if not .Values.externalSecrets.enabled }}
+          envFrom:
+            - secretRef:
+                name: {{ .Values.secrets.webUiEnv | quote }}
+          {{- end }}
+          env:
+            - name: CONFIG_SERVICE_URL
+              value: {{ required "global.configService.url is required" .Values.global.configService.url | quote }}
+            - name: AGENT_SERVICE_URL
+              value: {{ printf "http://opensre-agent.%s.svc.cluster.local:%d" .Values.namespace (.Values.services.agent.servicePort | int) | quote }}
+            - name: ORCHESTRATOR_URL
+              value: {{ printf "http://opensre-orchestrator.%s.svc.cluster.local:%d" .Values.namespace (.Values.services.orchestrator.servicePort | int) | quote }}
+            {{- if .Values.services.webUi.raptorApiUrl }}
+            - name: RAPTOR_API_URL
+              value: {{ .Values.services.webUi.raptorApiUrl | quote }}
+            {{- end }}
+            # Ensure Next.js binds on all interfaces in Kubernetes (otherwise it may bind to pod hostname only,
+            # which breaks kubectl port-forward and can confuse health checks).
+            - name: HOSTNAME
+              value: "0.0.0.0"
+            - name: WEB_UI_COOKIE_SECURE
+              value: {{ default false .Values.services.webUi.cookieSecure | ternary "1" "0" | quote }}
+            - name: NEXT_PUBLIC_WEB_UI_OIDC_ENABLED
+              value: {{ default false .Values.services.webUi.oidc.enabled | ternary "1" "0" | quote }}
+            - name: WEB_UI_OIDC_ENABLED
+              value: {{ default false .Values.services.webUi.oidc.enabled | ternary "1" "0" | quote }}
+            - name: WEB_UI_PUBLIC_BASE_URL
+              value: {{ default "" .Values.services.webUi.oidc.publicBaseUrl | quote }}
+            - name: WEB_UI_OIDC_AUTHORIZATION_ENDPOINT
+              value: {{ default "" .Values.services.webUi.oidc.authorizationEndpoint | quote }}
+            - name: WEB_UI_OIDC_TOKEN_ENDPOINT
+              value: {{ default "" .Values.services.webUi.oidc.tokenEndpoint | quote }}
+            - name: WEB_UI_OIDC_CLIENT_ID
+              value: {{ default "" .Values.services.webUi.oidc.clientId | quote }}
+            - name: WEB_UI_OIDC_SCOPES
+              value: {{ default "openid email profile groups" .Values.services.webUi.oidc.scopes | quote }}
+            {{- if and .Values.externalSecrets.enabled .Values.services.webUi.oidc.clientSecret .Values.services.webUi.oidc.clientSecret.secretName }}
+            - name: WEB_UI_OIDC_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.services.webUi.oidc.clientSecret.secretName | quote }}
+                  key: {{ default "client_secret" .Values.services.webUi.oidc.clientSecret.secretKey | quote }}
+            {{- else if and .Values.externalSecrets.enabled .Values.services.webUi.oidc.clientSecret .Values.services.webUi.oidc.clientSecret.value }}
+            - name: WEB_UI_OIDC_CLIENT_SECRET
+              value: {{ .Values.services.webUi.oidc.clientSecret.value | quote }}
+            {{- end }}
+            {{- if and .Values.externalSecrets.enabled .Values.services.webUi.slack.enabled }}
+            - name: SLACK_SIGNING_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.externalSecrets.contract.slack.secretName | quote }}
+                  key: {{ .Values.externalSecrets.contract.slack.signingSecretKey | quote }}
+            - name: SLACK_BOT_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.externalSecrets.contract.slack.secretName | quote }}
+                  key: {{ .Values.externalSecrets.contract.slack.botTokenKey | quote }}
+            - name: ORCHESTRATOR_INTERNAL_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.externalSecrets.contract.orchestratorInternal.secretName | quote }}
+                  key: {{ .Values.externalSecrets.contract.orchestratorInternal.internalTokenKey | quote }}
+            {{- end }}
+          readinessProbe:
+            httpGet:
+              path: /
+              port: {{ .Values.services.webUi.servicePort }}
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          {{- if .Values.services.webUi.livenessProbe.enabled }}
+          livenessProbe:
+            httpGet:
+              path: {{ .Values.services.webUi.livenessProbe.path | quote }}
+              port: {{ .Values.services.webUi.servicePort }}
+            initialDelaySeconds: {{ .Values.services.webUi.livenessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.services.webUi.livenessProbe.periodSeconds }}
+          {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: opensre-web-ui
+  namespace: {{ .Values.namespace }}
+spec:
+  selector:
+    app: opensre-web-ui
+  ports:
+    - port: {{ .Values.services.webUi.servicePort }}
+      targetPort: {{ .Values.services.webUi.servicePort }}
+      protocol: TCP
+---
+{{- if .Values.ingress.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: opensre-web-ui
+  namespace: {{ .Values.namespace }}
+  annotations:
+{{- if .Values.ingress.annotations }}
+{{ toYaml .Values.ingress.annotations | indent 4 }}
+{{- end }}
+{{- if eq .Values.ingress.className "alb" }}
+{{- if .Values.ingress.tls.enabled }}
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP":80},{"HTTPS":443}]'
+    alb.ingress.kubernetes.io/certificate-arn: {{ required "ingress.tls.certificateArn is required when ingress.tls.enabled=true" .Values.ingress.tls.certificateArn | quote }}
+    {{- if (default true .Values.ingress.tls.redirectToHttps) }}
+    alb.ingress.kubernetes.io/ssl-redirect: "443"
+    {{- end }}
+{{- end }}
+{{- if .Values.ingress.waf.enabled }}
+    alb.ingress.kubernetes.io/wafv2-acl-arn: {{ required "ingress.waf.webAclArn is required when ingress.waf.enabled=true" .Values.ingress.waf.webAclArn | quote }}
+{{- end }}
+{{- end }}
+spec:
+  ingressClassName: {{ .Values.ingress.className | quote }}
+{{- if and .Values.ingress.tls.enabled .Values.ingress.tls.secretName (ne .Values.ingress.className "alb") }}
+  tls:
+    - hosts:
+        - {{ .Values.ingress.host | quote }}
+      secretName: {{ .Values.ingress.tls.secretName | quote }}
+{{- end }}
+  rules:
+    - {{- if .Values.ingress.host }}
+      host: {{ .Values.ingress.host | quote }}
+      {{- end }}
+      http:
+        paths:
+          {{- if .Values.services.k8sGateway.enabled }}
+          # K8s Gateway - for customer agents to connect via SSE
+          - path: /gateway
+            pathType: Prefix
+            backend:
+              service:
+                name: opensre-k8s-gateway
+                port:
+                  number: {{ .Values.services.k8sGateway.servicePort }}
+          {{- end }}
+          {{- if .Values.services.configService.enabled }}
+          # GitHub App callback - route directly to config-service
+          - path: /github/callback
+            pathType: Exact
+            backend:
+              service:
+                name: opensre-config-service
+                port:
+                  number: {{ .Values.services.configService.servicePort }}
+          {{- end }}
+          {{- if .Values.services.orchestrator.enabled }}
+          # Webhooks - route to orchestrator for Vercel, GitHub, PagerDuty, etc.
+          - path: /webhooks
+            pathType: Prefix
+            backend:
+              service:
+                name: opensre-orchestrator
+                port:
+                  number: {{ .Values.services.orchestrator.servicePort }}
+          {{- end }}
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: opensre-web-ui
+                port:
+                  number: {{ .Values.services.webUi.servicePort }}
+{{- end }}
+{{- end }}
+
+

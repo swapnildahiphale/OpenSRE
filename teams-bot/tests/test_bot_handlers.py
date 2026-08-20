@@ -40,6 +40,106 @@ def test_personal_always_handles():
     )
 
 
+@pytest.mark.asyncio
+async def test_channel_investigation_does_not_use_activity_stream():
+    on_message_handler = None
+
+    class FakeApp:
+        def on_message(self, fn):
+            nonlocal on_message_handler
+            on_message_handler = fn
+            return fn
+
+        def on_card_action_execute(self, _verb):
+            def decorator(fn):
+                return fn
+
+            return decorator
+
+    register_handlers(FakeApp())
+    ctx = MagicMock()
+    ctx.send = AsyncMock(return_value=MagicMock(id="act-ch"))
+    ctx.stream = MagicMock()
+    ctx.stream.update = MagicMock()
+    ctx.stream.close = MagicMock()
+    mention = MagicMock(type="mention")
+    ctx.activity = MagicMock(
+        text="<at>OpenSRE</at> Investigate oc-1234",
+        entities=[mention],
+        conversation=MagicMock(
+            id="19:b6fb18b3e55b49afb74f7a0ee8a41c64@thread.tacv2",
+            conversation_type="channel",
+            conversationType=None,
+        ),
+        channel_id="msteams",
+        channelId="msteams",
+    )
+    with patch("bot_handlers.run_investigation", new_callable=AsyncMock) as mock_run:
+        await on_message_handler(ctx)
+
+    mock_run.assert_awaited_once()
+    kwargs = mock_run.await_args.kwargs
+    ctx.stream.update.assert_not_called()
+    # Ack is one send; progress edits reuse that activity id (PUT, not stream).
+    assert ctx.send.await_count == 1
+    await kwargs["stream_update"]("Working on Jira…")
+    await kwargs["stream_close"]()
+    ctx.stream.update.assert_not_called()
+    ctx.stream.close.assert_not_called()
+    assert ctx.send.await_count == 2
+    progress = ctx.send.await_args_list[-1].args[0]
+    assert progress.id == "act-ch"
+    assert progress.text == "Working on Jira…"
+    await kwargs["update_card"](
+        "act-q", {"type": "AdaptiveCard", "body": [], "actions": []}
+    )
+    timeout_card = ctx.send.await_args_list[-1].args[0]
+    assert timeout_card.id == "act-q"
+
+
+@pytest.mark.asyncio
+async def test_personal_investigation_keeps_activity_stream():
+    on_message_handler = None
+
+    class FakeApp:
+        def on_message(self, fn):
+            nonlocal on_message_handler
+            on_message_handler = fn
+            return fn
+
+        def on_card_action_execute(self, _verb):
+            def decorator(fn):
+                return fn
+
+            return decorator
+
+    register_handlers(FakeApp())
+    ctx = MagicMock()
+    ctx.send = AsyncMock(return_value=MagicMock(id="act-p"))
+    ctx.stream = MagicMock()
+    ctx.stream.update = MagicMock()
+    ctx.stream.close = MagicMock()
+    ctx.activity = MagicMock(
+        text="oc-1234",
+        entities=[],
+        conversation=MagicMock(
+            id="a:16i0nmlwexample",
+            conversation_type="personal",
+            conversationType=None,
+        ),
+        channel_id="msteams",
+        channelId="msteams",
+    )
+    with patch("bot_handlers.run_investigation", new_callable=AsyncMock) as mock_run:
+        await on_message_handler(ctx)
+
+    kwargs = mock_run.await_args.kwargs
+    await kwargs["stream_update"]("progress")
+    await kwargs["stream_close"]()
+    ctx.stream.update.assert_called_once()
+    ctx.stream.close.assert_called_once()
+
+
 def test_is_personal_chat():
     assert is_personal_chat("personal") is True
     assert is_personal_chat("channel") is False

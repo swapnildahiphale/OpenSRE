@@ -3,12 +3,11 @@ import { apiFetch } from "./apiClient";
 
 export type Identity = {
   role: "admin" | "team";
-  auth_kind: "admin_token" | "team_token" | "oidc" | "impersonation" | "visitor";
+  auth_kind: "admin_token" | "team_token" | "oidc" | "impersonation";
   org_id?: string | null;
   team_node_id?: string | null;
   can_write: boolean;
   permissions: string[];
-  visitor_session_id?: string | null;
 };
 
 export function useIdentity() {

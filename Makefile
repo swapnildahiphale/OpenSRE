@@ -2,7 +2,7 @@
 #
 # Run 'make help' to see all available targets.
 
-.PHONY: help setup-llm dev dev-slack dev-teams stop logs logs-agent logs-config logs-web status clean db-shell \
+.PHONY: help setup-llm compose-reconcile dev dev-slack dev-teams stop logs logs-agent logs-config logs-web status clean db-shell \
         kind-create kind-delete otel-install otel-images otel-wait e2e-verify \
         e2e-setup e2e-teardown e2e-agent e2e-status e2e-token \
         e2e-setup-eks e2e-teardown-eks eks-port-forward eks-port-forward-stop \
@@ -47,6 +47,11 @@ FRONTEND_PORT    ?= 8090
 # Internal Configuration
 # ═══════════════════════════════════════════════════════════════════════
 
+# Single compose project across worktrees — dirname-derived names collide on
+# fixed container_name: opensre-* entries in docker-compose.yml.
+COMPOSE_PROJECT_NAME ?= opensre
+export COMPOSE_PROJECT_NAME
+
 # Compose file sets — dev uses base only so a local docker-compose.override.yml
 # (E2E fast-fail: AGENT_TIMEOUT_SECONDS=600, kind networking)
 # is NOT auto-merged into everyday `make dev`. E2E targets opt in explicitly.
@@ -89,7 +94,7 @@ help:
 	@echo "  make logs-config        Follow config-service logs"
 	@echo "  make logs-web           Follow web-ui logs"
 	@echo "  make status             Show service health status"
-	@echo "  make clean              Remove containers, volumes, and images"
+	@echo "  make clean              Remove containers (volumes are external — preserved)"
 	@echo "  make db-shell           Open PostgreSQL shell"
 	@echo ""
 	@echo "E2E Testing — Kind (local cluster):"
@@ -137,15 +142,18 @@ help:
 setup-llm:
 	@bash scripts/generate-litellm-config.sh
 
-dev: setup-llm
+compose-reconcile:
+	@bash scripts/compose-reconcile.sh
+
+dev: setup-llm compose-reconcile
 	$(COMPOSE_DEV) up -d --build
 	@bash scripts/post-startup-banner.sh
 
-dev-slack: setup-llm
+dev-slack: setup-llm compose-reconcile
 	$(COMPOSE_DEV) --profile slack up -d --build
 	@bash scripts/post-startup-banner.sh
 
-dev-teams: setup-llm
+dev-teams: setup-llm compose-reconcile
 	$(COMPOSE_DEV) --profile teams up -d --build
 	@bash scripts/post-startup-banner.sh
 
@@ -180,8 +188,12 @@ status:
 		&& echo "  web-ui:         ✅ healthy (port $(WEB_UI_PORT))" \
 		|| echo "  web-ui:         ❌ down"
 
+# Do NOT pass -v: postgres/neo4j/agent-sessions are shared external volumes
+# (COMPOSE_PROJECT_NAME=opensre). A prior `down -v` from another worktree wiped
+# investigation history. Use `make stop` for day-to-day teardown.
 clean:
-	$(COMPOSE_DEV) down -v --remove-orphans
+	$(COMPOSE_DEV) down --remove-orphans
+	@echo "Note: data volumes are external and were preserved (opensre-postgres-data, opensre-neo4j-data, opensre-agent-sessions)."
 
 db-shell:
 	$(COMPOSE_DEV) exec postgres psql -U opensre -d opensre
