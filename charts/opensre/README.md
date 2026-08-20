@@ -129,16 +129,26 @@ All migration steps are **idempotent** and safe to re-run.
 ```bash
 helm upgrade --install opensre charts/opensre \
   -n opensre --create-namespace \
-  -f values.yaml
+  -f charts/opensre/values.self-hosted-simple.yaml
 ```
 
-### Production example values
+### Self-hosted profile (recommended)
 
-See `charts/opensre/values.prod.yaml` for a high-signal starting point (OIDC-first + RBAC + ALB HTTPS annotations).
+See `charts/opensre/values.self-hosted-simple.yaml` for the supported public self-hosted profile (simple mode with embedded Postgres/Neo4j; Docker Hub image pins for v1.2.0). Full walkthrough: `docs/SELF_HOSTED_SIMPLE_INSTALL.md`.
 
-### Pilot example values (recommended first deploy)
+### Site overlay (hosts, TLS, private registry)
 
-See `charts/opensre/values.pilot.yaml` for a minimal “happy path” deploy profile (token auth, HTTP-only internal ALB) intended for first-time cluster bring-up and smoke testing.
+Copy `charts/opensre/values.examples/site-overlay.yaml.example` and merge with the self-hosted profile:
+
+```bash
+cp charts/opensre/values.examples/site-overlay.yaml.example my-site.yaml
+# edit my-site.yaml — do not commit secrets to a public fork
+
+helm upgrade --install opensre charts/opensre \
+  -n opensre --create-namespace \
+  -f charts/opensre/values.self-hosted-simple.yaml \
+  -f my-site.yaml
+```
 
 ## Production hardening knobs
 
