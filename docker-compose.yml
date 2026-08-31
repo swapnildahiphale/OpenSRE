@@ -32,7 +32,7 @@ services:
       POSTGRES_PASSWORD: localdev
       POSTGRES_DB: opensre
     ports:
-      - "5433:5432"
+      - "127.0.0.1:5433:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
     healthcheck:
@@ -42,6 +42,8 @@ services:
       retries: 10
     networks:
       - app_network
+      # Same as config-service: custom-only networks skip host port publish on Desktop.
+      - default
 
   # ─────────────────────────────────────────────────────────────────────────────
   # Config Service — team config, tokens, audit logging
@@ -61,12 +63,12 @@ services:
       ADMIN_TOKEN: ${ADMIN_TOKEN:-local-admin-token}
       ADMIN_AUTH_MODE: token
       TEAM_AUTH_MODE: token
-      IMPERSONATION_JWT_SECRET: local-dev-impersonation-secret-32chars!!
+      IMPERSONATION_JWT_SECRET: ${IMPERSONATION_JWT_SECRET:-local-dev-impersonation-secret-32chars!!}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
       LOG_FORMAT: console
       ENV_FILE_PATH: /repo/.env  # Path to .env file for write-back
     ports:
-      - "8081:8080"
+      - "127.0.0.1:8081:8080"
     volumes:
       # Mount config directory for YAML config in local mode
       - ./config_service/config:/app/config:rw
@@ -93,8 +95,8 @@ services:
     container_name: opensre-neo4j
     restart: unless-stopped
     ports:
-      - "7475:7474"
-      - "7688:7687"
+      - "127.0.0.1:7475:7474"
+      - "127.0.0.1:7688:7687"
     environment:
       NEO4J_AUTH: ${NEO4J_USERNAME:-neo4j}/${NEO4J_PASSWORD:-localdev}
       NEO4J_PLUGINS: '["apoc"]'
@@ -106,6 +108,8 @@ services:
       timeout: 5s
     networks:
       - app_network
+      # Same as config-service: custom-only networks skip host port publish on Desktop.
+      - default
 
   # ─────────────────────────────────────────────────────────────────────────────
   # LiteLLM Proxy — OPTIONAL multi-provider proxy (OpenRouter/others).
@@ -124,7 +128,7 @@ services:
       - ./litellm_config.yaml:/app/config.yaml:ro
     command: ["--config", "/app/config.yaml", "--port", "4000"]
     ports:
-      - "4001:4000"
+      - "127.0.0.1:4001:4000"
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:4000/health/readiness')"]
       interval: 10s
@@ -244,7 +248,7 @@ services:
         max-size: "10m"
         max-file: "3"
     ports:
-      - "8001:8000"
+      - "127.0.0.1:8001:8000"
     networks:
       - app_network
       - default  # Needs external access for API calls
@@ -271,7 +275,7 @@ services:
       - HOSTNAME=0.0.0.0
       - PORT=3000
     ports:
-      - "3002:3000"
+      - "127.0.0.1:3002:3000"
     depends_on:
       config-service:
         condition: service_healthy
@@ -344,7 +348,7 @@ services:
       - SRE_AGENT_URL=http://sre-agent:8000
       - PORT=3978
     ports:
-      - "3978:3978"
+      - "127.0.0.1:3978:3978"
     depends_on:
       - sre-agent
     security_opt:
