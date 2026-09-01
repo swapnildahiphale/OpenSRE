@@ -1,0 +1,263 @@
+# OpenSRE investigation eval scenarios
+#
+# Each entry becomes one item in the Langfuse dataset (see sync_dataset.py).
+# Keeping the dataset in git means changes to what "correct" means are reviewed
+# like code; Langfuse holds the runnable copy plus the run history.
+#
+# Field guide
+#   name              Stable id. Used as the Langfuse dataset item id, so editing
+#                     an entry updates that item instead of creating a duplicate.
+#   input.prompt      Exactly what a responder would type into Slack / the console.
+#   expected_output   Reference answer for the LLM judge. Prose, not keywords —
+#                     the judge compares meaning, so a correct investigation
+#                     phrased differently still scores well.
+#   metadata          Inputs to the deterministic code evaluators, plus the fault
+#                     the fixture environment must have injected for the scenario
+#                     to be valid.
+#
+# `fault` documents which fault injection this item assumes. `kind: none` means
+# the scenario runs against a healthy system (a control, to catch the failure
+# mode where the agent invents a root cause for a system that is fine).
+
+- name: healthy-control
+  input:
+    prompt: >-
+      Check the health of the cart service in the otel-demo namespace and tell me
+      whether anything is wrong.
+  expected_output:
+    root_cause: >-
+      Nothing is wrong. The cart service pods are running and ready, with no
+      recent restarts, no error-level events and no elevated error rate. The
+      correct answer is that the service is healthy.
+    affected_services: []
+    remediation: >-
+      No action needed. The agent should say the service is healthy rather than
+      manufacture a plausible-sounding fault.
+  metadata:
+    tier: 0
+    fault:
+      kind: none
+    expected_tools:
+      - list_pods
+    latency_budget_seconds: 120
+
+- name: cart-crashloop
+  input:
+    prompt: The cart service in otel-demo namespace has a problem. Diagnose it.
+  expected_output:
+    root_cause: >-
+      The cart deployment's container command was overridden with a command that
+      immediately exits non-zero, so every pod terminates on startup and the
+      deployment is stuck in CrashLoopBackOff. The failure is in the workload
+      definition itself, not in a dependency or in the cart application logic.
+    affected_services:
+      - cart
+      - checkout
+    remediation: >-
+      Roll back the deployment or remove the overridden container command so pods
+      start with their real entrypoint again.
+  metadata:
+    tier: 1
+    fault:
+      kind: pod-crash
+      target: cart
+    # K8s events name CrashLoopBackOff directly, so an investigation that never
+    # reads events is taking a needlessly slow path even if it lands correctly.
+    expected_tools:
+      - get_events
+    required_evidence:
+      - CrashLoopBackOff
+    latency_budget_seconds: 180
+
+- name: payment-crashloop
+  input:
+    prompt: The payment service in otel-demo namespace is failing. Diagnose it.
+  expected_output:
+    root_cause: >-
+      The payment deployment's container command was overridden with a failing
+      command, so its pods exit on startup and the deployment sits in
+      CrashLoopBackOff. Checkout fails because it depends on payment.
+    affected_services:
+      - payment
+      - checkout
+    remediation: >-
+      Roll back the payment deployment or remove the overridden container command.
+  metadata:
+    tier: 1
+    fault:
+      kind: pod-crash
+      target: payment
+    expected_tools:
+      - get_events
+    required_evidence:
+      - CrashLoopBackOff
+    latency_budget_seconds: 180
+
+- name: payment-unreachable
+  input:
+    prompt: Payment transactions are failing in otel-demo. Investigate.
+  expected_output:
+    root_cause: >-
+      The paymentServiceUnreachable feature flag is enabled in flagd, so checkout
+      cannot reach the payment service and payment calls time out. The payment
+      pods themselves are healthy — the fault is configuration, not infrastructure.
+    affected_services:
+      - payment
+      - checkout
+    remediation: >-
+      Disable the paymentServiceUnreachable flag in flagd.
+  metadata:
+    tier: 2
+    fault:
+      kind: flagd
+      flag: paymentServiceUnreachable
+    expected_tools: []
+    latency_budget_seconds: 240
+
+- name: product-catalog-failure
+  input:
+    prompt: Product pages are showing errors in otel-demo. Investigate.
+  expected_output:
+    root_cause: >-
+      The productCatalogFailure feature flag is enabled in flagd, which makes the
+      product catalog service return errors for a subset of product lookups. The
+      frontend surfaces those as broken product pages.
+    affected_services:
+      - productcatalog
+      - frontend
+    remediation: >-
+      Disable the productCatalogFailure flag in flagd.
+  metadata:
+    tier: 2
+    fault:
+      kind: flagd
+      flag: productCatalogFailure
+    expected_tools: []
+    latency_budget_seconds: 240
+
+- name: ad-high-cpu
+  input:
+    prompt: The ad service in otel-demo is very slow. Check resource usage.
+  expected_output:
+    root_cause: >-
+      The adServiceHighCpu (or adHighCpu) feature flag is enabled in flagd, which
+      drives artificial CPU load in the ad service. The pod is CPU-throttled
+      against its limit, which is what makes ad responses slow. This is induced
+      load, not a traffic increase or a resource-request misconfiguration.
+    affected_services:
+      - ad
+    remediation: >-
+      Disable the high-CPU flag in flagd. Raising the CPU limit only masks the
+      injected load.
+  metadata:
+    tier: 3
+    fault:
+      kind: flagd
+      flag: adServiceHighCpu
+    expected_tools: []
+    latency_budget_seconds: 300
+
+- name: kafka-consumer-lag
+  input:
+    prompt: Message processing is delayed in otel-demo. Check Kafka.
+  expected_output:
+    root_cause: >-
+      The kafkaQueueProblems feature flag is enabled, which slows Kafka consumers
+      so the consumer group falls behind and lag grows on the orders topic.
+      Downstream processing is delayed because messages are queued, not lost.
+    affected_services:
+      - kafka
+      - checkout
+    remediation: >-
+      Disable the kafkaQueueProblems flag. Scaling consumers only reduces the
+      symptom while the flag is on.
+  metadata:
+    tier: 3
+    fault:
+      kind: flagd
+      flag: kafkaQueueProblems
+    expected_tools: []
+    latency_budget_seconds: 300
+
+- name: email-memory-leak
+  input:
+    prompt: The email service in otel-demo may have a memory issue. Check it.
+  expected_output:
+    root_cause: >-
+      The email service is leaking memory under the injected fault: its working
+      set grows steadily until the container hits its memory limit and is
+      OOMKilled, after which it restarts and the cycle repeats. Restart counts
+      climb with OOMKilled as the last termination reason.
+    affected_services:
+      - email
+    remediation: >-
+      Disable the injected leak. Raising the memory limit or restarting the pod
+      only delays the next OOM kill.
+  metadata:
+    tier: 4
+    fault:
+      kind: flagd
+      flag: emailMemoryLeak
+    expected_tools:
+      - get_events
+    latency_budget_seconds: 300
+
+- name: payment-partial-failure
+  input:
+    prompt: About half of payment transactions are failing in otel-demo. Diagnose.
+  expected_output:
+    root_cause: >-
+      The paymentServiceFailure flag is enabled at roughly a 50 percent rollout,
+      so the payment service fails a fraction of requests while the rest succeed.
+      The intermittent, partial nature of the failure is the key finding — the
+      pods are healthy and the failure rate tracks the flag's rollout percentage.
+    affected_services:
+      - payment
+      - checkout
+    remediation: >-
+      Set the paymentServiceFailure flag rollout back to zero in flagd.
+  metadata:
+    tier: 4
+    fault:
+      kind: flagd
+      flag: paymentServiceFailure
+      variant: 50%
+    expected_tools: []
+    latency_budget_seconds: 300
+
+# Adversarial twin of cart-crashloop. Same injected fault; the prompt plants
+# two decoys (yesterday's deploy, ad CPU) that must not become the diagnosis.
+- name: cart-crashloop-red-herring
+  input:
+    prompt: >-
+      The cart service in otel-demo namespace is down. A deploy went out
+      yesterday and the ad service CPU looks high. Diagnose the cart failure.
+  expected_output:
+    root_cause: >-
+      The cart deployment's container command was overridden with a command that
+      immediately exits non-zero, so every pod terminates on startup and the
+      deployment is stuck in CrashLoopBackOff. Yesterday's deploy and the ad
+      service CPU are unrelated decoys — they are not the cart failure.
+    affected_services:
+      - cart
+      - checkout
+    remediation: >-
+      Roll back the cart deployment or remove the overridden container command.
+      Do not chase the ad-service CPU or yesterday's deploy.
+  metadata:
+    tier: 2
+    fault:
+      kind: pod-crash
+      target: cart
+    expected_tools:
+      - get_events
+    required_evidence:
+      - CrashLoopBackOff
+    # Phrased as false diagnoses so a correct dismissal ("ad CPU is unrelated")
+    # does not trip the forbidden-claim check.
+    forbidden_claims:
+      - caused by yesterday's deploy
+      - ad service cpu is the root cause
+    ruling_out:
+      - CrashLoopBackOff
+    latency_budget_seconds: 180

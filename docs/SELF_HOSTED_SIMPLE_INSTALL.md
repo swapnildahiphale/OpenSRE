@@ -9,12 +9,12 @@ Deploy OpenSRE in **simple mode** (`server_simple.py`) using the umbrella Helm c
 - Optional: Ingress controller (nginx, Apisix, or ALB)
 - Container registry with pull access for your chosen image references (public Docker Hub defaults work out of the box)
 
-Simple-mode image defaults (tag **v1.2.0**):
+Simple-mode image defaults (tag **v1.2.1**):
 
-- `swapnildahiphale/opensre-sre-agent:v1.2.0`
-- `swapnildahiphale/opensre-config-service:v1.2.0`
-- `swapnildahiphale/opensre-web-ui:v1.2.0`
-- `swapnildahiphale/opensre-teams-bot:v1.2.0` (chart service off unless you enable `teamsBot`)
+- `swapnildahiphale/opensre-sre-agent:v1.2.1`
+- `swapnildahiphale/opensre-config-service:v1.2.1`
+- `swapnildahiphale/opensre-web-ui:v1.2.1`
+- `swapnildahiphale/opensre-teams-bot:v1.2.1` (chart service off unless you enable `teamsBot`)
 
 Override only in a local `my-site.yaml` if you use a private registry.
 
@@ -50,7 +50,7 @@ helm upgrade --install opensre charts/opensre \
 
 | Secret | Keys (representative) |
 |--------|------------------------|
-| `opensre-config-service-env` | `DATABASE_URL`, `ADMIN_TOKEN`, `TOKEN_PEPPER`, `IMPERSONATION_JWT_SECRET`, `ADMIN_AUTH_MODE=token`, `TEAM_AUTH_MODE=token` |
+| `opensre-config-service-env` | `DATABASE_URL`, `ADMIN_TOKEN`, `TOKEN_PEPPER`, `SSO_CLIENT_SECRET`, `IMPERSONATION_JWT_SECRET`, `ADMIN_AUTH_MODE=token`, `TEAM_AUTH_MODE=token` |
 | `opensre-sre-agent-env` | `ANTHROPIC_API_KEY`, `CONFIG_SERVICE_URL`, `NEO4J_*`, `CLAUDE_CONFIG_DIR`, integration vars from `.env` |
 | `opensre-web-ui-env` | Optional; chart sets in-cluster service URLs |
 
@@ -96,6 +96,17 @@ kubectl auth can-i list pods \
 kubectl port-forward -n opensre svc/opensre-web-ui 3002:3000
 # http://localhost:3002 — log in with team token via /api/session/login
 ```
+
+## Enable Entra SSO (optional)
+
+Keep `services.webUi.oidc.enabled: false`. The chart sets `WEB_UI_SSO_ORG_ID` from `global.configService.orgId` and `WEB_UI_PUBLIC_BASE_URL` from `ingress.host`.
+
+1. Create a confidential **Web** Entra app with redirect `https://<ingress.host>/api/auth/callback` — see [`docs/SSO_SETUP.md`](SSO_SETUP.md).
+2. Put `SSO_CLIENT_SECRET` in `opensre-config-service-env` (alongside `TOKEN_PEPPER`).
+3. Sign in with the admin token → **Admin → SSO** → paste tenant / client id → allowed domains → enable.
+4. Incognito: Continue with Microsoft Entra ID → `/team`. Token login remains.
+
+Do not put the Entra client secret in the site overlay YAML.
 
 ## Site overlay
 

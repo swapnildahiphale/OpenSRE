@@ -43,6 +43,8 @@ spec:
           env:
             - name: CONFIG_SERVICE_URL
               value: {{ required "global.configService.url is required" .Values.global.configService.url | quote }}
+            - name: WEB_UI_SSO_ORG_ID
+              value: {{ .Values.global.configService.orgId | quote }}
             - name: AGENT_SERVICE_URL
               value: {{ printf "http://opensre-agent.%s.svc.cluster.local:%d" .Values.namespace (.Values.services.agent.servicePort | int) | quote }}
             - name: ORCHESTRATOR_URL
@@ -61,8 +63,17 @@ spec:
               value: {{ default false .Values.services.webUi.oidc.enabled | ternary "1" "0" | quote }}
             - name: WEB_UI_OIDC_ENABLED
               value: {{ default false .Values.services.webUi.oidc.enabled | ternary "1" "0" | quote }}
+            # Browser origin for Entra redirect_uri. Do not use request.nextUrl.origin:
+            # HOSTNAME=0.0.0.0 would send 0.0.0.0 to Entra. Helm OIDC can stay off.
             - name: WEB_UI_PUBLIC_BASE_URL
-              value: {{ default "" .Values.services.webUi.oidc.publicBaseUrl | quote }}
+              {{- $oidcBase := default "" .Values.services.webUi.oidc.publicBaseUrl }}
+              {{- if $oidcBase }}
+              value: {{ $oidcBase | quote }}
+              {{- else if .Values.ingress.host }}
+              value: {{ printf "https://%s" .Values.ingress.host | quote }}
+              {{- else }}
+              value: ""
+              {{- end }}
             - name: WEB_UI_OIDC_AUTHORIZATION_ENDPOINT
               value: {{ default "" .Values.services.webUi.oidc.authorizationEndpoint | quote }}
             - name: WEB_UI_OIDC_TOKEN_ENDPOINT

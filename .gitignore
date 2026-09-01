@@ -96,6 +96,7 @@ test-infra/eks/kubeconfig-eks.yaml
 # Local web UI redesign scratch (mockups, session logs, accidental stubs)
 logs/
 web_ui/design/
+website/demo/design/
 web_ui/pnpm-workspace.yaml
 
 # Large video/media files

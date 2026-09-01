@@ -2,8 +2,8 @@ apiVersion: v2
 name: opensre
 description: AI-powered SRE platform for automated incident investigation and response
 type: application
-version: 1.2.0
-appVersion: "1.2.0"
+version: 1.2.1
+appVersion: "1.2.1"
 home: https://opensre.in
 icon: https://raw.githubusercontent.com/swapnildahiphale/OpenSRE/main/web_ui/public/brand/opensre-spinner.png
 sources:

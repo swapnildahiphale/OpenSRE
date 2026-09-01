@@ -61,6 +61,7 @@ services:
       ADMIN_TOKEN: ${ADMIN_TOKEN:-local-admin-token}
       ADMIN_AUTH_MODE: token
       TEAM_AUTH_MODE: token
+      SSO_DEFAULT_TEAM_NODE_ID: ${SSO_DEFAULT_TEAM_NODE_ID:-default}
       IMPERSONATION_JWT_SECRET: local-dev-impersonation-secret-32chars!!
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
       LOG_FORMAT: console
@@ -185,6 +186,16 @@ services:
       - WRITEUP_LLM_MODEL=${ANTHROPIC_MODEL:-claude-sonnet-4-6}
       # Other services
       - LMNR_PROJECT_API_KEY=${LMNR_PROJECT_API_KEY:-}
+      # Langfuse tracing. Unset by default — the agent auto-detects the backend
+      # from whichever credentials are present, so leaving these blank is a no-op.
+      # The Langfuse console hands out LANGFUSE_BASE_URL while older setups use
+      # LANGFUSE_HOST, so pass both through rather than defaulting one of them to
+      # a region the operator did not pick. The agent reconciles the two.
+      - OBSERVABILITY_BACKEND=${OBSERVABILITY_BACKEND:-}
+      - LANGFUSE_PUBLIC_KEY=${LANGFUSE_PUBLIC_KEY:-}
+      - LANGFUSE_SECRET_KEY=${LANGFUSE_SECRET_KEY:-}
+      - LANGFUSE_BASE_URL=${LANGFUSE_BASE_URL:-}
+      - LANGFUSE_HOST=${LANGFUSE_HOST:-}
       # AWS + EKS connectivity (local dev). The agent runs skills in-process
       # (server_simple.py), so it needs direct access to your host AWS SSO creds
       # and kubeconfig. ~/.aws is mounted read-write so the aws CLI can refresh
@@ -267,6 +278,8 @@ services:
     environment:
       - CONFIG_SERVICE_URL=http://config-service:8080
       - AGENT_SERVICE_URL=http://sre-agent:8000
+      - WEB_UI_SSO_ORG_ID=${WEB_UI_SSO_ORG_ID:-local}
+      - WEB_UI_PUBLIC_BASE_URL=${WEB_UI_PUBLIC_BASE_URL:-http://localhost:3002}
       - WEB_UI_COOKIE_SECURE=0
       - HOSTNAME=0.0.0.0
       - PORT=3000

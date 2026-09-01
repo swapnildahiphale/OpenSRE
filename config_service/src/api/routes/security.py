@@ -17,6 +17,7 @@ from sqlalchemy.orm import Session
 from ...db.models import Integration, SecurityPolicy, TokenAudit, TokenPermission
 from ...db.session import get_db
 from .admin import check_org_access, require_admin
+from .sso import _sso_client_secret
 
 router = APIRouter(prefix="/api/v1/admin/orgs/{org_id}", tags=["security"])
 
@@ -796,7 +797,6 @@ class SSOConfigUpdate(BaseModel):
     provider_name: Optional[str] = None
     issuer: Optional[str] = None
     client_id: Optional[str] = None
-    client_secret: Optional[str] = None  # Plain text, will be encrypted
     scopes: Optional[str] = None
     tenant_id: Optional[str] = None
     email_claim: Optional[str] = None
@@ -810,27 +810,12 @@ class SSOTestRequest(BaseModel):
     # For testing, we use the current config or provided overrides
     issuer: Optional[str] = None
     client_id: Optional[str] = None
-    client_secret: Optional[str] = None
 
 
 class SSOTestResponse(BaseModel):
     success: bool
     message: str
     metadata: Optional[Dict[str, Any]] = None
-
-
-def _encrypt_secret(secret: str) -> str:
-    """Encrypt client secrets using Fernet (AES-128-CBC with HMAC)."""
-    from src.crypto import encrypt
-
-    return encrypt(secret)
-
-
-def _decrypt_secret(encrypted: str) -> str:
-    """Decrypt a client secret."""
-    from src.crypto import decrypt
-
-    return decrypt(encrypted)
 
 
 @router.get("/sso-config", response_model=SSOConfigResponse)
@@ -855,7 +840,7 @@ async def get_sso_config(
         provider_name=config.provider_name,
         issuer=config.issuer,
         client_id=config.client_id,
-        has_client_secret=bool(config.client_secret_encrypted),
+        has_client_secret=bool(_sso_client_secret()),
         scopes=config.scopes,
         tenant_id=config.tenant_id,
         email_claim=config.email_claim,
@@ -888,12 +873,6 @@ async def update_sso_config(
     # Update fields
     update_data = body.model_dump(exclude_unset=True)
 
-    # Handle client_secret specially (encrypt it)
-    if "client_secret" in update_data:
-        secret = update_data.pop("client_secret")
-        if secret:
-            config.client_secret_encrypted = _encrypt_secret(secret)
-
     for key, value in update_data.items():
         setattr(config, key, value)
 
@@ -910,7 +889,7 @@ async def update_sso_config(
         provider_name=config.provider_name,
         issuer=config.issuer,
         client_id=config.client_id,
-        has_client_secret=bool(config.client_secret_encrypted),
+        has_client_secret=bool(_sso_client_secret()),
         scopes=config.scopes,
         tenant_id=config.tenant_id,
         email_claim=config.email_claim,
@@ -998,10 +977,11 @@ async def get_public_sso_config(
     )
 
     if not config:
-        return {"enabled": False}
+        return {"enabled": False, "org_id": org_id}
 
     return {
         "enabled": True,
+        "org_id": org_id,
         "provider_type": config.provider_type,
         "provider_name": config.provider_name or config.provider_type.title(),
         "issuer": config.issuer,

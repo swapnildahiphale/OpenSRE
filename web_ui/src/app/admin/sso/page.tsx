@@ -7,8 +7,6 @@ import {
   Shield, 
   Save, 
   TestTube, 
-  Eye, 
-  EyeOff,
   CheckCircle,
   XCircle,
   Loader2,
@@ -72,7 +70,6 @@ export default function SSOSettingsPage() {
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
-  const [showSecret, setShowSecret] = useState(false);
   
   // Form state
   const [enabled, setEnabled] = useState(false);
@@ -80,7 +77,6 @@ export default function SSOSettingsPage() {
   const [providerName, setProviderName] = useState('');
   const [issuer, setIssuer] = useState('');
   const [clientId, setClientId] = useState('');
-  const [clientSecret, setClientSecret] = useState('');
   const [scopes, setScopes] = useState('openid email profile');
   const [tenantId, setTenantId] = useState('');
   const [adminGroup, setAdminGroup] = useState('');
@@ -149,11 +145,6 @@ export default function SSOSettingsPage() {
       if (providerType === 'azure') {
         body.tenant_id = tenantId;
       }
-      
-      // Only send secret if changed
-      if (clientSecret) {
-        body.client_secret = clientSecret;
-      }
 
       const res = await apiFetch(`/api/admin/orgs/${orgId}/sso-config`, {
         method: 'PUT',
@@ -164,7 +155,6 @@ export default function SSOSettingsPage() {
       if (res.ok) {
         const data = await res.json();
         setConfig(data);
-        setClientSecret(''); // Clear secret after save
         setTestResult({ success: true, message: 'SSO configuration saved!' });
       } else {
         const err = await res.json();
@@ -337,32 +327,16 @@ export default function SSOSettingsPage() {
           />
         </div>
 
-        {/* Client Secret */}
+        {/* Client secret (env-only) */}
         <div>
           <label className="block text-sm font-medium text-stone-700 dark:text-stone-300 mb-1">
-            Client Secret <span className="text-clay">*</span>
+            Client Secret
           </label>
-          <div className="relative">
-            <input
-              type={showSecret ? 'text' : 'password'}
-              value={clientSecret}
-              onChange={(e) => setClientSecret(e.target.value)}
-              placeholder={config?.has_client_secret ? '••••••••••••••••' : 'Your OAuth client secret'}
-              className="w-full px-3 py-2 pr-10 rounded-lg border border-stone-200 dark:border-stone-600 bg-white dark:bg-stone-700 text-stone-900 dark:text-white"
-            />
-            <button
-              type="button"
-              onClick={() => setShowSecret(!showSecret)}
-              className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-stone-400 hover:text-stone-600"
-            >
-              {showSecret ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-            </button>
-          </div>
-          {config?.has_client_secret && (
-            <p className="text-xs text-stone-500 mt-1">
-              Leave empty to keep existing secret, or enter new value to update
-            </p>
-          )}
+          <p className="text-sm text-stone-600 dark:text-stone-300">
+            {config?.has_client_secret
+              ? 'SSO_CLIENT_SECRET detected on config-service'
+              : 'SSO_CLIENT_SECRET not detected — set it on config-service (not in this form)'}
+          </p>
         </div>
 
         {/* Admin Group */}

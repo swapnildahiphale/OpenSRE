@@ -575,7 +575,7 @@ async def agent_background_task(
     Processes messages from queue and sends responses back.
     """
 
-    from agent import InteractiveAgentSession
+    from agent import InteractiveAgentSession, observability_update_metadata
 
     logger.info(f"[BG] Starting background agent task for thread {thread_id}")
 
@@ -643,6 +643,9 @@ async def agent_background_task(
             )
             if _rid:
                 _run_id_by_thread[thread_id] = _rid
+                # Stamp the OpenSRE URL hex onto this turn's Langfuse metadata
+                # so cost traces can be pasted onto /team/agent-runs/{id}.
+                observability_update_metadata(thread_id, agent_run_id=_rid)
                 await response_queue.put(
                     {
                         "event": "run_started",

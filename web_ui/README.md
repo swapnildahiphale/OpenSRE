@@ -42,11 +42,24 @@ The login route now **validates** the token/JWT against `config_service: GET /ap
 
 Note: set `WEB_UI_COOKIE_SECURE=1` for real HTTPS deployments. For HTTP localhost tunnels, keep it `0`.
 
-### OIDC redirect login (recommended UX)
+### Entra SSO (Admin → SSO, recommended for Microsoft Entra)
+
+Microsoft Entra **Web** (confidential) apps use Authorization Code **without** PKCE. Enable that path from **Admin → SSO**, not `WEB_UI_OIDC_*`.
+
+- Login page loads `GET /api/sso/config` (org from `WEB_UI_SSO_ORG_ID`)
+- Browser redirects to Entra, then `GET /api/auth/callback` exchanges the code via config-service `POST /api/v1/auth/sso/exchange`
+- Session cookie `opensre_session_token` is a minted team token on `SSO_DEFAULT_TEAM_NODE_ID` (default `default`)
+- Set `WEB_UI_PUBLIC_BASE_URL` to the browser origin so Entra `redirect_uri` is not `http://0.0.0.0:...`
+
+Keep `WEB_UI_OIDC_ENABLED=0`. Full steps: `docs/SSO_SETUP.md` / [opensre.in/docs/sso](https://www.opensre.in/docs/sso).
+
+### OIDC redirect login (PKCE — optional)
 
 If you enable OIDC env vars, the UI supports an **Authorization Code + PKCE** flow:
 - `GET /api/auth/login` → redirects to your IdP authorization endpoint
 - `GET /api/auth/callback` → exchanges `code` for tokens server-side, validates the resulting JWT via `config_service /api/v1/auth/me`, then sets `opensre_session_token`
+
+Do not enable this PKCE path for Entra confidential Web apps.
 
 ## Configuration
 

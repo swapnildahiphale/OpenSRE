@@ -28,7 +28,7 @@ OpenSRE is an AI SRE platform that investigates production incidents. A root inv
 
 **Entry points**
 
-- **Web UI** — admin console and investigation UI; streams SSE from sre-agent.
+- **Web UI** — admin console and investigation UI; streams SSE from sre-agent. Optional Microsoft Entra SSO via **Admin → SSO** (see [`docs/SSO_SETUP.md`](SSO_SETUP.md)).
 - **Slack bot** — Socket Mode; @mentions and threads; streams the same SSE protocol.
 - **Teams bot** — Microsoft Teams channels or DMs; streams the same SSE protocol.
 - **REST API** — `POST /investigate` and related thread endpoints on sre-agent (used by the clients above).

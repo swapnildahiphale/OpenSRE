@@ -1,16 +1,18 @@
 """SSO Authentication endpoints for OAuth/OIDC login."""
 
 import base64
-import hashlib
+import json
+import os
 import secrets
 from datetime import datetime, timedelta
-from typing import Optional
+from typing import Any, Optional
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
+from ...core.security import get_token_pepper, hash_token
 from ...db.models import SSOConfig, TeamToken
 from ...db.session import get_db
 
@@ -31,11 +33,9 @@ class TokenExchangeResponse(BaseModel):
     org_id: str
 
 
-def _decrypt_secret(encrypted: str) -> str:
-    """Decrypt a client secret."""
-    if encrypted.startswith("enc:"):
-        return base64.b64decode(encrypted[4:]).decode()
-    return encrypted
+def _sso_client_secret() -> str:
+    """Entra/OIDC client secret from config-service env (not stored in DB)."""
+    return os.getenv("SSO_CLIENT_SECRET", "").strip()
 
 
 def _generate_token_id() -> str:
@@ -48,9 +48,54 @@ def _generate_token_secret() -> str:
     return secrets.token_urlsafe(32)
 
 
-def _hash_secret(secret: str) -> str:
-    """Hash a token secret for storage."""
-    return hashlib.sha256(secret.encode()).hexdigest()
+def _sso_token_hash(secret: str) -> str:
+    """Hash like mint_team_token so /api/v1/auth/me accepts the cookie."""
+    return hash_token(secret, pepper=get_token_pepper())
+
+
+def _sso_team_node_id() -> str:
+    """Team node SSO sessions attach to. Default matches self-hosted `default`."""
+    return os.getenv("SSO_DEFAULT_TEAM_NODE_ID", "default")
+
+
+def _id_token_claims(id_token: Optional[str]) -> dict[str, Any]:
+    """Decode ID-token payload without verifying the signature.
+
+    The token just arrived from the provider token endpoint. We only
+    read claims as a fallback when Graph userinfo omits email.
+    """
+    if not id_token or id_token.count(".") < 2:
+        return {}
+    payload = id_token.split(".")[1]
+    padding = "=" * (-len(payload) % 4)
+    try:
+        decoded = base64.urlsafe_b64decode(payload + padding)
+        claims = json.loads(decoded)
+        return claims if isinstance(claims, dict) else {}
+    except (ValueError, json.JSONDecodeError):
+        return {}
+
+
+def _resolve_sso_email(
+    userinfo: dict[str, Any],
+    id_token_claims: Optional[dict[str, Any]],
+    email_claim: str,
+) -> Optional[str]:
+    """First identifier that looks like an email.
+
+    Graph userinfo often omits `email` unless the optional claim is set.
+    Entra still returns `preferred_username` or `upn` for work accounts.
+    """
+    sources = [userinfo]
+    if id_token_claims:
+        sources.append(id_token_claims)
+    keys = (email_claim, "email", "preferred_username", "upn")
+    for source in sources:
+        for key in keys:
+            value = source.get(key)
+            if isinstance(value, str) and "@" in value:
+                return value
+    return None
 
 
 @router.post("/exchange", response_model=TokenExchangeResponse)
@@ -80,10 +125,15 @@ async def exchange_auth_code(
             status_code=400, detail="SSO not configured for this organization"
         )
 
-    if not config.client_id or not config.client_secret_encrypted:
+    if not config.client_id:
         raise HTTPException(status_code=400, detail="SSO configuration incomplete")
 
-    client_secret = _decrypt_secret(config.client_secret_encrypted)
+    client_secret = _sso_client_secret()
+    if not client_secret:
+        raise HTTPException(
+            status_code=500,
+            detail="SSO client secret not configured (set SSO_CLIENT_SECRET on config-service)",
+        )
 
     # Build token endpoint URL
     if config.provider_type == "google":
@@ -121,7 +171,7 @@ async def exchange_auth_code(
 
             tokens = token_resp.json()
             access_token = tokens.get("access_token")
-            tokens.get("id_token")
+            id_token = tokens.get("id_token")
 
             if not access_token:
                 raise HTTPException(status_code=400, detail="No access token received")
@@ -143,13 +193,14 @@ async def exchange_auth_code(
     except httpx.RequestError as e:
         raise HTTPException(status_code=500, detail=f"OAuth request failed: {str(e)}")
 
-    # Extract user details
+    # Extract user details. Prefer Graph userinfo, then ID-token claims.
     email_claim = config.email_claim or "email"
     name_claim = config.name_claim or "name"
     groups_claim = config.groups_claim or "groups"
+    token_claims = _id_token_claims(id_token)
 
-    email = userinfo.get(email_claim)
-    name = userinfo.get(name_claim)
+    email = _resolve_sso_email(userinfo, token_claims, email_claim)
+    name = userinfo.get(name_claim) or token_claims.get(name_claim)
     groups = userinfo.get(groups_claim, [])
 
     if not email:
@@ -184,12 +235,12 @@ async def exchange_auth_code(
 
     token_secret = _generate_token_secret()
 
-    # For SSO tokens, we use a special team_node_id
-    sso_team_node = "sso-users"  # Could be configurable per org
+    # Attach SSO users to the org's working team, not a fake node.
+    sso_team_node = _sso_team_node_id()
 
     if existing_token:
         # Update existing token
-        existing_token.token_hash = _hash_secret(token_secret)
+        existing_token.token_hash = _sso_token_hash(token_secret)
         existing_token.last_used_at = datetime.utcnow()
         existing_token.expires_at = datetime.utcnow() + timedelta(days=7)
         token_id = existing_token.token_id
@@ -200,7 +251,7 @@ async def exchange_auth_code(
             org_id=body.org_id,
             team_node_id=sso_team_node,
             token_id=token_id,
-            token_hash=_hash_secret(token_secret),
+            token_hash=_sso_token_hash(token_secret),
             label=f"sso:{email}",
             permissions=(
                 ["config:read", "config:write", "agent:invoke"]

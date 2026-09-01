@@ -1,5 +1,5 @@
 # Copy to my-site.yaml (local, gitignored). Do not commit secrets.
-# Simple-mode already pins Docker Hub swapnildahiphale/opensre-*:v1.2.0.
+# Simple-mode already pins Docker Hub swapnildahiphale/opensre-*:v1.2.1.
 # Set services.*.image here only when using a private registry.
 
 ingress:

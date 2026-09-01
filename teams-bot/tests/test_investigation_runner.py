@@ -1,7 +1,6 @@
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-
 from investigation_runner import (
     SSE_CLIENT_TIMEOUT,
     queue_message,

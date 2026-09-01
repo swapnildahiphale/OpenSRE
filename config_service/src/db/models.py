@@ -931,10 +931,6 @@ class SSOConfig(Base):
     # OIDC Configuration
     issuer: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)
     client_id: Mapped[Optional[str]] = mapped_column(String(256), nullable=True)
-    # Encrypted using Fernet (replaces old base64 "encryption")
-    client_secret_encrypted: Mapped[Optional[str]] = mapped_column(
-        EncryptedText, nullable=True
-    )
     scopes: Mapped[Optional[str]] = mapped_column(
         String(512), nullable=True, default="openid email profile"
     )

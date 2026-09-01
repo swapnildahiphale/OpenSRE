@@ -54,7 +54,7 @@ neo4j:
 services:
   configService:
     enabled: true
-    image: swapnildahiphale/opensre-config-service:v1.2.0
+    image: swapnildahiphale/opensre-config-service:v1.2.1
     adminAuthMode: token
     teamAuthMode: token
     migrations:
@@ -69,7 +69,7 @@ services:
 
   teamsBot:
     enabled: false
-    image: swapnildahiphale/opensre-teams-bot:v1.2.0
+    image: swapnildahiphale/opensre-teams-bot:v1.2.1
 
   k8sGateway:
     enabled: false
@@ -109,11 +109,11 @@ services:
       persistence:
         enabled: true
         size: 10Gi
-    image: swapnildahiphale/opensre-sre-agent:v1.2.0
+    image: swapnildahiphale/opensre-sre-agent:v1.2.1
 
   webUi:
     enabled: true
-    image: swapnildahiphale/opensre-web-ui:v1.2.0
+    image: swapnildahiphale/opensre-web-ui:v1.2.1
     cookieSecure: true
     oidc:
       enabled: false

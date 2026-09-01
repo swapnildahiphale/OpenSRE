@@ -205,10 +205,14 @@ Update organization settings (currently only telemetry preference).
 See `config/env.example`.
 
 Notable vars:
-- `TOKEN_PEPPER`: required (hashing for opaque team tokens)
+- `TOKEN_PEPPER`: required (hashing for opaque team tokens, including SSO sessions)
 - `ADMIN_TOKEN`: required if admin auth mode uses token
+- `SSO_CLIENT_SECRET`: Entra/OIDC client secret for web-console SSO (env only — not stored in DB)
 - `CONFIG_CACHE_BACKEND`: `memory` (default), `redis`, or `none`
 - `REDIS_URL`: required if `CONFIG_CACHE_BACKEND=redis`
+- `SSO_DEFAULT_TEAM_NODE_ID`: team node SSO sessions attach to (default `default`)
+
+Web console Entra login is **Admin → SSO** (`sso_configs`), not `OIDC_ENABLED`. See `docs/SSO_SETUP.md`.
 
 ### OIDC (recommended for enterprise)
 

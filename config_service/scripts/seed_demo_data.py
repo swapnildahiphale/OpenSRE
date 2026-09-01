@@ -13,7 +13,7 @@ from datetime import datetime
 from sqlalchemy import select
 from src.core.dotenv import load_dotenv
 from src.db.config_models import NodeConfiguration
-from src.db.models import NodeType, OrgNode
+from src.db.models import NodeType, OrgNode, SSOConfig
 from src.db.session import db_session
 
 
@@ -104,6 +104,26 @@ def main() -> None:
                     updated_by="seed",
                 )
             )
+
+        tenant_id = os.getenv("SSO_AZURE_TENANT_ID", "").strip()
+        client_id = os.getenv("SSO_AZURE_CLIENT_ID", "").strip()
+        if tenant_id and client_id:
+            sso = s.execute(
+                select(SSOConfig).where(SSOConfig.org_id == org_id)
+            ).scalar_one_or_none()
+            if sso is None:
+                sso = SSOConfig(org_id=org_id)
+                s.add(sso)
+            sso.enabled = os.getenv("SSO_ENABLED", "1") == "1"
+            sso.provider_type = "azure"
+            sso.provider_name = "Microsoft Entra ID"
+            sso.tenant_id = tenant_id
+            sso.client_id = client_id
+            sso.scopes = os.getenv("SSO_SCOPES", "openid email profile")
+            domains = os.getenv("SSO_ALLOWED_DOMAINS", "").strip()
+            sso.allowed_domains = domains or None
+            sso.updated_by = "seed"
+            print(f"Seeded Entra SSO config for org_id={org_id}")
 
     print(f"Seeded org_nodes/node_configs for org_id={org_id}, team_node_id={team_id}")
 

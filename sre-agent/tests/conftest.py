@@ -6,6 +6,16 @@ import sys
 
 import pytest
 
+# Never export telemetry from the test suite.
+#
+# agent.py calls load_dotenv() and initializes the observability backend at
+# import time, so with Langfuse credentials in the repo .env every test that
+# drives a session would ship spans to the real project — junk traces with
+# session ids like "t-debounce", plus network calls that make tests slow and
+# flaky. load_dotenv() does not override variables that are already set, and
+# conftest is imported before any test module, so setting this here wins.
+os.environ["OBSERVABILITY_BACKEND"] = "none"
+
 # Add sre-agent root to sys.path so local modules (config, agent, events, ...) are importable
 SRE_AGENT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if SRE_AGENT_ROOT not in sys.path:

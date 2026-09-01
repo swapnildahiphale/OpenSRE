@@ -84,16 +84,30 @@ services:
       agentRun: admin:agent:run
 ```
 
-### Web UI OIDC login
+### Web UI OIDC login (PKCE — optional)
 
-The `web_ui` supports an **OIDC Authorization Code + PKCE** login flow.
+The `web_ui` also supports an **OIDC Authorization Code + PKCE** login flow. That path is **not** Microsoft Entra confidential-Web SSO.
 
-Configure these values:
+For Entra **Web** apps (client secret, no PKCE), use **Admin → SSO** instead and keep `services.webUi.oidc.enabled: false`. See `docs/SSO_SETUP.md`.
+
+If you do use the PKCE path:
+
 - `services.webUi.cookieSecure: true` (when served over HTTPS)
 - `services.webUi.oidc.enabled: true`
 - `services.webUi.oidc.publicBaseUrl`: external https URL for the UI (used to compute callback URL)
 - `services.webUi.oidc.authorizationEndpoint`, `tokenEndpoint`, `clientId`
 - `services.webUi.oidc.clientSecret.secretName/secretKey`: points to a K8s Secret (recommended via ESO)
+
+### Web console Entra SSO (Admin form)
+
+Self-hosted Entra login for the team console:
+
+- Chart already sets `WEB_UI_SSO_ORG_ID` from `global.configService.orgId` and `WEB_UI_PUBLIC_BASE_URL` from `ingress.host` (or `oidc.publicBaseUrl` if you set one)
+- Paste tenant / client id in **Admin → SSO**. Do not put them in values files
+- Put `SSO_CLIENT_SECRET` and `TOKEN_PEPPER` in the config-service secret
+- Keep `services.webUi.oidc.enabled: false`
+
+Full steps: `docs/SSO_SETUP.md`.
 
 ### Impersonation JWT hardening knobs
 
@@ -134,7 +148,7 @@ helm upgrade --install opensre charts/opensre \
 
 ### Self-hosted profile (recommended)
 
-See `charts/opensre/values.self-hosted-simple.yaml` for the supported public self-hosted profile (simple mode with embedded Postgres/Neo4j; Docker Hub image pins for v1.2.0). Full walkthrough: `docs/SELF_HOSTED_SIMPLE_INSTALL.md`.
+See `charts/opensre/values.self-hosted-simple.yaml` for the supported public self-hosted profile (simple mode with embedded Postgres/Neo4j; Docker Hub image pins for v1.2.1). Full walkthrough: `docs/SELF_HOSTED_SIMPLE_INSTALL.md`.
 
 ### Site overlay (hosts, TLS, private registry)
 

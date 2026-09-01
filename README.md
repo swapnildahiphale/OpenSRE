@@ -54,7 +54,7 @@ make dev
 
 This starts Postgres, config-service, Neo4j, sre-agent, and the web console. Migrations run automatically. Open **http://localhost:3002** and paste the admin token shown in the terminal to sign in. (LiteLLM is an optional `--profile litellm` add-on.)
 
-> **[Full setup guide](https://www.opensre.in/docs/quick-start)** · **[Slack integration](https://www.opensre.in/docs/integrations)** · **[Configuration](https://www.opensre.in/docs/configuration)**
+> **[Full setup guide](https://www.opensre.in/docs/quick-start)** · **[Entra SSO](https://www.opensre.in/docs/sso)** · **[Slack integration](https://www.opensre.in/docs/integrations)** · **[Configuration](https://www.opensre.in/docs/configuration)**
 
 ## Architecture
 
@@ -73,6 +73,7 @@ This starts Postgres, config-service, Neo4j, sre-agent, and the web console. Mig
 | **Knowledge Graph** | Neo4j service topology, dependency traversal, blast radius |
 | **Multi-provider LLM** | Direct Anthropic by default; optional LiteLLM for OpenAI, Gemini, and more |
 | **Web Console** | Investigations, memory hub, config editor |
+| **Entra SSO** | Sign in to the web console with Microsoft Entra ID (token login remains) |
 | **Slack Integration** | Investigate incidents directly from Slack (`make dev-slack`) |
 | **Teams Bot** | Investigate incidents from Microsoft Teams (`make dev-teams`) |
 
@@ -98,6 +99,10 @@ This starts Postgres, config-service, Neo4j, sre-agent, and the web console. Mig
 ### Microsoft Teams
 
 Configure `TEAMS_APP_ID`, `TEAMS_APP_PASSWORD`, and `TEAMS_TENANT_ID` in `.env`, then run `make dev-teams`. The bot listens on port **3978**. See `teams-bot/README.md`.
+
+### Web console Entra SSO
+
+Create a confidential **Web** Entra app (redirect `http://localhost:3002/api/auth/callback` locally), paste tenant / client id into **Admin → SSO**, and set `SSO_CLIENT_SECRET` on config-service. Keep Helm `services.webUi.oidc.enabled` off — that PKCE path is separate. Token login remains as break-glass. [Full guide](https://www.opensre.in/docs/sso) · [`docs/SSO_SETUP.md`](docs/SSO_SETUP.md).
 
 ## E2E Testing with EKS
 

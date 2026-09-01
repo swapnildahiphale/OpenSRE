@@ -13,6 +13,7 @@ const PUBLIC_PATHS = ['/integrations/github/setup'];
 
 interface OrgSSOConfig {
   enabled: boolean;
+  org_id: string;
   provider_type: string;
   provider_name: string;
   issuer?: string;
@@ -37,10 +38,10 @@ export function SignInGate({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    fetch('/api/sso/config?org_id=org1')
+    fetch('/api/sso/config')
       .then((res) => res.json())
       .then((data) => {
-        if (data.enabled) setSsoConfig(data);
+        if (data.enabled && data.org_id) setSsoConfig(data);
         setLoadingSSO(false);
       })
       .catch(() => setLoadingSSO(false));
@@ -85,10 +86,10 @@ export function SignInGate({ children }: { children: React.ReactNode }) {
   };
 
   const handleSSOLogin = () => {
-    if (!ssoConfig) return;
+    if (!ssoConfig?.org_id) return;
 
     const redirectUri = `${window.location.origin}/api/auth/callback`;
-    const state = btoa(JSON.stringify({ org_id: 'org1', returnTo: '/' }));
+    const state = btoa(JSON.stringify({ org_id: ssoConfig.org_id, returnTo: '/team' }));
     const scopes = ssoConfig.scopes || 'openid email profile';
     let authUrl: string;
 
@@ -99,7 +100,7 @@ export function SignInGate({ children }: { children: React.ReactNode }) {
         `&redirect_uri=${encodeURIComponent(redirectUri)}` +
         `&response_type=code` +
         `&scope=${encodeURIComponent(scopes)}` +
-        `&state=${state}` +
+        `&state=${encodeURIComponent(state)}` +
         `&access_type=offline` +
         `&prompt=select_account`;
     } else if (ssoConfig.provider_type === 'azure') {
@@ -110,7 +111,7 @@ export function SignInGate({ children }: { children: React.ReactNode }) {
         `&redirect_uri=${encodeURIComponent(redirectUri)}` +
         `&response_type=code` +
         `&scope=${encodeURIComponent(scopes)}` +
-        `&state=${state}` +
+        `&state=${encodeURIComponent(state)}` +
         `&response_mode=query`;
     } else {
       const issuer = ssoConfig.issuer?.replace(/\/$/, '');
@@ -120,7 +121,7 @@ export function SignInGate({ children }: { children: React.ReactNode }) {
         `&redirect_uri=${encodeURIComponent(redirectUri)}` +
         `&response_type=code` +
         `&scope=${encodeURIComponent(scopes)}` +
-        `&state=${state}`;
+        `&state=${encodeURIComponent(state)}`;
     }
 
     window.location.href = authUrl;

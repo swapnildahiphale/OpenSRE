@@ -13,16 +13,13 @@ The following database columns are transparently encrypted/decrypted:
    - Other fields remain in plaintext for efficient querying
    - Example: `{"api_key": "fernet:...", "domain": "example.com"}`
 
-2. **`sso_configs.client_secret_encrypted`** (EncryptedText)
-   - OAuth/OIDC client secrets
-
-3. **`slack_installations.bot_token`** (EncryptedText)
+2. **`slack_installations.bot_token`** (EncryptedText)
    - Slack bot OAuth token
 
-4. **`slack_installations.user_token`** (EncryptedText)
+3. **`slack_installations.user_token`** (EncryptedText)
    - Slack user OAuth token (if using user-level installation)
 
-5. **`slack_installations.incoming_webhook_url`** (EncryptedText)
+4. **`slack_installations.incoming_webhook_url`** (EncryptedText)
    - Webhook URLs contain sensitive tokens in query parameters
 
 ## Encryption Method
