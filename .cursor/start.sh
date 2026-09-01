@@ -27,9 +27,30 @@ echo "[start] Booting OpenSRE dev stack from $REPO_ROOT"
 if [ ! -f "$REPO_ROOT/.env" ]; then
   echo "[start] .env missing — recreating from .env.example"
   cp "$REPO_ROOT/.env.example" "$REPO_ROOT/.env"
-  if [ -n "${ANTHROPIC_API_KEY:-}" ]; then
-    sed -i "s|^ANTHROPIC_API_KEY=.*|ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}|" "$REPO_ROOT/.env"
-  fi
+fi
+
+# Always sync the ANTHROPIC_API_KEY from the environment (Cloud Agent secret)
+# into .env on every boot. This runs even when .env already exists, so applying
+# the secret and restarting is enough to pick it up — no manual edit needed.
+if [ -n "${ANTHROPIC_API_KEY:-}" ]; then
+  echo "[start] Syncing ANTHROPIC_API_KEY from the environment into .env"
+  sed -i "s|^ANTHROPIC_API_KEY=.*|ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}|" "$REPO_ROOT/.env"
+fi
+
+# Point the sre-agent at a reachable Anthropic IP.
+# docker-compose.yml pins api.anthropic.com to a Cloudflare edge IP as an India
+# TLS workaround, but that edge is unreachable from Cloud Agent VMs, which makes
+# every LLM call hang. We resolve Anthropic's real IPv4 on the host (no /etc/hosts
+# pin here) and pass it to compose via ANTHROPIC_HOST_IP so the container uses a
+# route that actually works. Falls back to Anthropic's canonical IP if resolution
+# fails. This does not change the committed default for other networks.
+ANTHROPIC_HOST_IP="$(python3 -c "import socket; print(sorted({a[4][0] for a in socket.getaddrinfo('api.anthropic.com',443,socket.AF_INET)})[0])" 2>/dev/null || true)"
+ANTHROPIC_HOST_IP="${ANTHROPIC_HOST_IP:-160.79.104.10}"
+echo "[start] Using ANTHROPIC_HOST_IP=${ANTHROPIC_HOST_IP} for the sre-agent"
+if grep -q '^ANTHROPIC_HOST_IP=' "$REPO_ROOT/.env"; then
+  sed -i "s|^ANTHROPIC_HOST_IP=.*|ANTHROPIC_HOST_IP=${ANTHROPIC_HOST_IP}|" "$REPO_ROOT/.env"
+else
+  echo "ANTHROPIC_HOST_IP=${ANTHROPIC_HOST_IP}" >> "$REPO_ROOT/.env"
 fi
 
 # 3. The compose volumes are external, so make sure they exist (idempotent).

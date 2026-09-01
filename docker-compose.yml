@@ -147,8 +147,11 @@ services:
     restart: unless-stopped
     # Anthropic DNS now points at 160.79.104.10, which fails TLS from some
     # networks (e.g. India). Cloudflare edge still works — temporary workaround.
+    # The pinned IP is env-overridable so environments where the Cloudflare edge
+    # is unreachable (e.g. Cloud Agent VMs) can point at a reachable Anthropic IP
+    # via ANTHROPIC_HOST_IP in .env. Default preserves the original workaround.
     extra_hosts:
-      - "api.anthropic.com:104.18.19.125"
+      - "api.anthropic.com:${ANTHROPIC_HOST_IP:-104.18.19.125}"
     env_file:
       - .env
     environment:

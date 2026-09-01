@@ -25,6 +25,18 @@ sudo modprobe br_netfilter 2>/dev/null || true
 sudo sysctl -w net.bridge.bridge-nf-call-iptables=0 >/dev/null 2>&1 || true
 sudo sysctl -w net.bridge.bridge-nf-call-ip6tables=0 >/dev/null 2>&1 || true
 
+# Second nested-container fix: legacy iptables blocks container egress.
+# This VM has BOTH netfilter backends active — nftables (Docker 29's default,
+# where it writes its bridge/NAT rules) and iptables-legacy. The legacy FORWARD
+# chain ships with a default DROP policy that only whitelists docker0, so packets
+# from Docker's custom compose bridges (br-*) pass the nft rules but get dropped
+# by legacy → containers on compose networks have no outbound internet (LLM calls
+# hang, image pulls fail). Relaxing the legacy FORWARD policy to ACCEPT lets that
+# traffic through; the nftables backend still enforces Docker's real isolation.
+if command -v iptables-legacy >/dev/null 2>&1; then
+  sudo iptables-legacy -P FORWARD ACCEPT 2>/dev/null || true
+fi
+
 # ----------------------------------------------------------------------------
 # Start dockerd only if it is not already answering.
 # ----------------------------------------------------------------------------
