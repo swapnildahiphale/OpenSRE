@@ -66,4 +66,9 @@ export COMPOSE_PROJECT_NAME=opensre
 echo "[start] Starting services (postgres, config-service, neo4j, sre-agent, web-ui)..."
 make dev
 
+# 5. Seed the Neo4j knowledge graph with the otel-demo topology, but only when
+#    it is empty (safe to run every boot; never wipes existing data). This gives
+#    fresh environments topology-aware investigation data out of the box.
+bash "$SCRIPT_DIR/seed-neo4j.sh" || echo "[start] KG seed skipped (non-fatal)."
+
 echo "[start] OpenSRE is up. Web console: http://localhost:3002 (admin token: local-admin-token)"
