@@ -1,0 +1,13 @@
+{
+  "name": "OpenSRE",
+  "user": "ubuntu",
+  "install": "bash .cursor/install.sh",
+  "start": "bash .cursor/start.sh",
+  "ports": [
+    { "name": "web-ui", "port": 3002 },
+    { "name": "config-service", "port": 8081 },
+    { "name": "sre-agent", "port": 8001 },
+    { "name": "neo4j-browser", "port": 7475 },
+    { "name": "neo4j-bolt", "port": 7688 }
+  ]
+}
