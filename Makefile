@@ -2,7 +2,7 @@
 #
 # Run 'make help' to see all available targets.
 
-.PHONY: help setup-llm compose-reconcile dev dev-slack dev-teams stop logs logs-agent logs-config logs-web status clean db-shell \
+.PHONY: help setup-llm ensure-volumes compose-reconcile dev dev-slack dev-teams stop logs logs-agent logs-config logs-web status clean db-shell \
         kind-create kind-delete otel-install otel-images otel-wait e2e-verify \
         e2e-setup e2e-teardown e2e-agent e2e-status e2e-token \
         e2e-setup-eks e2e-teardown-eks eks-port-forward eks-port-forward-stop \
@@ -142,18 +142,22 @@ help:
 setup-llm:
 	@bash scripts/generate-litellm-config.sh
 
+# External volumes (postgres/neo4j/agent-sessions) must exist before compose up.
+ensure-volumes:
+	@bash scripts/ensure-volumes.sh
+
 compose-reconcile:
 	@bash scripts/compose-reconcile.sh
 
-dev: setup-llm compose-reconcile
+dev: setup-llm ensure-volumes compose-reconcile
 	$(COMPOSE_DEV) up -d --build
 	@bash scripts/post-startup-banner.sh
 
-dev-slack: setup-llm compose-reconcile
+dev-slack: setup-llm ensure-volumes compose-reconcile
 	$(COMPOSE_DEV) --profile slack up -d --build
 	@bash scripts/post-startup-banner.sh
 
-dev-teams: setup-llm compose-reconcile
+dev-teams: setup-llm ensure-volumes compose-reconcile
 	$(COMPOSE_DEV) --profile teams up -d --build
 	@bash scripts/post-startup-banner.sh
 

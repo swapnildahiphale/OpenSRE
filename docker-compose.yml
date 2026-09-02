@@ -62,6 +62,11 @@ services:
       ADMIN_AUTH_MODE: token
       TEAM_AUTH_MODE: token
       SSO_DEFAULT_TEAM_NODE_ID: ${SSO_DEFAULT_TEAM_NODE_ID:-default}
+      # Shared admin token has no org claim; /auth/me uses this so Org Tree
+      # and other admin pages target the seeded tenant (entrypoint seed uses local).
+      DEFAULT_ORG_ID: ${DEFAULT_ORG_ID:-local}
+      SEED_ORG_ID: ${SEED_ORG_ID:-local}
+      SEED_TEAM_NODE_ID: ${SEED_TEAM_NODE_ID:-default}
       IMPERSONATION_JWT_SECRET: local-dev-impersonation-secret-32chars!!
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
       LOG_FORMAT: console
@@ -286,6 +291,11 @@ services:
       - WEB_UI_COOKIE_SECURE=0
       - HOSTNAME=0.0.0.0
       - PORT=3000
+      # Fallback when a page needs an org before identity loads; must match
+      # config-service DEFAULT_ORG_ID / seed tenant.
+      - DEFAULT_ORG_ID=${DEFAULT_ORG_ID:-local}
+      - NEXT_PUBLIC_DEFAULT_ORG_ID=${DEFAULT_ORG_ID:-local}
+      - ORG_ID=${ORG_ID:-local}
     ports:
       - "3002:3000"
     depends_on:
@@ -390,10 +400,9 @@ networks:
 
 # Named volumes are shared across worktrees via COMPOSE_PROJECT_NAME=opensre.
 # Mark external so `docker compose down -v` / `make clean` from ANY worktree
-# cannot wipe investigation/memory data. Create once if missing:
-#   docker volume create opensre-postgres-data
-#   docker volume create opensre-neo4j-data
-#   docker volume create opensre-agent-sessions
+# cannot wipe investigation/memory data.
+# `make dev` creates them via scripts/ensure-volumes.sh if missing.
+# Manual (optional): docker volume create opensre-{postgres,neo4j}-data opensre-agent-sessions
 volumes:
   postgres-data:
     name: opensre-postgres-data

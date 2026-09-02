@@ -449,6 +449,26 @@ def get_org_node(session: Session, *, org_id: str, node_id: str) -> OrgNode:
     return node
 
 
+def org_exists(session: Session, *, org_id: str) -> bool:
+    """True if the org has any org-type root node.
+
+    Local seed and ensure_org_root_node use node_id='root' (not node_id==org_id).
+    Some deployments also use node_id==org_id. Accept either.
+    """
+    return (
+        session.execute(
+            select(OrgNode.node_id)
+            .where(
+                OrgNode.org_id == org_id,
+                OrgNode.node_type == NodeType.org,
+                OrgNode.parent_id.is_(None),
+            )
+            .limit(1)
+        ).scalar_one_or_none()
+        is not None
+    )
+
+
 def list_node_config_audit(
     session: Session, *, org_id: str, node_id: str, limit: int = 50
 ) -> List["ConfigChangeHistory"]:

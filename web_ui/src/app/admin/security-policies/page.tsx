@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useIdentity } from '@/lib/useIdentity';
 import { apiFetch } from '@/lib/apiClient';
+import { defaultOrgId } from '@/lib/defaultOrgId';
 import { 
   Shield, 
   Key, 
@@ -18,7 +19,7 @@ export default function SecurityPoliciesPage() {
   const [policiesSaving, setPoliciesSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
 
-  const orgId = identity?.org_id || 'org1';
+  const orgId = identity?.org_id || defaultOrgId();
   const isAdmin = identity?.role === 'admin';
 
   // Load security policies

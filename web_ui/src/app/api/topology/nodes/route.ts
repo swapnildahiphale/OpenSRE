@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { defaultOrgId } from "@/lib/defaultOrgId";
 import { getConfigServiceBaseUrl, getUpstreamAuthHeaders } from "../../_utils/upstream";
 
 export const runtime = "nodejs";
@@ -11,7 +12,7 @@ export async function GET(request: NextRequest) {
 
   try {
     const baseUrl = getConfigServiceBaseUrl();
-    const orgId = process.env.ORG_ID || "org1";
+    const orgId = defaultOrgId();
 
     const upstreamUrl = new URL(`/api/v1/admin/orgs/${orgId}/nodes`, baseUrl);
     const res = await fetch(upstreamUrl, {

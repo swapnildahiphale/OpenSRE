@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { RequireRole } from '@/components/RequireRole';
 import { apiFetch } from '@/lib/apiClient';
+import { defaultOrgId } from '@/lib/defaultOrgId';
 import { useIdentity } from '@/lib/useIdentity';
 import { Network, RefreshCcw, Plus, X, ChevronRight, Settings, Key, Edit2 } from 'lucide-react';
 
@@ -176,7 +177,7 @@ export default function OrgTreePage() {
   const [tokens, setTokens] = useState<{ token_id: string; revoked_at?: string }[]>([]);
 
   // Admin shared token has no org in the token; config-service sets org_id from DEFAULT_ORG_ID.
-  const orgId = identity?.org_id || undefined;
+  const orgId = identity?.org_id || defaultOrgId();
 
   const loadNodes = useCallback(async () => {
     if (!orgId) return; // Wait for identity to load
@@ -208,6 +209,10 @@ export default function OrgTreePage() {
 
   // Create node
   const handleCreateNode = async () => {
+    if (!orgId) {
+      alert('Organization is not loaded yet. Refresh and sign in again (admin token needs DEFAULT_ORG_ID).');
+      return;
+    }
     if (!newNodeId.trim()) {
       alert('Node ID is required');
       return;
@@ -250,7 +255,7 @@ export default function OrgTreePage() {
 
   // Save edit
   const handleSaveEdit = async () => {
-    if (!selectedNode) return;
+    if (!selectedNode || !orgId) return;
     try {
       const res = await apiFetch(`/api/admin/orgs/${orgId}/nodes/${selectedNode.node_id}`, {
         method: 'PATCH',

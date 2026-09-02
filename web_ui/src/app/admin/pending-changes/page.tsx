@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useIdentity } from '@/lib/useIdentity';
 import { apiFetch } from '@/lib/apiClient';
+import { defaultOrgId } from '@/lib/defaultOrgId';
 import { 
   Clock, 
   CheckCircle, 
@@ -41,7 +42,7 @@ export default function PendingChangesPage() {
   const [reviewingId, setReviewingId] = useState<string | null>(null);
   const [reviewComment, setReviewComment] = useState('');
 
-  const orgId = identity?.org_id || 'org1';
+  const orgId = identity?.org_id || defaultOrgId();
   const isAdmin = identity?.role === 'admin';
 
   const loadChanges = useCallback(async () => {

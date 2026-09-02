@@ -2,6 +2,7 @@
 
 import { RequireRole } from '@/components/RequireRole';
 import { apiFetch } from '@/lib/apiClient';
+import { defaultOrgId } from '@/lib/defaultOrgId';
 import { useIdentity } from '@/lib/useIdentity';
 import { useEffect, useState } from 'react';
 import {
@@ -45,7 +46,7 @@ interface TokenHealth {
 
 export default function TokenManagementPage() {
   const { identity } = useIdentity();
-  const orgId = identity?.org_id;
+  const orgId = identity?.org_id || defaultOrgId();
 
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -104,7 +105,15 @@ export default function TokenManagementPage() {
       const res = await fetch(`/api/admin/orgs/${orgId}/tokens`);
 
       if (!res.ok) {
-        throw new Error(`Failed to load tokens: ${res.statusText}`);
+        let detail = res.statusText || `HTTP ${res.status}`;
+        try {
+          const body = await res.json();
+          if (body?.detail) detail = typeof body.detail === 'string' ? body.detail : JSON.stringify(body.detail);
+          else if (body?.error) detail = body.error;
+        } catch {
+          /* keep statusText */
+        }
+        throw new Error(`Failed to load tokens: ${detail}`);
       }
 
       const data = await res.json();

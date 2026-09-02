@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useIdentity } from '@/lib/useIdentity';
 import { apiFetch } from '@/lib/apiClient';
+import { defaultOrgId } from '@/lib/defaultOrgId';
 import { 
   Activity, 
   RefreshCcw,
@@ -87,7 +88,7 @@ export default function AuditPage() {
   // Team options
   const [teams, setTeams] = useState<TeamOption[]>([]);
   
-  const orgId = identity?.org_id || 'org1';
+  const orgId = identity?.org_id || defaultOrgId();
   const isAdmin = identity?.role === 'admin';
 
   // Load teams for filter dropdown

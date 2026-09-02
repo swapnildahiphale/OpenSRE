@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { RequireRole } from '@/components/RequireRole';
 import { apiFetch } from '@/lib/apiClient';
+import { defaultOrgId } from '@/lib/defaultOrgId';
 import { useIdentity } from '@/lib/useIdentity';
 import { isPromptSet, agentPromptPatch, buildAgentList } from '@/lib/agentPrompts';
 import {
@@ -62,7 +63,7 @@ export default function OrgDefaultsPage() {
     enabled: true,
   });
 
-  const orgId = identity?.org_id || 'org1';
+  const orgId = identity?.org_id || defaultOrgId();
 
   // Load org-level config
   const loadOrgConfig = useCallback(async () => {

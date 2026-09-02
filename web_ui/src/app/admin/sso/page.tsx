@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useIdentity } from '@/lib/useIdentity';
 import { apiFetch } from '@/lib/apiClient';
+import { defaultOrgId } from '@/lib/defaultOrgId';
 import { 
   Shield, 
   Save, 
@@ -82,7 +83,7 @@ export default function SSOSettingsPage() {
   const [adminGroup, setAdminGroup] = useState('');
   const [allowedDomains, setAllowedDomains] = useState('');
 
-  const orgId = identity?.org_id || 'org1';
+  const orgId = identity?.org_id || defaultOrgId();
   const isAdmin = identity?.role === 'admin';
 
   const loadConfig = useCallback(async () => {

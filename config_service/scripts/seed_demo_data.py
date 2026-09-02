@@ -20,7 +20,7 @@ from src.db.session import db_session
 def main() -> None:
     load_dotenv()
     # Minimal seed data so /me/effective has something to return.
-    org_id = os.getenv("SEED_ORG_ID", "org1")
+    org_id = os.getenv("SEED_ORG_ID", "local")
     root_id = os.getenv("SEED_ROOT_NODE_ID", "root")
     team_id = os.getenv("SEED_TEAM_NODE_ID", "teamA")
     team_name = os.getenv("SEED_TEAM_NAME", "Team A")

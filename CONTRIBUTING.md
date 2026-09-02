@@ -76,7 +76,8 @@ cp .env.example .env
 
 ```bash
 make dev
-# Starts Postgres, config-service, Neo4j, sre-agent, web-ui
+# Ensures external Docker volumes exist, then starts
+# Postgres, config-service, Neo4j, sre-agent, web-ui
 # Migrations run automatically
 # Web console: http://localhost:3002
 ```

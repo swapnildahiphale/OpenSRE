@@ -1031,12 +1031,10 @@ def admin_list_org_tokens(
 ):
     """List all tokens across all teams in the organization."""
     check_org_access(principal, org_id)
-    from src.db.repository import get_org_node, list_org_tokens
+    from src.db.repository import list_org_tokens, org_exists
 
-    # Verify org exists (org root node has node_id == org_id)
-    try:
-        get_org_node(session, org_id=org_id, node_id=org_id)
-    except ValueError:
+    # Org root is typically node_id='root' (seed / ensure_org_root_node), not node_id==org_id.
+    if not org_exists(session, org_id=org_id):
         raise HTTPException(status_code=404, detail="Organization not found")
 
     tokens = list_org_tokens(session, org_id=org_id)
