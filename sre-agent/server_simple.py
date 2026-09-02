@@ -35,7 +35,7 @@ from memory.retrieval import EpisodeRetriever
 from memory.store import EpisodeStore
 from pydantic import BaseModel
 from report import extract_structured_report
-from tool_output_sanitize import sanitize_tool_end_payload
+from tool_output_sanitize import sanitize_tool_end_payload, sanitize_tool_input
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
@@ -303,6 +303,8 @@ def _tool_call_record(
     ).isoformat()
     tool_name = data.get("name") or started.get("name") or "unknown"
     tool_input = data.get("input") or started.get("input")
+    if tool_input is not None:
+        tool_input = sanitize_tool_input(tool_name, tool_input)
     tool_output = data.get("output") or data.get("summary")
     error_message = data.get("error")
     tool_output, error_message = sanitize_tool_end_payload(

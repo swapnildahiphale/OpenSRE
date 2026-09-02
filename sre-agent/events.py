@@ -11,6 +11,8 @@ from dataclasses import asdict, dataclass, field
 from datetime import datetime
 from typing import Optional
 
+from tool_output_sanitize import sanitize_tool_input
+
 
 @dataclass
 class StreamEvent:
@@ -92,6 +94,7 @@ def tool_start_event(
     data["parent_agent_type"] = parent_agent_type
     data["depth"] = depth
     if tool_input:
+        tool_input = sanitize_tool_input(name, tool_input)
         # Extract relevant info based on tool type
         if name == "Bash" and "command" in tool_input:
             data["command"] = tool_input["command"]
