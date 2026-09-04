@@ -24,6 +24,7 @@ class ThoughtSection:
 @dataclass
 class InvestigationState:
     thread_id: str
+    run_id: Optional[str] = None
     thoughts: list = field(default_factory=list)
     current_tool: Optional[ToolCall] = None
     final_result: Optional[str] = None

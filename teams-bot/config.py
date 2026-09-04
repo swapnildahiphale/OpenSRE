@@ -27,6 +27,7 @@ class Config:
 
     SRE_AGENT_URL = os.environ.get("SRE_AGENT_URL", "http://localhost:8000")
     INVESTIGATE_AUTH_TOKEN = os.environ.get("INVESTIGATE_AUTH_TOKEN", "")
+    WEB_UI_PUBLIC_BASE_URL = os.environ.get("WEB_UI_PUBLIC_BASE_URL", "")
 
     def __init__(self) -> None:
         _export_sdk_env(

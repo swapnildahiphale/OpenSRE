@@ -72,8 +72,17 @@ async def test_queue_message_posts_url_and_payload():
     assert result == {"queued": True, "pending_count": 1}
 
 
-async def _make_sse_runner(sse_lines: list[str], send_card, stream_close=None):
+async def _make_sse_runner(
+    sse_lines: list[str],
+    send_card,
+    stream_close=None,
+    send_text=None,
+    plain_text_final: bool = False,
+    web_ui_base_url: str = "",
+):
     """Helper: mock aiohttp to stream sse_lines then close, run investigation."""
+    if send_text is None:
+        send_text = AsyncMock()
     sse_bytes = ("\n".join(sse_lines) + "\n").encode()
 
     async def _iter_any():
@@ -100,15 +109,19 @@ async def _make_sse_runner(sse_lines: list[str], send_card, stream_close=None):
         with patch("investigation_runner.Config") as mock_cfg:
             mock_cfg.return_value.SRE_AGENT_URL = "http://agent:8001"
             mock_cfg.return_value.INVESTIGATE_AUTH_TOKEN = ""
+            mock_cfg.return_value.WEB_UI_PUBLIC_BASE_URL = web_ui_base_url
             await run_investigation(
                 thread_id="teams-test",
                 prompt="investigate latency",
                 stream_update=AsyncMock(),
                 stream_close=stream_close or AsyncMock(),
                 send_card=send_card,
+                send_text=send_text,
                 update_card=AsyncMock(),
+                plain_text_final=plain_text_final,
             )
-    assert mock_session.post.call_args.kwargs["json"]["trigger_source"] == "teams"
+            assert mock_session.post.call_args.kwargs["json"]["trigger_source"] == "teams"
+    return send_text
 
 
 @pytest.mark.asyncio
@@ -210,15 +223,63 @@ async def test_sse_read_timeout_sends_error_card():
         with patch("investigation_runner.Config") as mock_cfg:
             mock_cfg.return_value.SRE_AGENT_URL = "http://agent:8001"
             mock_cfg.return_value.INVESTIGATE_AUTH_TOKEN = ""
+            mock_cfg.return_value.WEB_UI_PUBLIC_BASE_URL = ""
             await run_investigation(
                 thread_id="teams-test",
                 prompt="investigate latency",
                 stream_update=AsyncMock(),
                 stream_close=AsyncMock(),
                 send_card=fake_send_card,
+                send_text=AsyncMock(),
                 update_card=AsyncMock(),
             )
 
     mock_cls.assert_called_once_with(timeout=SSE_CLIENT_TIMEOUT)
     assert len(cards_sent) == 1
     assert "Timed out waiting for the agent" in str(cards_sent[0])
+
+
+@pytest.mark.asyncio
+async def test_plain_text_final_uses_send_text_with_run_link():
+    sse_lines = [
+        'data: {"type": "run_started", "data": {"run_id": "run-abc"}}',
+        'data: {"type": "result", "data": {"text": "All clear"}}',
+    ]
+    send_text = AsyncMock()
+
+    await _make_sse_runner(
+        sse_lines,
+        send_card=AsyncMock(),
+        send_text=send_text,
+        plain_text_final=True,
+        web_ui_base_url="https://opensre.example.com",
+    )
+
+    send_text.assert_awaited_once()
+    body = send_text.await_args.args[0]
+    assert "All clear" in body
+    assert "[View in OpenSRE](https://opensre.example.com/team/agent-runs/run-abc)" in body
+
+
+@pytest.mark.asyncio
+async def test_card_final_includes_run_link_footer():
+    sse_lines = [
+        'data: {"type": "run_started", "data": {"run_id": "run-xyz"}}',
+        'data: {"type": "result", "data": {"text": "Root cause found"}}',
+    ]
+    cards_sent: list[dict] = []
+
+    async def fake_send_card(card: dict):
+        cards_sent.append(card)
+        return None
+
+    await _make_sse_runner(
+        sse_lines,
+        send_card=fake_send_card,
+        web_ui_base_url="https://opensre.example.com",
+    )
+
+    assert len(cards_sent) == 1
+    assert "[View in OpenSRE](https://opensre.example.com/team/agent-runs/run-xyz)" in str(
+        cards_sent[0]
+    )

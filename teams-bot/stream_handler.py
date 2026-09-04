@@ -46,6 +46,12 @@ def handle_stream_event(state: InvestigationState, event: dict) -> StreamStepRes
     event_type = event.get("type")
     data: dict[str, Any] = event.get("data") or {}
 
+    if event_type == "run_started":
+        run_id = data.get("run_id")
+        if run_id:
+            state.run_id = str(run_id)
+        return StreamStepResult()
+
     if event_type == "thought":
         text = data.get("text", "")
         if not text:

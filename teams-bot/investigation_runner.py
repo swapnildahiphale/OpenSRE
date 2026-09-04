@@ -8,11 +8,13 @@ from typing import Awaitable, Callable, Optional
 import aiohttp
 from card_builder import (
     build_final_card,
+    build_final_text,
     build_question_card,
     build_timeout_card,
 )
 from config import Config
 from progress_text import build_progress_text
+from run_links import build_agent_run_url
 from state import (
     InvestigationState,
     active_investigations,
@@ -33,7 +35,14 @@ SSE_CLIENT_TIMEOUT = aiohttp.ClientTimeout(total=900, sock_connect=30)
 StreamUpdate = Callable[[str], Awaitable[None]]
 StreamClose = Callable[[], Awaitable[None]]
 SendCard = Callable[[dict], Awaitable[Optional[str]]]  # returns activity id
+SendText = Callable[[str], Awaitable[None]]
 UpdateCard = Callable[[str, dict], Awaitable[None]]  # activity_id, card
+
+
+def _run_url(cfg: Config, state: InvestigationState) -> Optional[str]:
+    if not state.run_id:
+        return None
+    return build_agent_run_url(cfg.WEB_UI_PUBLIC_BASE_URL, state.run_id)
 
 
 def sanitize_thread_id(conversation_id: str) -> str:
@@ -95,7 +104,9 @@ async def run_investigation(
     stream_update: StreamUpdate,
     stream_close: StreamClose,
     send_card: SendCard,
+    send_text: SendText,
     update_card: UpdateCard,
+    plain_text_final: bool = False,
 ) -> None:
     active_investigations.add(thread_id)
     try:
@@ -105,7 +116,9 @@ async def run_investigation(
             stream_update=stream_update,
             stream_close=stream_close,
             send_card=send_card,
+            send_text=send_text,
             update_card=update_card,
+            plain_text_final=plain_text_final,
         )
     finally:
         active_investigations.discard(thread_id)
@@ -118,7 +131,9 @@ async def _run_investigation_body(
     stream_update: StreamUpdate,
     stream_close: StreamClose,
     send_card: SendCard,
+    send_text: SendText,
     update_card: UpdateCard,
+    plain_text_final: bool,
 ) -> None:
     cfg = Config()
     state = InvestigationState(thread_id=thread_id)
@@ -129,6 +144,25 @@ async def _run_investigation_body(
         "trigger_source": "teams",
     }
     last_update = 0.0
+
+    async def send_final_reply() -> None:
+        run_url = _run_url(cfg, state)
+        if plain_text_final:
+            await send_text(
+                build_final_text(
+                    result_text=state.final_result,
+                    error=state.error,
+                    run_url=run_url,
+                )
+            )
+            return
+        await send_card(
+            build_final_card(
+                result_text=state.final_result,
+                error=state.error,
+                run_url=run_url,
+            )
+        )
 
     async def process_sse_line(line: str) -> bool:
         nonlocal last_update
@@ -163,9 +197,7 @@ async def _run_investigation_body(
             if state.error:
                 # error is terminal — backend sends nothing after this.
                 await stream_close()
-                await send_card(
-                    build_final_card(result_text=state.final_result, error=state.error)
-                )
+                await send_final_reply()
                 return True
             # result: backend may continue if a message was queued mid-run.
             # Let the stream drain; the bottom handler sends the final card.
@@ -188,21 +220,14 @@ async def _run_investigation_body(
     except TimeoutError:
         logger.exception("SSE timed out for thread %s", thread_id)
         await stream_close()
-        await send_card(
-            build_final_card(
-                result_text=state.final_result,
-                error=(
-                    None
-                    if state.final_result
-                    else "Timed out waiting for the agent. Reply in this thread to continue."
-                ),
+        if not state.final_result:
+            state.error = (
+                "Timed out waiting for the agent. Reply in this thread to continue."
             )
-        )
+        await send_final_reply()
         return
 
-    # Stream closed — send the final card with whatever result we accumulated.
+    # Stream closed — send the final reply with whatever result we accumulated.
     await stream_close()
     if state.final_result or state.error:
-        await send_card(
-            build_final_card(result_text=state.final_result, error=state.error)
-        )
+        await send_final_reply()

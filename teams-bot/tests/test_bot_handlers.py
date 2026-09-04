@@ -80,6 +80,7 @@ async def test_channel_investigation_does_not_use_activity_stream():
 
     mock_run.assert_awaited_once()
     kwargs = mock_run.await_args.kwargs
+    assert kwargs["plain_text_final"] is True
     ctx.stream.update.assert_not_called()
     # Ack is one send; progress edits reuse that activity id (PUT, not stream).
     assert ctx.send.await_count == 1
@@ -139,6 +140,7 @@ async def test_personal_investigation_keeps_activity_stream():
     await kwargs["stream_close"]()
     ctx.stream.update.assert_called_once()
     ctx.stream.close.assert_called_once()
+    assert kwargs["plain_text_final"] is False
 
 
 def test_is_personal_chat():

@@ -102,7 +102,7 @@ If you do use the PKCE path:
 
 Self-hosted Entra login for the team console:
 
-- Chart already sets `WEB_UI_SSO_ORG_ID` from `global.configService.orgId` and `WEB_UI_PUBLIC_BASE_URL` from `ingress.host` (or `oidc.publicBaseUrl` if you set one)
+- Chart already sets `WEB_UI_SSO_ORG_ID` from `global.configService.orgId` and `WEB_UI_PUBLIC_BASE_URL` from `ingress.host` (or `oidc.publicBaseUrl` if you set one) on **web-ui** and **teams-bot** (Teams “View in OpenSRE” run links)
 - Paste tenant / client id in **Admin → SSO**. Do not put them in values files
 - Put `SSO_CLIENT_SECRET` and `TOKEN_PEPPER` in the config-service secret
 - Keep `services.webUi.oidc.enabled: false`
