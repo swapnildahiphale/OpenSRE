@@ -35,66 +35,56 @@ The agent supports rich configuration via config_service for team-specific behav
 Each agent in your team config supports:
 
 - **`enabled`** (bool): Whether this agent is active
+- **`description`** (str): Routing hint the SDK uses to select this sub-agent
 - **`prompt.system`** (str): Agent's system prompt defining its role and behavior
-- **`prompt.prefix`** (str): Description shown when used as subagent
 - **`tools.enabled`** (list): Allowed tools (`["*"]` for all)
 - **`tools.disabled`** (list): Tools to exclude from enabled set
-- **`model`** (object): Model settings for LLM calls
-  - **`temperature`** (float, 0.0-1.0): Sampling temperature (None = provider default)
-  - **`max_tokens`** (int): Maximum response tokens
-  - **`top_p`** (float, 0.0-1.0): Nucleus sampling parameter
+- **`model.name`** (str): Model to use for this agent, or `"inherit"` for the root model
 - **`max_turns`** (int): Maximum conversation turns (prevents infinite loops)
+- **`sub_agents`** (object): Allowed child agents `{agent_name: bool}` for routing enforcement
 - **`skills`** (object): Per-agent skill enable/disable overrides
+
+Only `model.name` is expressible through the Claude Agent SDK — sampling
+parameters (`temperature`, `top_p`) and response limits (`max_tokens`) have
+no SDK equivalent and are not configurable.
 
 ### Example Configuration
 
 ```json
 {
   "agents": {
-    "investigator": {
+    "planner": {
       "enabled": true,
-      "model": {
-        "temperature": 0.3,
-        "max_tokens": 4000,
-        "top_p": 0.9
-      },
+      "model": { "name": "inherit" },
       "max_turns": 50,
       "prompt": {
-        "system": "You are an SRE investigator specialized in incident analysis...",
-        "prefix": "Use for incident investigation and root cause analysis"
+        "system": "You are an SRE investigator specialized in incident analysis..."
       },
       "tools": {
         "enabled": ["*"],
         "disabled": ["Write", "Edit"]
-      }
+      },
+      "sub_agents": { "kubernetes": true, "aws": true }
     },
-    "k8s-specialist": {
+    "kubernetes": {
       "enabled": true,
       "max_turns": 30,
+      "description": "Use for pod crashes, deployments, resource issues",
       "prompt": {
-        "system": "You are a Kubernetes specialist...",
-        "prefix": "Use for pod crashes, deployments, resource issues"
+        "system": "You are a Kubernetes specialist..."
       }
     },
-    "log-analyst": {
+    "log_analysis": {
       "enabled": true,
       "max_turns": 20,
+      "description": "Use for analyzing application logs and error patterns",
       "prompt": {
-        "system": "You are a log analysis specialist...",
-        "prefix": "Use for analyzing application logs and error patterns"
+        "system": "You are a log analysis specialist..."
       }
     }
   }
 }
 ```
-
-### Model Settings
-
-Model settings control the Claude Agent SDK session:
-
-- `temperature`, `max_tokens`, `top_p` supported
-- Applied per-session from team config or defaults
-- Calls go directly to Anthropic — no proxy layer
 
 ### Execution Limits
 
@@ -157,7 +147,7 @@ See `env.example` for all available integrations.
 
 ## Skills
 
-**46 skills** organized by category provide on-demand methodology and best practices:
+**52 skills** organized by category provide on-demand methodology and best practices:
 
 | Category | Skills |
 |----------|--------|
@@ -207,7 +197,7 @@ Every investigation is recorded with full tool call traces:
 - **tools/** — Neo4j semantic layer
 - **pyproject.toml** — Python dependencies
 - **Dockerfile** — container image
-- **.claude/skills/** — 46 skills with methodology docs and scripts
+- **.claude/skills/** — 52 skills with methodology docs and scripts
 
 ## Features
 

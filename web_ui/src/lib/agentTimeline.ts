@@ -19,7 +19,7 @@ export interface ToolItem {
   agentName?: string;
   // Nested-agent attribution (from SDK PreToolUse hook agent_id resolution).
   // parentAgentName is the *agent type* of the dispatching parent (e.g.
-  // "investigation" for a grandchild under it), not a tool_use_id. depth is
+  // "kubernetes" for a grandchild under it), not a tool_use_id. depth is
   // 0 for the root agent's own calls, 1 for a direct subagent, 2 for a
   // sub-sub-agent, etc. agentId is the SDK's opaque per-agent id.
   parentAgentName?: string;

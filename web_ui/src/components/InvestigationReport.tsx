@@ -6,10 +6,12 @@ import {
   Shield,
   Clock,
   Target,
+  FileSearch,
   Lightbulb,
   CheckCircle2,
   ChevronDown,
   ChevronRight,
+  ArrowDown,
 } from 'lucide-react';
 
 export interface InvestigationReportData {
@@ -30,7 +32,8 @@ export interface InvestigationReportData {
     confidence?: string;
     details?: string | null;
   };
-  action_items?: { priority: string; action: string }[];
+  evidence?: string[];
+  action_items?: { action: string; additional?: boolean }[];
   lessons_learned?: string[];
 }
 
@@ -41,9 +44,9 @@ const SEVERITY_COLORS: Record<string, { border: string; badge: string; text: str
     text: 'text-clay',
   },
   high: {
-    border: 'border-l-orange-500',
-    badge: 'bg-orange-100 text-orange-800 dark:bg-orange-900/40 dark:text-orange-300',
-    text: 'text-orange-500',
+    border: 'border-l-emerald-500',
+    badge: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300',
+    text: 'text-emerald-500',
   },
   medium: {
     border: 'border-l-yellow-500',
@@ -73,17 +76,6 @@ const CONFIDENCE_COLORS: Record<string, string> = {
   confirmed: 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300',
   probable: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-300',
   hypothesis: 'bg-stone-100 text-stone-700 dark:bg-stone-700 dark:text-stone-300',
-};
-
-const PRIORITY_STYLES: Record<string, string> = {
-  immediate: 'border-l-clay bg-clay-light/10 dark:bg-clay/10',
-  short_term: 'border-l-yellow-500 bg-yellow-50 dark:bg-yellow-900/10',
-  long_term: 'border-l-forest bg-forest-light/10 dark:bg-forest/20',
-  // Also accept raw priority names from LLM output
-  critical: 'border-l-clay bg-clay-light/10 dark:bg-clay/10',
-  high: 'border-l-orange-500 bg-orange-50 dark:bg-orange-900/10',
-  medium: 'border-l-yellow-500 bg-yellow-50 dark:bg-yellow-900/10',
-  low: 'border-l-forest bg-forest-light/10 dark:bg-forest/20',
 };
 
 function SectionHeader({ icon, title }: { icon: React.ReactNode; title: string }) {
@@ -132,11 +124,14 @@ function normalizeReport(raw: InvestigationReportData & Record<string, any>): In
     };
   }
 
+  // Normalize evidence: must be a string array
+  if (!Array.isArray(r.evidence)) r.evidence = [];
+
   // Normalize action_items: description/recommendation -> action
   if (r.action_items && Array.isArray(r.action_items)) {
     r.action_items = r.action_items.map((item: any) => ({
-      ...item,
       action: item.action || item.description || item.detail || item.recommendation || item.title || '',
+      additional: Boolean(item.additional),
     }));
   } else {
     r.action_items = [];
@@ -253,6 +248,53 @@ export default function InvestigationReport({ report }: { report: InvestigationR
         </div>
       )}
 
+      {/* Root Cause */}
+      {normalized.root_cause && normalized.root_cause.summary && (
+        <div className="px-4 py-3 border-t border-stone-100 dark:border-stone-700">
+          <SectionHeader
+            icon={<AlertTriangle className="w-4 h-4 text-stone-500" />}
+            title="Root Cause"
+          />
+          {normalized.root_cause.confidence && (
+            <span
+              className={`inline-block text-xs font-medium px-2 py-0.5 rounded-full mb-2 ${
+                CONFIDENCE_COLORS[normalized.root_cause.confidence] || CONFIDENCE_COLORS.hypothesis
+              }`}
+            >
+              {normalized.root_cause.confidence}
+            </span>
+          )}
+          <p className="text-sm text-stone-700 dark:text-stone-300 leading-relaxed">
+            {normalized.root_cause.summary}
+          </p>
+          {normalized.root_cause.details && (
+            <p className="text-sm text-stone-500 dark:text-stone-400 mt-1.5 leading-relaxed">
+              {normalized.root_cause.details}
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* Evidence */}
+      {normalized.evidence && normalized.evidence.length > 0 && (
+        <div className="px-4 py-3 border-t border-stone-100 dark:border-stone-700">
+          <SectionHeader
+            icon={<FileSearch className="w-4 h-4 text-stone-500" />}
+            title="Evidence"
+          />
+          <div>
+            {normalized.evidence.map((item, i) => (
+              <div key={i}>
+                {i > 0 && <ArrowDown className="w-3.5 h-3.5 text-stone-400 ml-1 my-0.5" />}
+                <div className="text-sm font-mono text-stone-700 dark:text-stone-300 leading-snug whitespace-pre-wrap break-words">
+                  {item}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Timeline */}
       {timeline.length > 0 && (
         <div className="px-4 py-3 border-t border-stone-100 dark:border-stone-700">
@@ -295,52 +337,29 @@ export default function InvestigationReport({ report }: { report: InvestigationR
         </div>
       )}
 
-      {/* Root Cause */}
-      {normalized.root_cause && normalized.root_cause.summary && (
-        <div className="px-4 py-3 border-t border-stone-100 dark:border-stone-700">
-          <SectionHeader
-            icon={<AlertTriangle className="w-4 h-4 text-stone-500" />}
-            title="Root Cause"
-          />
-          {normalized.root_cause.confidence && (
-            <span
-              className={`inline-block text-xs font-medium px-2 py-0.5 rounded-full mb-2 ${
-                CONFIDENCE_COLORS[normalized.root_cause.confidence] || CONFIDENCE_COLORS.hypothesis
-              }`}
-            >
-              {normalized.root_cause.confidence}
-            </span>
-          )}
-          <p className="text-sm text-stone-700 dark:text-stone-300 leading-relaxed">
-            {normalized.root_cause.summary}
-          </p>
-          {normalized.root_cause.details && (
-            <p className="text-sm text-stone-500 dark:text-stone-400 mt-1.5 leading-relaxed">
-              {normalized.root_cause.details}
-            </p>
-          )}
-        </div>
-      )}
-
-      {/* Action Items */}
+      {/* Recommended Fix */}
       {normalized.action_items && normalized.action_items.length > 0 && (
         <div className="px-4 py-3 border-t border-stone-100 dark:border-stone-700">
           <SectionHeader
             icon={<CheckCircle2 className="w-4 h-4 text-stone-500" />}
-            title="Action Items"
+            title="Recommended Fix"
           />
           <div className="space-y-1.5">
             {normalized.action_items.map((item, i) => (
               <div
                 key={i}
                 className={`border-l-2 rounded-r px-3 py-1.5 ${
-                  PRIORITY_STYLES[item.priority] || 'border-l-stone-300 bg-stone-50 dark:bg-stone-700/50'
+                  item.additional
+                    ? 'border-l-stone-300 bg-stone-50 dark:bg-stone-700/50'
+                    : 'border-l-emerald-500 bg-emerald-50 dark:bg-emerald-900/10'
                 }`}
               >
                 <div className="flex items-center gap-2">
-                  <span className="text-xs font-medium text-stone-500 uppercase flex-shrink-0">
-                    {item.priority.replace('_', ' ')}
-                  </span>
+                  {item.additional && (
+                    <span className="text-xs font-medium text-stone-500 uppercase flex-shrink-0">
+                      additional
+                    </span>
+                  )}
                   <span className="text-sm text-stone-700 dark:text-stone-300">{item.action}</span>
                 </div>
               </div>

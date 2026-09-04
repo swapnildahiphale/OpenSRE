@@ -31,46 +31,13 @@ _TEMPLATE_PATH = os.path.join(
 @pytest.fixture
 def sample_team_config():
     """Load the POC incident-triage template into a TeamConfig for testing."""
-    from config import (
-        AgentConfig,
-        MemoryConfig,
-        ModelConfig,
-        PromptConfig,
-        SkillsConfig,
-        TeamConfig,
-        _coerce_tools,
-    )
+    from config import MemoryConfig, SkillsConfig, TeamConfig, _parse_agents
 
     with open(_TEMPLATE_PATH) as f:
         raw = json.load(f)
 
-    agents = {}
-    for name, cfg in raw.get("agents", {}).items():
-        prompt_data = cfg.get("prompt", {})
-        tools_data = cfg.get("tools", {})
-        model_data = cfg.get("model", {})
-        agents[name] = AgentConfig(
-            enabled=cfg.get("enabled", True),
-            name=name,
-            prompt=PromptConfig(
-                system=prompt_data.get("system", ""),
-                prefix=prompt_data.get("prefix", ""),
-                suffix=prompt_data.get("suffix", ""),
-            ),
-            tools=_coerce_tools(tools_data),
-            skills=cfg.get("skills", {}),
-            model=ModelConfig(
-                name=model_data.get("name", "claude-sonnet-4-6"),
-                temperature=model_data.get("temperature"),
-                max_tokens=model_data.get("max_tokens"),
-                top_p=model_data.get("top_p"),
-            ),
-            max_turns=cfg.get("max_turns"),
-            sub_agents=cfg.get("sub_agents", {}),
-        )
-
     return TeamConfig(
-        agents=agents,
+        agents=_parse_agents(raw.get("agents", {})),
         skills=SkillsConfig(),
         memory=MemoryConfig(),
         team_context=[],

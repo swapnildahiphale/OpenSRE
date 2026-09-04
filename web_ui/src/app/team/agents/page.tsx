@@ -41,8 +41,6 @@ interface AgentModel {
 
 interface AgentPrompt {
   system: string;
-  prefix?: string;
-  suffix?: string;
 }
 
 interface AgentConfig {
@@ -55,7 +53,6 @@ interface AgentConfig {
   sub_agents: { [agent_id: string]: boolean };  // Dict format: {agent_id: boolean}
   disable_default_sub_agents?: string[];  // Team overrides to disable inherited sub-agents
   enable_extra_sub_agents?: string[];     // Team overrides to add team-specific sub-agents
-  handoff_strategy?: string;
   source: 'org' | 'team';
 }
 
@@ -176,7 +173,6 @@ export default function AgentSettingsPage() {
             sub_agents: cfg.sub_agents || {},
             disable_default_sub_agents: cfg.disable_default_sub_agents,
             enable_extra_sub_agents: cfg.enable_extra_sub_agents,
-            handoff_strategy: cfg.handoff_strategy,
             source: 'org', // TODO: detect from raw config
           };
         }
@@ -511,7 +507,6 @@ export default function AgentSettingsPage() {
               prompt: editingAgent.prompt,
               // Use canonical sub_agents dict format: {agent_id: boolean}
               sub_agents: editingAgent.sub_agents,
-              handoff_strategy: editingAgent.handoff_strategy,
             },
           },
         }),
@@ -1157,7 +1152,6 @@ export default function AgentSettingsPage() {
                                               ...editingAgent.sub_agents,
                                               [agentId]: true,
                                             },
-                                            handoff_strategy: editingAgent.handoff_strategy || 'agent_as_tool',
                                           });
                                         }}
                                         className="flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-lg border border-dashed border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-400 hover:border-slate-400 hover:text-slate-500 dark:hover:text-slate-300 transition-colors"

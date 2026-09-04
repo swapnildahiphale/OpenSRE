@@ -4,8 +4,7 @@ Integration test for Enhanced Config-Driven Agent Building.
 
 Tests the complete implementation:
 1. Config loading with new fields (ModelConfig, max_turns)
-2. Model settings application via environment variables
-3. Backward compatibility
+2. Backward compatibility
 """
 
 import sys
@@ -23,13 +22,11 @@ def test_config_loading():
     agent = AgentConfig(
         enabled=True,
         name="test",
-        model=ModelConfig(temperature=0.3, max_tokens=4000, top_p=0.9),
+        model=ModelConfig(name="opus"),
         max_turns=50,
     )
 
-    assert agent.model.temperature == 0.3
-    assert agent.model.max_tokens == 4000
-    assert agent.model.top_p == 0.9
+    assert agent.model.name == "opus"
     assert agent.max_turns == 50
     print("✅ Config loading with new fields works!")
 
@@ -48,37 +45,9 @@ def test_backward_compatibility():
 
     # New fields should have defaults
     assert agent.model.name == "claude-sonnet-4-6"
-    assert agent.model.temperature is None
     assert agent.max_turns is None
 
     print("✅ Backward compatibility maintained!")
-
-
-def test_model_settings_environment():
-    """Test that model settings are applied via environment variables."""
-    import os
-
-    from config import AgentConfig, ModelConfig
-
-    # Create agent with model settings
-    agent = AgentConfig(
-        name="test", model=ModelConfig(temperature=0.5, max_tokens=3000, top_p=0.95)
-    )
-
-    # Simulate what agent.py does
-    if agent.model.temperature is not None:
-        os.environ["LLM_TEMPERATURE"] = str(agent.model.temperature)
-    if agent.model.max_tokens is not None:
-        os.environ["LLM_MAX_TOKENS"] = str(agent.model.max_tokens)
-    if agent.model.top_p is not None:
-        os.environ["LLM_TOP_P"] = str(agent.model.top_p)
-
-    # Verify environment variables are set
-    assert os.environ.get("LLM_TEMPERATURE") == "0.5"
-    assert os.environ.get("LLM_MAX_TOKENS") == "3000"
-    assert os.environ.get("LLM_TOP_P") == "0.95"
-
-    print("✅ Model settings environment variables work!")
 
 
 def test_complete_integration():
@@ -90,11 +59,10 @@ def test_complete_integration():
         "agents": {
             "planner": {
                 "enabled": True,
-                "model": {"temperature": 0.3, "max_tokens": 4000},
+                "model": {"name": "opus"},
                 "max_turns": 50,
                 "prompt": {
                     "system": "You are a planner agent",
-                    "prefix": "Planning and coordination",
                 },
                 "tools": {"enabled": ["*"]},
             },
@@ -103,21 +71,18 @@ def test_complete_integration():
                 "max_turns": 40,
                 "prompt": {
                     "system": "You are an investigator",
-                    "prefix": "Incident investigation",
                 },
             },
             "k8s": {
                 "enabled": True,
                 "prompt": {
                     "system": "You are a k8s specialist",
-                    "prefix": "Kubernetes debugging",
                 },
             },
             "metrics": {
                 "enabled": True,
                 "prompt": {
                     "system": "You are a metrics analyst",
-                    "prefix": "Metrics analysis",
                 },
             },
         }
@@ -135,17 +100,10 @@ def test_complete_integration():
         agents[name] = AgentConfig(
             enabled=cfg.get("enabled", True),
             name=name,
-            model=ModelConfig(
-                name=model_data.get("name", "claude-sonnet-4-6"),
-                temperature=model_data.get("temperature"),
-                max_tokens=model_data.get("max_tokens"),
-                top_p=model_data.get("top_p"),
-            ),
+            model=ModelConfig(name=model_data.get("name", "claude-sonnet-4-6")),
             max_turns=cfg.get("max_turns"),
             prompt=PromptConfig(
                 system=prompt_data.get("system", ""),
-                prefix=prompt_data.get("prefix", ""),
-                suffix=prompt_data.get("suffix", ""),
             ),
             tools=ToolsConfig(
                 enabled=tools_data.get("enabled", ["*"]),
@@ -155,15 +113,14 @@ def test_complete_integration():
 
     # Verify agents were parsed correctly
     assert len(agents) == 4
-    assert agents["planner"].model.temperature == 0.3
+    assert agents["planner"].model.name == "opus"
     assert agents["planner"].max_turns == 50
     assert agents["investigation"].max_turns == 40
     assert agents["k8s"].max_turns is None
 
     print(f"  ✅ Loaded {len(agents)} agents")
     print(f"  ✅ Planner has {agents['planner'].max_turns} max_turns")
-    print(f"  ✅ Planner temperature: {agents['planner'].model.temperature}")
-    print(f"  ✅ Planner max_tokens: {agents['planner'].model.max_tokens}")
+    print(f"  ✅ Planner model: {agents['planner'].model.name}")
 
     print("\n✅ Complete integration test passed!")
 
@@ -176,7 +133,6 @@ if __name__ == "__main__":
     try:
         test_config_loading()
         test_backward_compatibility()
-        test_model_settings_environment()
         test_complete_integration()
 
         print("\n" + "=" * 60)

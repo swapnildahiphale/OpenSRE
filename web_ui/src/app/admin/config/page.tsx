@@ -10,8 +10,8 @@ interface AgentConfig {
   enabled: boolean;
   name: string;
   description?: string;
-  model: { name: string; temperature: number; max_tokens?: number };
-  prompt: { system: string; prefix: string; suffix: string };
+  model: { name: string };
+  prompt: { system: string };
   max_turns: number;
   tools: { [tool_id: string]: boolean };  // Changed from {enabled: [], disabled: []}
   sub_agents: { [agent_id: string]: boolean };  // Changed from string[]
@@ -20,7 +20,6 @@ interface AgentConfig {
   enable_extra_tools?: string[];  // Extra tools to enable
   disable_default_sub_agents?: string[];  // Sub-agents from default set to disable
   enable_extra_sub_agents?: string[];  // Extra sub-agents to enable
-  handoff_strategy?: string;  // Strategy for sub-agent handoff
 }
 
 interface RemoteAgentConfig {
@@ -507,14 +506,10 @@ export default function AdminConfigPage() {
       description: '',
       enabled: true,
       model: {
-        name: 'gpt-5.2',
-        temperature: 0.3,
-        max_tokens: 16000,
+        name: 'inherit',
       },
       prompt: {
         system: '',
-        prefix: '',
-        suffix: '',
       },
       tools: {
         think: true,
@@ -1164,13 +1159,13 @@ export default function AdminConfigPage() {
                               <h3 className="font-semibold text-white">Model</h3>
                             </div>
 
-                            <div className="grid grid-cols-3 gap-4">
+                            <div className="grid grid-cols-2 gap-4">
                               <div>
                                 <label className="block text-xs font-medium text-stone-500 mb-1">
                                   Model Name
                                 </label>
                                 <select
-                                  value={agentDraft.model?.name || 'gpt-5.2'}
+                                  value={agentDraft.model?.name || 'inherit'}
                                   onChange={(e) =>
                                     setAgentDraft({
                                       ...agentDraft,
@@ -1179,38 +1174,11 @@ export default function AdminConfigPage() {
                                   }
                                   className="w-full px-3 py-2 text-sm rounded-lg border border-stone-600 bg-stone-900 text-white"
                                 >
-                                  <option value="gpt-5">gpt-5</option>
-                                  <option value="gpt-5.2">gpt-5.2</option>
-                                  <option value="gpt-5.2-mini">gpt-5.2-mini</option>
-                                  <option value="gpt-4-turbo">gpt-4-turbo</option>
-                                  <option value="gpt-3.5-turbo">gpt-3.5-turbo</option>
-                                  <option value="o1">o1</option>
-                                  <option value="o3-mini">o3-mini</option>
-                                  <option value="o4-mini">o4-mini</option>
+                                  <option value="inherit">inherit</option>
+                                  <option value="sonnet">sonnet</option>
+                                  <option value="opus">opus</option>
+                                  <option value="haiku">haiku</option>
                                 </select>
-                              </div>
-
-                              <div>
-                                <label className="block text-xs font-medium text-stone-500 mb-1">
-                                  Temperature
-                                </label>
-                                <input
-                                  type="number"
-                                  step="0.1"
-                                  min="0"
-                                  max="2"
-                                  value={agentDraft.model?.temperature ?? 0.4}
-                                  onChange={(e) =>
-                                    setAgentDraft({
-                                      ...agentDraft,
-                                      model: {
-                                        ...agentDraft.model,
-                                        temperature: parseFloat(e.target.value) || 0,
-                                      } as AgentConfig['model'],
-                                    })
-                                  }
-                                  className="w-full px-3 py-2 text-sm rounded-lg border border-stone-600 bg-stone-900 text-white"
-                                />
                               </div>
 
                               <div>
@@ -1268,7 +1236,7 @@ export default function AdminConfigPage() {
                                   onChange={(e) =>
                                     setAgentDraft({
                                       ...agentDraft,
-                                      prompt: { ...(agentDraft.prompt || { system: '', prefix: '', suffix: '' }), system: e.target.value },
+                                      prompt: { ...(agentDraft.prompt || { system: '' }), system: e.target.value },
                                     })
                                   }
                                   rows={12}
@@ -1731,7 +1699,6 @@ export default function AdminConfigPage() {
                                                         ...agentSubAgents,
                                                         [agentId]: true
                                                       },
-                                                      handoff_strategy: agentDraft.handoff_strategy || 'agent_as_tool'
                                                     });
                                                   }}
                                                   className={`flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-lg border border-dashed transition-colors ${

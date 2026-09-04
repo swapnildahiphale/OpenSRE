@@ -696,6 +696,15 @@ wheels = [
 ]
 
 [[package]]
+name = "mistune"
+version = "3.3.4"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/7b/92/328a294a6de83bacb95bed01f04e0eaff4e3616ee359fc821a5dfc539b02/mistune-3.3.4.tar.gz", hash = "sha256:58b5c96d6fcb61190dfe5fae498d2b2065f99cf61e9649418fd54cf1ada86dfe", size = 121426, upload-time = "2026-07-22T05:22:30.89Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/77/e4/288365afae98953bc01de09f686f40d8ee84578135aa7767d5d4e60b5278/mistune-3.3.4-py3-none-any.whl", hash = "sha256:ee015381e955e370962968befe1d729ab60fafb6a715ac6751763fbce38c8d4a", size = 66862, upload-time = "2026-07-22T05:22:29.419Z" },
+]
+
+[[package]]
 name = "msal"
 version = "1.37.0"
 source = { registry = "https://pypi.org/simple" }
@@ -834,6 +843,7 @@ dependencies = [
     { name = "aiohttp" },
     { name = "microsoft-teams-apps" },
     { name = "microsoft-teams-cards" },
+    { name = "mistune" },
     { name = "python-dotenv" },
 ]
 
@@ -848,6 +858,7 @@ requires-dist = [
     { name = "aiohttp", specifier = ">=3.9.0" },
     { name = "microsoft-teams-apps", specifier = ">=2.0.14" },
     { name = "microsoft-teams-cards", specifier = ">=2.0.14" },
+    { name = "mistune", specifier = ">=3.0.0" },
     { name = "python-dotenv", specifier = ">=1.0.0" },
 ]
 

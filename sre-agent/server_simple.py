@@ -34,7 +34,7 @@ from memory.neo4j_conn import NEO4J_DATABASE, get_driver
 from memory.retrieval import EpisodeRetriever
 from memory.store import EpisodeStore
 from pydantic import BaseModel
-from report import extract_structured_report
+from report import clean_and_extract
 from tool_output_sanitize import sanitize_tool_end_payload
 
 logger = logging.getLogger(__name__)
@@ -98,13 +98,14 @@ def finalize_investigation(
         )
     except Exception as e:
         logger.error("[MEMORY] finalize failed: %s", e)
+    display_text, structured = clean_and_extract(result_text or "")
     _complete_agent_run(
         thread_id=thread_id,
         success=success,
-        result_text=result_text,
+        result_text=display_text,
         tool_calls=tool_calls,
         duration_seconds=duration_seconds,
-        output_json=extract_structured_report(result_text or ""),
+        output_json=structured,
         sdk_session_id=sdk_session_id,
         tool_calls_count=tool_calls_count,
         run_status=run_status,
@@ -291,7 +292,7 @@ def _tool_call_record(
     depth = data.get("depth", 0)
     agent_name = data.get("agent_type") or root_agent
     # depth 0 == root agent's own call -> no parent. Otherwise the real parent
-    # agent type (e.g. "investigation" for a grandchild under it), falling back
+    # agent type (e.g. "kubernetes" for a grandchild under it), falling back
     # to root_agent if the hook somehow didn't populate it.
     if depth == 0:
         parent_agent = None
@@ -923,12 +924,13 @@ async def create_investigation_stream(
             event_type = response["event"]
             data = response["data"]
 
-            # Task 6: attach structured_report to result events when present
+            # Attach structured_report to result events when present, and
+            # strip the fence from the visible text so it never leaks into
+            # Slack/Teams/web_ui as raw JSON (see report.clean_and_extract).
             if event_type == "result" and isinstance(data, dict):
-                result_text_for_report = data.get("text", "")
-                structured = extract_structured_report(result_text_for_report)
+                display_text, structured = clean_and_extract(data.get("text", ""))
                 if structured is not None:
-                    data = {**data, "structured_report": structured}
+                    data = {**data, "text": display_text, "structured_report": structured}
 
             # Emit SSE event in same format as sandbox mode
             # Format: data: {"type": "...", "data": {...}, "thread_id": "...", "timestamp": "..."}

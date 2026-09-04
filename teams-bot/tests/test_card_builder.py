@@ -38,3 +38,18 @@ def test_final_card_shows_error():
     card = build_final_card(result_text=None, error="Agent timed out")
     assert "timed out" in str(card).lower()
     assert "Investigation failed" not in str(card)
+
+
+def test_final_card_converts_markdown_report_into_multiple_blocks():
+    text = "**Root cause**\n\n- one\n- two\n"
+    card = build_final_card(result_text=text, error=None)
+    assert card["body"] == [
+        {"type": "TextBlock", "text": "**Root cause**", "wrap": True},
+        {"type": "TextBlock", "text": "• one", "wrap": True, "spacing": "None"},
+        {"type": "TextBlock", "text": "• two", "wrap": True, "spacing": "None"},
+    ]
+
+
+def test_final_card_error_path_is_a_single_text_block():
+    card = build_final_card(result_text=None, error="Agent timed out")
+    assert card["body"] == [{"type": "TextBlock", "text": "Agent timed out", "wrap": True}]

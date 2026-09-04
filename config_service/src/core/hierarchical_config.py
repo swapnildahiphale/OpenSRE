@@ -401,258 +401,136 @@ def hash_config(config: Dict[str, Any]) -> str:
 
 
 def get_default_agent_config() -> Dict[str, Any]:
-    """
-    Get the default agent configuration.
+    """Get the default agent configuration.
 
-    This is the baseline that all orgs start with.
-    Teams inherit from org, which inherits from this.
+    This is the baseline that all orgs start with. Teams inherit from org,
+    which inherits from this.
 
-    Uses STARSHIP TOPOLOGY:
-    - Planner (orchestrator) → investigation, coding, writeup
-    - Investigation (sub-orchestrator) → github, k8s, aws, metrics, log_analysis
+    FLAT TOPOLOGY: the root agent (planner) dispatches specialists directly.
+    The Claude Agent SDK registers every reachable agent as a peer in one
+    registry, so a mid-tier orchestrator was never a real parent — only prose.
+
+    `description` is load-bearing: the SDK routes sub-agent selection on it and
+    competes against its own built-in general-purpose agent, so each one names
+    concrete signals rather than a role.
+
+    Tools are deliberately not declared. `resolve_agent_tools()` returns None
+    for anything that is not an SDK tool name, so agents inherit the session
+    tool set; declaring names here would only document a restriction that does
+    not apply. Model sampling knobs are absent because the SDK cannot express
+    them.
     """
     return {
         "agents": {
-            # =================================================================
-            # TOP-LEVEL ORCHESTRATOR
-            # =================================================================
             "planner": {
                 "enabled": True,
                 "name": "Planner",
-                "description": "Top-level orchestrator that delegates to 3 specialized agents",
-                "model": {"name": "inherit", "temperature": 0.3, "max_tokens": 16000},
-                "prompt": {
-                    "system": DEFAULT_PROMPTS.get("planner", ""),
-                    "prefix": "",
-                    "suffix": "",
-                },
+                "description": (
+                    "Root incident coordinator: triages severity, investigates "
+                    "directly, and dispatches specialists when a domain needs depth"
+                ),
+                "model": {"name": "inherit"},
+                "prompt": {"system": DEFAULT_PROMPTS.get("planner", "")},
                 "max_turns": 50,
-                "tools": {"think": True, "llm_call": True, "web_search": True},
-                # STARSHIP: Only 3 top-level agents
                 "sub_agents": {
-                    "investigation": True,
-                    "coding": True,
-                    "writeup": True,
-                },
-                "mcps": {},  # No MCPs by default, teams can add
-                "handoff_strategy": "agent_as_tool",
-            },
-            # =================================================================
-            # SUB-ORCHESTRATOR (Investigation has its own sub-agents)
-            # =================================================================
-            "investigation": {
-                "enabled": True,
-                "name": "Investigation Agent",
-                "description": "Sub-orchestrator for incident investigation with 5 specialized sub-agents",
-                "model": {"name": "inherit", "temperature": 0.4, "max_tokens": 16000},
-                "prompt": {
-                    "system": DEFAULT_PROMPTS.get("investigation", ""),
-                    "prefix": "",
-                    "suffix": "",
-                },
-                "max_turns": 25,
-                "tools": {"think": True, "llm_call": True, "web_search": True},
-                # STARSHIP: Investigation coordinates specialized agents
-                "sub_agents": {
-                    "github": True,
                     "kubernetes": True,
                     "aws": True,
                     "metrics": True,
                     "log_analysis": True,
-                    "traces": True,
+                    "github": True,
+                    "coding": True,
+                    "writeup": True,
                 },
-                "mcps": {},
-            },
-            # =================================================================
-            # TOP-LEVEL AGENTS (from Planner)
-            # =================================================================
-            "coding": {
-                "enabled": True,
-                "name": "Coding Agent",
-                "description": "Code analysis, debugging, and fixes",
-                "model": {"name": "inherit", "temperature": 0.4, "max_tokens": 16000},
-                "prompt": {
-                    "system": DEFAULT_PROMPTS.get("coding", ""),
-                    "prefix": "",
-                    "suffix": "",
-                },
-                "max_turns": 20,
-                "tools": {
-                    "think": True,
-                    "llm_call": True,
-                    "web_search": True,
-                    "read_file": True,
-                    "write_file": True,
-                    "list_directory": True,
-                    "repo_search_text": True,
-                    "python_run_tests": True,
-                    "pytest_run": True,
-                    "run_linter": True,
-                    "git_status": True,
-                    "git_diff": True,
-                    "git_log": True,
-                    "git_blame": True,
-                    "git_show": True,
-                    "git_branch_list": True,
-                },
-                "sub_agents": {},
-                "mcps": {},
-            },
-            "writeup": {
-                "enabled": True,
-                "name": "Writeup Agent",
-                "description": "Blameless postmortem and incident documentation",
-                "model": {"name": "inherit", "temperature": 0.5, "max_tokens": 16000},
-                "prompt": {
-                    "system": DEFAULT_PROMPTS.get("writeup", ""),
-                    "prefix": "",
-                    "suffix": "",
-                },
-                "max_turns": 15,
-                "tools": {"think": True, "llm_call": True, "web_search": True},
-                "sub_agents": {},
-                "mcps": {},
-            },
-            # =================================================================
-            # SUB-AGENTS (from Investigation)
-            # =================================================================
-            "github": {
-                "enabled": True,
-                "name": "GitHub Agent",
-                "description": "GitHub repository analysis for change correlation",
-                "model": {"name": "inherit", "temperature": 0.3, "max_tokens": 16000},
-                "prompt": {
-                    "system": DEFAULT_PROMPTS.get("github", ""),
-                    "prefix": "",
-                    "suffix": "",
-                },
-                "max_turns": 15,
-                "tools": {
-                    "think": True,
-                    "llm_call": True,
-                    "read_github_file": True,
-                    "search_github_code": True,
-                    "list_pull_requests": True,
-                    "list_issues": True,
-                    "git_log": True,
-                    "git_show": True,
-                    "git_diff": True,
-                },
-                "sub_agents": {},
                 "mcps": {},
             },
             "kubernetes": {
                 "enabled": True,
                 "name": "Kubernetes Agent",
-                "description": "Kubernetes troubleshooting and operations",
-                "model": {"name": "inherit", "temperature": 0.3, "max_tokens": 16000},
-                "prompt": {
-                    "system": DEFAULT_PROMPTS.get("k8s", ""),
-                    "prefix": "",
-                    "suffix": "",
-                },
+                "description": (
+                    "Kubernetes and container diagnosis: CrashLoopBackOff, OOMKilled, "
+                    "Pending pods, failing deployments, pod events and container logs"
+                ),
+                "model": {"name": "inherit"},
+                "prompt": {"system": DEFAULT_PROMPTS.get("kubernetes", "")},
                 "max_turns": 15,
-                "tools": {
-                    "think": True,
-                    "llm_call": True,
-                    "web_search": True,
-                    "list_pods": True,
-                    "describe_pod": True,
-                    "get_pod_logs": True,
-                    "get_pod_events": True,
-                    "get_pod_resource_usage": True,
-                    "describe_deployment": True,
-                    "get_deployment_history": True,
-                    "describe_service": True,
-                    "docker_ps": True,
-                    "docker_logs": True,
-                    "docker_inspect": True,
-                    "docker_exec": True,
-                    "docker_stats": True,
-                },
                 "sub_agents": {},
                 "mcps": {},
             },
             "aws": {
                 "enabled": True,
                 "name": "AWS Agent",
-                "description": "AWS resource management and debugging",
-                "model": {"name": "inherit", "temperature": 0.3, "max_tokens": 16000},
-                "prompt": {
-                    "system": DEFAULT_PROMPTS.get("aws", ""),
-                    "prefix": "",
-                    "suffix": "",
-                },
+                "description": (
+                    "AWS resource diagnosis: RDS connection exhaustion, Lambda "
+                    "timeouts, ECS task failures, load balancer and CloudWatch signals"
+                ),
+                "model": {"name": "inherit"},
+                "prompt": {"system": DEFAULT_PROMPTS.get("aws", "")},
                 "max_turns": 15,
-                "tools": {
-                    "think": True,
-                    "llm_call": True,
-                    "web_search": True,
-                    "describe_ec2_instance": True,
-                    "describe_lambda_function": True,
-                    "get_rds_instance_status": True,
-                    "list_ecs_tasks": True,
-                    "get_cloudwatch_logs": True,
-                    "query_cloudwatch_insights": True,
-                    "get_cloudwatch_metrics": True,
-                },
                 "sub_agents": {},
                 "mcps": {},
             },
             "metrics": {
                 "enabled": True,
                 "name": "Metrics Agent",
-                "description": "Metrics analysis and anomaly detection",
-                "model": {"name": "inherit", "temperature": 0.2, "max_tokens": 16000},
-                "prompt": {
-                    "system": DEFAULT_PROMPTS.get("metrics", ""),
-                    "prefix": "",
-                    "suffix": "",
-                },
+                "description": (
+                    "Metric anomaly detection and correlation: error-rate and latency "
+                    "spikes, change points, saturation, and dependency degradation"
+                ),
+                "model": {"name": "inherit"},
+                "prompt": {"system": DEFAULT_PROMPTS.get("metrics", "")},
                 "max_turns": 15,
-                "tools": {
-                    "think": True,
-                    "llm_call": True,
-                    "web_search": True,
-                    "get_cloudwatch_metrics": True,
-                    "query_cloudwatch_insights": True,
-                    "detect_anomalies": True,
-                    "correlate_metrics": True,
-                    "find_change_point": True,
-                    "forecast_metric": True,
-                    "analyze_metric_distribution": True,
-                    "grafana_list_dashboards": True,
-                    "grafana_get_dashboard": True,
-                    "grafana_query_prometheus": True,
-                    "grafana_list_datasources": True,
-                    "grafana_get_annotations": True,
-                    "grafana_get_alerts": True,
-                },
                 "sub_agents": {},
                 "mcps": {},
             },
             "log_analysis": {
                 "enabled": True,
                 "name": "Log Analysis Agent",
-                "description": "Partition-first log investigation specialist",
-                "model": {"name": "inherit", "temperature": 0.2, "max_tokens": 16000},
-                "prompt": {
-                    "system": DEFAULT_PROMPTS.get("log_analysis", ""),
-                    "prefix": "",
-                    "suffix": "",
-                },
+                "description": (
+                    "High-volume log investigation: error-pattern extraction, log "
+                    "signatures, and correlating log bursts against incident timing"
+                ),
+                "model": {"name": "inherit"},
+                "prompt": {"system": DEFAULT_PROMPTS.get("log_analysis", "")},
                 "max_turns": 15,
-                "tools": {
-                    "think": True,
-                    "llm_call": True,
-                    "get_log_statistics": True,
-                    "sample_logs": True,
-                    "search_logs_by_pattern": True,
-                    "extract_log_signatures": True,
-                    "get_logs_around_timestamp": True,
-                    "correlate_logs_with_events": True,
-                    "detect_log_anomalies": True,
-                },
+                "sub_agents": {},
+                "mcps": {},
+            },
+            "github": {
+                "enabled": True,
+                "name": "GitHub Agent",
+                "description": (
+                    "Change correlation: recent deployments, commits, pull requests "
+                    "and diffs that line up with when the incident started"
+                ),
+                "model": {"name": "inherit"},
+                "prompt": {"system": DEFAULT_PROMPTS.get("github", "")},
+                "max_turns": 15,
+                "sub_agents": {},
+                "mcps": {},
+            },
+            "coding": {
+                "enabled": True,
+                "name": "Coding Agent",
+                "description": (
+                    "Source-level analysis and fixes: reading application code, "
+                    "locating a defect in a diff, and proposing or making a change"
+                ),
+                "model": {"name": "inherit"},
+                "prompt": {"system": DEFAULT_PROMPTS.get("coding", "")},
+                "max_turns": 20,
+                "sub_agents": {},
+                "mcps": {},
+            },
+            "writeup": {
+                "enabled": True,
+                "name": "Writeup Agent",
+                "description": (
+                    "Blameless postmortem and incident documentation: timeline, "
+                    "contributing factors, and follow-up actions from findings"
+                ),
+                "model": {"name": "inherit"},
+                "prompt": {"system": DEFAULT_PROMPTS.get("writeup", "")},
+                "max_turns": 15,
                 "sub_agents": {},
                 "mcps": {},
             },

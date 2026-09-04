@@ -19,14 +19,8 @@ dependencies = [
     # Langfuse v4 (OpenTelemetry-based) powers both agent tracing and the
     # offline eval harness in evals/.
     "langfuse>=4.14.0,<5",
-    "datadog-api-client>=2.20.0",
     "httpx>=0.28.1",
     "requests>=2.32.5",
-
-    # VCS & Collaboration
-    "PyGithub>=2.1.0",
-    "slack-sdk>=3.27.0",
-    "atlassian-python-api>=3.41.0",  # Confluence integration
 
     # Knowledge Graph
     "neo4j>=5.14.0",
@@ -36,10 +30,7 @@ dependencies = [
 
     # Utilities
     "pyyaml>=6.0",
-
-    # Optional dependencies for advanced features
-    "numpy>=1.24.0",  # For anomaly detection
-    "scipy>=1.11.0",  # For statistical analysis
+    "mistune>=3.0.0",  # Markdown parser for the Jira ADF converter
 ]
 
 [build-system]
@@ -53,4 +44,7 @@ only-include = ["agent.py", "events.py", "sandbox_server.py", "server.py", "sand
 [dependency-groups]
 dev = [
     "pytest>=9.1.1",
+    # Required transitively: test_default_config_drift.py imports
+    # config_service's core.hierarchical_config, which imports structlog.
+    "structlog>=23.0.0",
 ]
