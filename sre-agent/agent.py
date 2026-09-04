@@ -875,6 +875,10 @@ class TextSegmentBuffer:
         return (fallback or "").strip()
 
 
+class NoPendingQuestionError(RuntimeError):
+    """Raised when an answer arrives without an active user question."""
+
+
 class InteractiveAgentSession:
     """
     Manages a persistent ClaudeSDKClient session that supports interrupts.
@@ -2061,12 +2065,11 @@ class InteractiveAgentSession:
 
     async def provide_answer(self, answers: dict) -> None:
         """Provide answer to pending AskUserQuestion."""
-        if (
-            hasattr(self, "_pending_answer_event")
-            and self._pending_answer_event is not None
-        ):
-            self._pending_answer = answers
-            self._pending_answer_event.set()
+        if not hasattr(self, "_pending_answer_event") or self._pending_answer_event is None:
+            raise NoPendingQuestionError("No pending question")
+
+        self._pending_answer = answers
+        self._pending_answer_event.set()
 
 
 def create_agent_session(thread_id: str, team_config=None):
