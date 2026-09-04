@@ -5,7 +5,7 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { clsx } from 'clsx';
-import { ChevronDown, Clock, Search } from 'lucide-react';
+import { ChevronDown, Clock, RotateCw, Search } from 'lucide-react';
 import { formatRelativeTime } from '@/lib/formatRelativeTime';
 import { Button, Chip, EmptyState, Panel, Skeleton, listRowHoverClass } from '@/components/ui-flow';
 
@@ -29,6 +29,7 @@ interface Episode {
   effectiveness_score: number | null;
   duration_seconds: number | null;
   created_at: string | null;
+  extraction_status?: 'ok' | 'failed';
 }
 
 const ISSUE_TYPE_INITIAL = 5;
@@ -120,6 +121,7 @@ export default function EpisodesPage() {
   const [sortBy, setSortBy] = useState<'newest' | 'effectiveness'>('newest');
   const [issueTypeVisibleCount, setIssueTypeVisibleCount] = useState(ISSUE_TYPE_INITIAL);
   const [manualExpandedId, setManualExpandedId] = useState<string | null>(null);
+  const [retryingId, setRetryingId] = useState<string | null>(null);
   const scrolledToDeepLink = useRef(false);
 
   useEffect(() => {
@@ -246,6 +248,25 @@ export default function EpisodesPage() {
 
   const toggleExpand = (id: string) => {
     setManualExpandedId((prev) => (prev === id ? null : id));
+  };
+
+  const retryExtract = async (episodeId: string) => {
+    setRetryingId(episodeId);
+    try {
+      const res = await fetch(`/api/memory/episodes/${episodeId}/reextract`, {
+        method: 'POST',
+      });
+      const data = await res.json();
+      if (res.ok && data.episode) {
+        setEpisodes((prev) =>
+          prev.map((ep) => (ep.episode_id === episodeId ? data.episode : ep)),
+        );
+      }
+    } catch {
+      // leave row as failed
+    } finally {
+      setRetryingId(null);
+    }
   };
 
   if (loading) {
@@ -422,6 +443,11 @@ export default function EpisodesPage() {
                           <span className="text-[14.5px] text-slate-900">
                             {ep.issue_type || 'unknown'}
                           </span>
+                          {ep.extraction_status === 'failed' && (
+                            <span className="inline-flex items-center h-5 px-2 rounded-full text-[10px] font-medium tracking-wide bg-slate-100 text-slate-600">
+                              couldn’t summarize
+                            </span>
+                          )}
                           {ep.severity && (
                             <span
                               className={clsx(
@@ -511,6 +537,23 @@ export default function EpisodesPage() {
                               {c.type}:{c.name}
                             </span>
                           ))}
+                        </div>
+                      )}
+                      {ep.extraction_status === 'failed' && (
+                        <div className="flex items-center justify-between gap-3 mb-4">
+                          <p className="text-sm text-slate-500">Couldn’t summarize this investigation.</p>
+                          <button
+                            type="button"
+                            disabled={retryingId === ep.episode_id}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              void retryExtract(ep.episode_id);
+                            }}
+                            className="inline-flex items-center gap-1.5 text-sm text-emerald-700 hover:underline disabled:opacity-50"
+                          >
+                            <RotateCw className="w-3.5 h-3.5" />
+                            Retry
+                          </button>
                         </div>
                       )}
                       {ep.effectiveness_score != null && (

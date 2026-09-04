@@ -133,6 +133,7 @@ def finalize_investigation(
             root_cause=ext.root_cause,
             summary=ext.summary,
             effectiveness_score=compute_effectiveness(ext.resolved, ext.root_cause),
+            extraction_status=ext.status,
             duration_seconds=duration_seconds,
             created_at=(prior.created_at if prior else now),
             updated_at=now,

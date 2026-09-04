@@ -1146,9 +1146,38 @@ def _episode_row(r: dict) -> dict:
         "summary": e.get("summary"),
         "effectiveness_score": e.get("effectiveness_score"),
         "skills_used": e.get("skills_used", []),
+        "extraction_status": e.get("extraction_status") or "ok",
         "created_at": e.get("created_at"),
         "updated_at": e.get("updated_at"),
     }
+
+
+def _episode_from_model(ep) -> dict:
+    import json as _json
+
+    services = [c.name for c in ep.components if c.type == "service"]
+    return _episode_row(
+        {
+            "e": {
+                "episode_id": ep.episode_id,
+                "correlation_id": ep.correlation_id,
+                "agent_run_id": ep.agent_run_id,
+                "issue_type": ep.issue_type,
+                "issue_description": ep.issue_description,
+                "severity": ep.severity,
+                "components_json": _json.dumps([c.model_dump() for c in ep.components]),
+                "resolved": ep.resolved,
+                "root_cause": ep.root_cause,
+                "summary": ep.summary,
+                "effectiveness_score": ep.effectiveness_score,
+                "skills_used": ep.skills_used,
+                "extraction_status": ep.extraction_status,
+                "created_at": ep.created_at,
+                "updated_at": ep.updated_at,
+            },
+            "services": services,
+        }
+    )
 
 
 @app.get("/memory/episodes")
@@ -1170,6 +1199,7 @@ async def memory_stats(request: Request):
     org_id, team_node_id = _tenancy_from_request(request)
     q = (
         "MATCH (e:Episode {org_id:$org, team_node_id:$team}) "
+        "WHERE (e.extraction_status IS NULL OR e.extraction_status <> 'failed') "
         "RETURN count(e) AS total, "
         "sum(CASE WHEN e.resolved THEN 1 ELSE 0 END) AS resolved, "
         "collect(DISTINCT e.issue_type) AS issue_types"
@@ -1222,6 +1252,7 @@ async def memory_overview(request: Request):
         stats_rec = sess.run(
             """
             MATCH (e:Episode {org_id:$org, team_node_id:$team})
+            WHERE (e.extraction_status IS NULL OR e.extraction_status <> 'failed')
             RETURN count(e) AS total,
                    sum(CASE WHEN e.resolved THEN 1 ELSE 0 END) AS resolved
             """,
@@ -1233,6 +1264,7 @@ async def memory_overview(request: Request):
             """
             MATCH (e:Episode {org_id:$org, team_node_id:$team})
             WHERE e.issue_type IS NOT NULL AND e.issue_type <> ''
+              AND (e.extraction_status IS NULL OR e.extraction_status <> 'failed')
             RETURN e.issue_type AS issue_type, count(*) AS count
             ORDER BY count DESC
             """,
@@ -1243,6 +1275,7 @@ async def memory_overview(request: Request):
         recent_rows = sess.run(
             """
             MATCH (e:Episode {org_id:$org, team_node_id:$team})
+            WHERE (e.extraction_status IS NULL OR e.extraction_status <> 'failed')
             OPTIONAL MATCH (e)-[:AFFECTED]->(s:Service)
             RETURN e AS e, collect(s.name) AS services
             ORDER BY coalesce(e.updated_at, e.created_at) DESC
@@ -1256,6 +1289,7 @@ async def memory_overview(request: Request):
             """
             MATCH (e:Episode {org_id:$org, team_node_id:$team})
             WHERE coalesce(e.updated_at, e.created_at) >= $week_ago
+              AND (e.extraction_status IS NULL OR e.extraction_status <> 'failed')
             RETURN count(e) AS count
             """,
             org=org_id,
@@ -1306,6 +1340,56 @@ async def memory_overview(request: Request):
             "latest_strategies": [_overview_strategy_row(r) for r in latest_strats],
         },
     }
+
+
+@app.post("/memory/episodes/{episode_id}/reextract")
+async def memory_reextract(request: Request, episode_id: str):
+    org_id, team_node_id = _tenancy_from_request(request)
+    store = EpisodeStore()
+    ep = store.get_by_episode_id(episode_id, org_id, team_node_id)
+    if not ep:
+        raise HTTPException(404, "episode not found")
+    if not ep.agent_run_id:
+        raise HTTPException(409, "episode has no agent run")
+    run = httpx.get(
+        f"{_CONFIG_SERVICE_URL}/api/v1/internal/agent-runs/{ep.agent_run_id}",
+        headers=_INTERNAL_HEADERS,
+        timeout=5.0,
+    )
+    if run.status_code == 404:
+        raise HTTPException(409, "agent run not found")
+    run.raise_for_status()
+    body = run.json()
+    prompt = body.get("trigger_message") or ""
+    result_text = body.get("output_summary") or ""
+    if len(result_text.strip()) < 50:
+        raise HTTPException(409, "agent run has no result to summarize")
+    tc_resp = httpx.get(
+        f"{_CONFIG_SERVICE_URL}/api/v1/internal/agent-runs/{ep.agent_run_id}/tool-calls",
+        headers=_INTERNAL_HEADERS,
+        timeout=5.0,
+    )
+    tool_calls = []
+    if tc_resp.is_success:
+        for tc in tc_resp.json().get("tool_calls") or []:
+            tool_calls.append(
+                {
+                    "tool_name": tc.get("tool_name"),
+                    "tool_input": tc.get("tool_input") or {},
+                    "tool_output": tc.get("tool_output"),
+                }
+            )
+    _il.finalize_investigation(
+        correlation_id=ep.correlation_id,
+        agent_run_id=ep.agent_run_id,
+        prompt=prompt,
+        result_text=result_text,
+        tool_calls=tool_calls,
+        org_id=org_id,
+        team_node_id=team_node_id,
+    )
+    updated = store.get_by_episode_id(episode_id, org_id, team_node_id)
+    return {"success": True, "result": _episode_from_model(updated)}
 
 
 @app.post("/memory/search")

@@ -62,6 +62,7 @@ class EpisodeStore:
             "summary": ep.summary,
             "effectiveness_score": ep.effectiveness_score,
             "duration_seconds": ep.duration_seconds,
+            "extraction_status": ep.extraction_status or "ok",
             "created_at": ep.created_at,
             "updated_at": ep.updated_at,
             "embedding": ep.embedding,
@@ -102,6 +103,24 @@ class EpisodeStore:
             return None
         return self._node_to_episode(dict(rec["e"]), correlation_id)
 
+    def get_by_episode_id(
+        self, episode_id: str, org_id: str, team_node_id: str
+    ) -> Optional[Episode]:
+        with self._session() as s:
+            rec = s.run(
+                """
+                MATCH (e:Episode {episode_id: $eid, org_id: $org, team_node_id: $team})
+                RETURN e AS e
+                """,
+                eid=episode_id,
+                org=org_id,
+                team=team_node_id,
+            ).single()
+        if not rec:
+            return None
+        n = dict(rec["e"])
+        return self._node_to_episode(n, n.get("correlation_id", ""))
+
     @staticmethod
     def _node_to_episode(n: dict, correlation_id: str) -> Episode:
         comps = [Component(**c) for c in json.loads(n.get("components_json", "[]"))]
@@ -122,6 +141,7 @@ class EpisodeStore:
             root_cause=n.get("root_cause"),
             summary=n.get("summary", ""),
             effectiveness_score=float(n.get("effectiveness_score", 0.1)),
+            extraction_status=n.get("extraction_status") or "ok",
             duration_seconds=n.get("duration_seconds"),
             created_at=n.get("created_at", ""),
             updated_at=n.get("updated_at", ""),

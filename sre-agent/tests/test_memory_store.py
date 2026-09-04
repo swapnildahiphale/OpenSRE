@@ -79,3 +79,11 @@ def test_get_by_correlation_roundtrip(clean_store):
         and got.root_cause == "dns"
         and got.issue_type == "latency-spike"
     )
+
+
+def test_extraction_status_roundtrip(clean_store):
+    ep = _episode("c-fail", None, False, 0.1)
+    ep.extraction_status = "failed"
+    clean_store.upsert_episode(ep)
+    got = clean_store.get_by_correlation("c-fail")
+    assert got is not None and got.extraction_status == "failed"

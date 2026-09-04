@@ -3,6 +3,7 @@
 import json
 import logging
 import os
+import re
 from dataclasses import dataclass, field
 from typing import List, Optional
 
@@ -12,20 +13,157 @@ logger = logging.getLogger(__name__)
 
 _MODEL = os.getenv("MEMORY_LLM_MODEL", "claude-haiku-4-5-20251001")
 
+EXTRACTION_JSON_SCHEMA = {
+    "type": "object",
+    "additionalProperties": False,
+    "required": [
+        "issue_type",
+        "issue_description",
+        "severity",
+        "components",
+        "root_cause",
+        "resolved",
+        "summary",
+    ],
+    "properties": {
+        "issue_type": {"type": "string"},
+        "issue_description": {"type": "string"},
+        "severity": {"type": ["string", "null"]},
+        "components": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "additionalProperties": False,
+                "required": ["type", "name"],
+                "properties": {
+                    "type": {"type": "string"},
+                    "name": {"type": "string"},
+                },
+            },
+        },
+        "root_cause": {"type": ["string", "null"]},
+        "resolved": {"type": "boolean"},
+        "summary": {"type": "string"},
+    },
+}
 
-def llm_text_completion(prompt: str, max_tokens: int = 300) -> str:
+
+def _initial_structured_cap() -> str:
+    provider = os.getenv("MEMORY_LLM_PROVIDER", "anthropic")
+    if provider == "openai_compat":
+        return "json_object"
+    return "json_schema"
+
+
+_structured_cap = _initial_structured_cap()
+
+
+def _anthropic_client():
+    from anthropic import Anthropic
+
+    return Anthropic()
+
+
+def _format_unsupported(exc: Exception) -> bool:
+    if isinstance(exc, TypeError):
+        return True
+    status = getattr(exc, "status_code", None)
+    if status == 400:
+        return True
+    msg = str(exc).lower()
+    return "output_config" in msg or "response_format" in msg
+
+
+def _extract_message_text(msg) -> str:
+    return "".join(
+        b.text for b in msg.content if getattr(b, "type", "") == "text"
+    ).strip()
+
+
+def _anthropic_messages_create(client, prompt: str, max_tokens: int, json_schema: dict | None):
+    """Create an Anthropic message, optionally with structured output config."""
+    global _structured_cap
+    kwargs = {
+        "model": _MODEL,
+        "max_tokens": max_tokens,
+        "messages": [{"role": "user", "content": prompt}],
+    }
+    if json_schema is not None and _structured_cap == "json_schema":
+        output_config = {"format": {"type": "json_schema", "schema": json_schema}}
+        try:
+            return client.messages.create(**kwargs, output_config=output_config)
+        except TypeError as e:
+            if "output_config" not in str(e):
+                raise
+            try:
+                return client.messages.create(
+                    **kwargs, extra_body={"output_config": output_config}
+                )
+            except Exception as e:
+                if not _format_unsupported(e):
+                    raise
+                _structured_cap = "prompt"
+                return client.messages.create(**kwargs)
+        except Exception as e:
+            if not _format_unsupported(e):
+                raise
+            _structured_cap = "prompt"
+            return client.messages.create(**kwargs)
+    return client.messages.create(**kwargs)
+
+
+def _openai_compat_completion(prompt: str, max_tokens: int, json_schema: dict | None) -> str:
+    """OpenAI-compatible chat completions via httpx (no OpenAI SDK)."""
+    global _structured_cap
+    import httpx
+
+    base = (os.getenv("OPENAI_BASE_URL") or os.getenv("ANTHROPIC_BASE_URL") or "").rstrip(
+        "/"
+    )
+    api_key = os.getenv("OPENAI_API_KEY") or os.getenv("ANTHROPIC_API_KEY") or ""
+    payload: dict = {
+        "model": _MODEL,
+        "max_tokens": max_tokens,
+        "messages": [{"role": "user", "content": prompt}],
+    }
+    if json_schema is not None and _structured_cap == "json_object":
+        payload["response_format"] = {"type": "json_object"}
     try:
-        from anthropic import Anthropic
-
-        client = Anthropic()
-        msg = client.messages.create(
-            model=_MODEL,
-            max_tokens=max_tokens,
-            messages=[{"role": "user", "content": prompt}],
+        resp = httpx.post(
+            f"{base}/chat/completions",
+            headers={"Authorization": f"Bearer {api_key}"},
+            json=payload,
+            timeout=60.0,
         )
-        return "".join(
-            b.text for b in msg.content if getattr(b, "type", "") == "text"
-        ).strip()
+        if resp.status_code == 400 and json_schema is not None:
+            body = resp.text.lower()
+            if "response_format" in body or "json_schema" in body:
+                _structured_cap = "prompt"
+                payload.pop("response_format", None)
+                resp = httpx.post(
+                    f"{base}/chat/completions",
+                    headers={"Authorization": f"Bearer {api_key}"},
+                    json=payload,
+                    timeout=60.0,
+                )
+        resp.raise_for_status()
+        data = resp.json()
+        return (data.get("choices") or [{}])[0].get("message", {}).get("content", "").strip()
+    except Exception as e:
+        logger.error("[MEMORY] openai_compat completion failed: %s", e)
+        return ""
+
+
+def llm_text_completion(
+    prompt: str, max_tokens: int = 300, json_schema: dict | None = None
+) -> str:
+    provider = os.getenv("MEMORY_LLM_PROVIDER", "anthropic")
+    try:
+        if provider == "openai_compat":
+            return _openai_compat_completion(prompt, max_tokens, json_schema)
+        client = _anthropic_client()
+        msg = _anthropic_messages_create(client, prompt, max_tokens, json_schema)
+        return _extract_message_text(msg)
     except Exception as e:
         logger.error("[MEMORY] LLM completion failed: %s", e)
         return ""
@@ -77,6 +215,7 @@ class Extraction:
     root_cause: Optional[str] = None
     resolved: bool = False
     summary: str = ""
+    status: str = "ok"
 
 
 _EXTRACT_PROMPT = """You are summarizing an SRE investigation into a compact JSON record.
@@ -117,13 +256,34 @@ def extract_investigation(
             f'{{"issue_type": "{prior.issue_type}", "root_cause": {json.dumps(prior.root_cause)}, '
             f'"resolved": {str(prior.resolved).lower()}, "summary": {json.dumps(prior.summary)}}}\n\n'
         )
-    raw = llm_text_completion(
-        _EXTRACT_PROMPT.format(
-            prior_block=prior_block, prompt=prompt[:2000], result=result_text[:4000]
-        ),
-        max_tokens=500,
+    prompt_text = _EXTRACT_PROMPT.format(
+        prior_block=prior_block, prompt=prompt[:2000], result=result_text[:4000]
     )
+    try:
+        raw = llm_text_completion(
+            prompt_text, max_tokens=500, json_schema=EXTRACTION_JSON_SCHEMA
+        )
+    except Exception:
+        raw = ""
+    if not raw:
+        try:
+            raw = llm_text_completion(
+                prompt_text, max_tokens=500, json_schema=EXTRACTION_JSON_SCHEMA
+            )
+        except Exception:
+            raw = ""
     data = _safe_json(raw)
+    if not data and (not raw.strip() or not _raw_looks_like_json_object(raw)):
+        return Extraction(
+            issue_type="unknown",
+            issue_description=prompt[:200],
+            severity=None,
+            components=[],
+            root_cause=None,
+            resolved=False,
+            summary=result_text[:200] if result_text else "",
+            status="failed",
+        )
     comps = [
         Component(type=c.get("type", "unknown"), name=c.get("name", ""))
         for c in data.get("components", [])
@@ -137,7 +297,17 @@ def extract_investigation(
         root_cause=data.get("root_cause"),
         resolved=bool(data.get("resolved", False)),
         summary=data.get("summary") or (result_text[:200] if result_text else ""),
+        status="ok",
     )
+
+
+def _raw_looks_like_json_object(raw: str) -> bool:
+    s = raw.strip()
+    if s.startswith("```"):
+        s = s.split("```")[1] if "```" in s[3:] else s.strip("`")
+        s = s[4:] if s.startswith("json") else s
+    start, end = s.find("{"), s.rfind("}")
+    return start >= 0 and end > start
 
 
 def _safe_json(raw: str) -> dict:
@@ -150,6 +320,7 @@ def _safe_json(raw: str) -> dict:
     start, end = s.find("{"), s.rfind("}")
     if start >= 0 and end > start:
         s = s[start : end + 1]
+    s = re.sub(r",\s*([}\]])", r"\1", s)
     try:
         return json.loads(s)
     except Exception as e:

@@ -43,6 +43,7 @@ class Episode(BaseModel):
     root_cause: Optional[str] = None
     summary: str = ""
     effectiveness_score: float = 0.1
+    extraction_status: str = "ok"
 
     duration_seconds: Optional[float] = None
     created_at: str = ""

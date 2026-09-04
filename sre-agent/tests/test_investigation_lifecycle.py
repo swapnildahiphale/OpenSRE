@@ -55,7 +55,11 @@ def test_finalize_consolidates_via_prior(monkeypatch):
         il,
         "extract_investigation",
         lambda *a, **k: Extraction(
-            issue_type="db", root_cause="missing index", resolved=True, summary="fixed"
+            status="ok",
+            issue_type="db",
+            root_cause="missing index",
+            resolved=True,
+            summary="fixed",
         ),
     )
     monkeypatch.setattr(il, "_embed_episode_text", lambda ep: [0.0] * 384)
@@ -75,6 +79,40 @@ def test_finalize_consolidates_via_prior(monkeypatch):
         and ep.resolved is True
     )
     assert ep.effectiveness_score == 0.8 and ep.agent_run_id == "run9"
+    assert captured["ep"].extraction_status == "ok"
+
+
+def test_finalize_persists_failed_status(monkeypatch):
+    import investigation_lifecycle as il
+    from memory.extraction import Extraction
+
+    captured = {}
+
+    class FakeStore:
+        def get_by_correlation(self, cid):
+            return None
+
+        def upsert_episode(self, ep):
+            captured["ep"] = ep
+
+    monkeypatch.setattr(il, "_store", FakeStore())
+    monkeypatch.setattr(
+        il,
+        "extract_investigation",
+        lambda *a, **k: Extraction(status="failed", summary="stub " * 20),
+    )
+    monkeypatch.setattr(il, "_embed_episode_text", lambda ep: [0.0] * 384)
+    il.finalize_investigation(
+        "c-fail",
+        "run1",
+        "prompt",
+        "result text long enough to store " * 5,
+        [{"tool_name": "Skill", "tool_input": {"skill": "memory-search"}, "tool_output": "ok"}],
+        org_id="acme",
+        team_node_id="t1",
+    )
+    assert captured["ep"].extraction_status == "failed"
+    assert captured["ep"].skills_used == ["memory-search"]
 
 
 def test_guidance_requires_memory_before_reporting_back():
