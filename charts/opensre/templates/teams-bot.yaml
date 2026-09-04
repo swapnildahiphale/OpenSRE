@@ -56,6 +56,15 @@ spec:
               value: {{ .Values.services.teamsBot.servicePort | default 3978 | quote }}
             - name: SRE_AGENT_URL
               value: {{ printf "http://opensre-agent.%s.svc.cluster.local:%d" .Values.namespace (.Values.services.agent.servicePort | int) | quote }}
+            - name: WEB_UI_PUBLIC_BASE_URL
+              {{- $oidcBase := default "" .Values.services.webUi.oidc.publicBaseUrl }}
+              {{- if $oidcBase }}
+              value: {{ $oidcBase | quote }}
+              {{- else if .Values.ingress.host }}
+              value: {{ printf "https://%s" .Values.ingress.host | quote }}
+              {{- else }}
+              value: ""
+              {{- end }}
             # uv defaults to /.cache/uv; non-root UID 1000 cannot write there.
             - name: UV_CACHE_DIR
               value: /tmp/uv-cache

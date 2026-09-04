@@ -13,6 +13,12 @@ def test_parse_sse_event_ignores_non_data():
     assert parse_sse_event(": keepalive") is None
 
 
+def test_run_started_sets_run_id():
+    state = InvestigationState(thread_id="t1")
+    handle_stream_event(state, {"type": "run_started", "data": {"run_id": "r-99"}})
+    assert state.run_id == "r-99"
+
+
 def test_thought_appends_section():
     state = InvestigationState(thread_id="t1")
     result = handle_stream_event(

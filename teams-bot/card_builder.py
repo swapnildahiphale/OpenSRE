@@ -3,6 +3,7 @@
 from typing import Any, Optional
 
 from markdown_converter import markdown_to_adaptive_blocks
+from run_links import format_view_link_markdown
 
 
 def _text_block(
@@ -84,18 +85,41 @@ def build_question_card(*, thread_id: str, questions: list[dict]) -> dict:
     }
 
 
-def build_final_card(*, result_text: Optional[str], error: Optional[str]) -> dict:
+def _append_run_link_blocks(body: list[dict], run_url: Optional[str]) -> None:
+    if not run_url:
+        return
+    body.append(_text_block(""))
+    body.append(_text_block(format_view_link_markdown(run_url)))
+
+
+def build_final_card(
+    *, result_text: Optional[str], error: Optional[str], run_url: Optional[str] = None
+) -> dict:
     # No boilerplate title — show agent result or error only.
     if error:
         body = [_text_block(error)]
     else:
         body = markdown_to_adaptive_blocks(result_text or "_No summary returned._")
+    _append_run_link_blocks(body, run_url)
     return {
         "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
         "type": "AdaptiveCard",
         "version": "1.5",
         "body": body,
     }
+
+
+def build_final_text(
+    *, result_text: Optional[str], error: Optional[str], run_url: Optional[str] = None
+) -> str:
+    """Plain-text final reply for channel threads (markdown link supported)."""
+    if error:
+        lines = [error]
+    else:
+        lines = [result_text or "_No summary returned._"]
+    if run_url:
+        lines.extend(["", format_view_link_markdown(run_url)])
+    return "\n".join(lines)
 
 
 def build_timeout_card() -> dict:

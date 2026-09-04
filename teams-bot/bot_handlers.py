@@ -157,6 +157,9 @@ def register_handlers(app) -> None:
             )
             return getattr(sent, "id", None)
 
+        async def send_text(content: str) -> None:
+            await ctx.send(MessageActivityInput().add_text(content))
+
         async def update_card(activity_id: str, card: dict) -> None:
             # PUT the existing activity so question-timeout does not spawn a new card.
             try:
@@ -183,7 +186,9 @@ def register_handlers(app) -> None:
             stream_update=stream_update,
             stream_close=stream_close,
             send_card=send_card,
+            send_text=send_text,
             update_card=update_card,
+            plain_text_final=not use_stream,
         )
 
     @app.on_card_action_execute(SUBMIT_VERB)

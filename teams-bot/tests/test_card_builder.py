@@ -1,5 +1,6 @@
 from card_builder import (
     build_final_card,
+    build_final_text,
     build_question_card,
     build_welcome_card,
 )
@@ -53,3 +54,26 @@ def test_final_card_converts_markdown_report_into_multiple_blocks():
 def test_final_card_error_path_is_a_single_text_block():
     card = build_final_card(result_text=None, error="Agent timed out")
     assert card["body"] == [{"type": "TextBlock", "text": "Agent timed out", "wrap": True}]
+
+
+def test_final_card_appends_run_link_footer():
+    run_url = "https://opensre.example.com/team/agent-runs/abc123"
+    card = build_final_card(result_text="Done", error=None, run_url=run_url)
+    assert card["body"][-1]["text"] == f"[View in OpenSRE]({run_url})"
+
+
+def test_final_card_omits_link_without_run_url():
+    card = build_final_card(result_text="Done", error=None, run_url=None)
+    assert "View in OpenSRE" not in str(card)
+
+
+def test_final_text_includes_run_link():
+    run_url = "https://opensre.example.com/team/agent-runs/abc123"
+    text = build_final_text(result_text="Done", error=None, run_url=run_url)
+    assert "Done" in text
+    assert f"[View in OpenSRE]({run_url})" in text
+
+
+def test_final_text_omits_link_without_run_url():
+    text = build_final_text(result_text="Done", error=None, run_url=None)
+    assert text == "Done"

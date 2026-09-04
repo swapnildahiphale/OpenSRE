@@ -368,6 +368,7 @@ services:
       - .env
     environment:
       - SRE_AGENT_URL=http://sre-agent:8000
+      - WEB_UI_PUBLIC_BASE_URL=${WEB_UI_PUBLIC_BASE_URL:-http://localhost:3002}
       - PORT=3978
     ports:
       - "3978:3978"
