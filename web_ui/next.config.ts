@@ -31,6 +31,7 @@ const nextConfig: NextConfig = {
       // Proxy GitHub App OAuth callback to config service
       // GitHub redirects here after app installation
       { source: "/github/callback", destination: `${base}/github/callback` },
+      { source: "/github/install/start", destination: `${base}/github/install/start` },
       { source: "/github/installations/:path*", destination: `${base}/github/installations/:path*` },
     ];
   },
