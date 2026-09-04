@@ -108,10 +108,8 @@ def test_explicit_all_false_yields_empty_registry():
     assert resolve_registered_agents(tc) == {}
 
 
-def test_poc_template_excludes_disabled_subagents(sample_team_config):
-    """The POC template disables github+aws via investigation.sub_agents."""
+def test_poc_template_enables_all_specialist_subagents(sample_team_config):
+    """The triage template enables all specialists via planner.sub_agents."""
     result = resolve_registered_agents(sample_team_config)
-    assert "github" not in result  # investigation.sub_agents.github = False
-    assert "aws" not in result  # investigation.sub_agents.aws = False
-    assert "investigation" in result
-    assert {"k8s", "metrics", "log_analysis"} <= set(result)
+    assert "investigation" not in result  # flat topology: no mid-tier
+    assert {"kubernetes", "metrics", "log_analysis", "github", "aws"} <= set(result)

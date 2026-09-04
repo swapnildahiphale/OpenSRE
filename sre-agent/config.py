@@ -26,8 +26,6 @@ CONFIG_SERVICE_URL = os.getenv(
 @dataclass
 class PromptConfig:
     system: str = ""
-    prefix: str = ""
-    suffix: str = ""
 
 
 @dataclass
@@ -81,15 +79,14 @@ LEGACY_SKILL_NAME_MAP = {
 
 @dataclass
 class ModelConfig:
-    """Model settings for LLM calls.
+    """Model selection for the session and for each sub-agent.
 
-    These settings apply globally to the session (Claude SDK limitation).
+    Only the model name is expressible through the Claude Agent SDK.
+    Sampling parameters (temperature, top_p) and response limits (max_tokens)
+    have no SDK equivalent and are deliberately absent.
     """
 
     name: str = "claude-sonnet-4-6"
-    temperature: float | None = None  # 0.0-1.0, None = provider default
-    max_tokens: int | None = None  # Maximum response tokens
-    top_p: float | None = None  # Nucleus sampling parameter (0.0-1.0)
 
 
 @dataclass
@@ -109,16 +106,18 @@ class AgentConfig:
     Fields:
         enabled: Whether this agent is active
         name: Agent identifier
+        description: Routing hint the SDK uses to select this sub-agent
         prompt: System prompt configuration
         tools: Tool filtering configuration
         skills: Per-agent skill toggles {skill_id: bool} from UI
-        model: Model settings (temperature, max_tokens, top_p)
+        model: Model selection (see ModelConfig)
         max_turns: Maximum conversation turns (prevents infinite loops)
         sub_agents: Allowed child agents {agent_name: bool} for routing enforcement
     """
 
     enabled: bool = True
     name: str = ""
+    description: str = ""
     prompt: PromptConfig = field(default_factory=PromptConfig)
     tools: ToolsConfig = field(default_factory=ToolsConfig)
     skills: dict[str, bool] = field(default_factory=dict)
@@ -171,6 +170,26 @@ def _coerce_tools(raw) -> "ToolsConfig":
     return ToolsConfig()
 
 
+def _parse_agents(raw_agents: dict) -> dict[str, AgentConfig]:
+    """Parse the effective config's `agents` map into AgentConfig objects."""
+    agents: dict[str, AgentConfig] = {}
+    for name, cfg in raw_agents.items():
+        prompt_data = cfg.get("prompt", {})
+        model_data = cfg.get("model", {})
+        agents[name] = AgentConfig(
+            enabled=cfg.get("enabled", True),
+            name=name,
+            description=cfg.get("description", ""),
+            prompt=PromptConfig(system=prompt_data.get("system", "")),
+            tools=_coerce_tools(cfg.get("tools", {})),
+            skills=cfg.get("skills", {}),
+            model=ModelConfig(name=model_data.get("name", "claude-sonnet-4-6")),
+            max_turns=cfg.get("max_turns"),
+            sub_agents=cfg.get("sub_agents", {}),
+        )
+    return agents
+
+
 def load_team_config() -> TeamConfig:
     """
     Load team config from config_service. Raises on failure.
@@ -204,31 +223,7 @@ def load_team_config() -> TeamConfig:
     effective = data.get("effective_config", data)
 
     # Parse agents
-    agents: dict[str, AgentConfig] = {}
-    for name, cfg in effective.get("agents", {}).items():
-        prompt_data = cfg.get("prompt", {})
-        tools_data = cfg.get("tools", {})
-        model_data = cfg.get("model", {})
-
-        agents[name] = AgentConfig(
-            enabled=cfg.get("enabled", True),
-            name=name,
-            prompt=PromptConfig(
-                system=prompt_data.get("system", ""),
-                prefix=prompt_data.get("prefix", ""),
-                suffix=prompt_data.get("suffix", ""),
-            ),
-            tools=_coerce_tools(tools_data),
-            skills=cfg.get("skills", {}),
-            model=ModelConfig(
-                name=model_data.get("name", "claude-sonnet-4-6"),
-                temperature=model_data.get("temperature"),
-                max_tokens=model_data.get("max_tokens"),
-                top_p=model_data.get("top_p"),
-            ),
-            max_turns=cfg.get("max_turns"),
-            sub_agents=cfg.get("sub_agents", {}),
-        )
+    agents = _parse_agents(effective.get("agents", {}))
 
     # Parse team-level skills config
     skills_data = effective.get("skills", {})

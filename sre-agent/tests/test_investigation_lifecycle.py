@@ -5,7 +5,7 @@ def test_investigation_guidance_append_always():
     assert "memory-search" in block
     assert "infrastructure-neo4j" in block
     assert "todo" in block.lower()
-    assert "episodic" not in block.lower()
+    assert "episodic" in block.lower()
     assert len(block) > 100
 
 
@@ -75,3 +75,35 @@ def test_finalize_consolidates_via_prior(monkeypatch):
         and ep.resolved is True
     )
     assert ep.effectiveness_score == 0.8 and ep.agent_run_id == "run9"
+
+
+def test_guidance_requires_memory_before_reporting_back():
+    from investigation_lifecycle import investigation_guidance_append
+
+    out = investigation_guidance_append()
+    assert "memory-search" in out
+    assert "root planner" in out.lower()
+    assert "specialist" in out.lower()
+
+
+def test_guidance_disambiguates_from_claude_code_memory():
+    from investigation_lifecycle import investigation_guidance_append
+
+    out = investigation_guidance_append()
+    assert "Claude Code MEMORY.md" in out
+    assert "search memory" not in out.lower()
+
+
+def test_guidance_allows_repeat_search():
+    from investigation_lifecycle import investigation_guidance_append
+
+    out = investigation_guidance_append()
+    assert "searching again" in out.lower()
+
+
+def test_guidance_names_opensre_memory_as_the_lesson_store():
+    from investigation_lifecycle import investigation_guidance_append
+
+    out = investigation_guidance_append()
+    assert "MEMORY.md" in out
+    assert "CLAUDE.md" in out

@@ -7,6 +7,7 @@ dependencies = [
   "microsoft-teams-cards>=2.0.14",
   "aiohttp>=3.9.0",
   "python-dotenv>=1.0.0",
+  "mistune>=3.0.0",
 ]
 
 [dependency-groups]

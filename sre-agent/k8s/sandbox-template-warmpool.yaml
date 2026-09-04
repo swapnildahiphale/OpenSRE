@@ -34,7 +34,7 @@ spec:
       containers:
       # Main agent container
       - name: agent
-        image: swapnildahiphale/opensre-sre-agent:v1.2.1
+        image: swapnildahiphale/opensre-sre-agent:v1.2.2
         imagePullPolicy: Always
         ports:
         - containerPort: 8888

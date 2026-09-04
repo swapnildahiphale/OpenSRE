@@ -26,7 +26,10 @@ def test_completion_persists_untruncated_output_and_structured_report():
         )
     body = _captured_patch_body(mock_patch)
     assert len(body["output_summary"]) > 500  # NOT truncated
-    assert body["output_summary"] == long_text
+    # output_summary is a display field (run history) - the structured_report
+    # fence is stripped from it, same as chat surfaces (see report.clean_and_extract).
+    assert body["output_summary"] == "X" * 2000
+    assert "```json" not in body["output_summary"]
     assert body["output_json"] == {"title": "RC"}  # structured report persisted
 
 

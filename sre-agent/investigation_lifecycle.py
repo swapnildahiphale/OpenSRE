@@ -1,4 +1,4 @@
-"""Shared post-investigation memory hooks and root-agent investigation guidance.
+"""Shared post-investigation memory hooks and investigation guidance.
 
 investigation_guidance_append — permanent memory + KG instructions (agent.py).
 memory_system_prompt_append  — alias for backward compatibility.
@@ -23,12 +23,20 @@ from memory.store import EpisodeStore
 logger = logging.getLogger(__name__)
 
 _MEMORY_GUIDANCE = (
-    "\n\n## Memory (agent-driven recall)\n\n"
-    "Past investigation summaries are NOT pre-loaded. After you have concrete evidence\n"
-    "(error text, failing job/service, stack trace):\n\n"
-    '1. Add a todo: "Search memory for similar past investigations"\n'
-    "2. Invoke the `memory-search` skill with a specific query (symptom + component + system)\n\n"
-    "Do not search memory on vague initial alerts alone — gather facts first (e.g. read build logs).\n"
+    "\n\n## OpenSRE episodic memory (`memory-search` skill)\n\n"
+    "OpenSRE keeps its own episodic memory of past investigations in Neo4j — separate from any\n"
+    "Claude Code MEMORY.md or built-in memory feature, and not pre-loaded. Once YOU have concrete\n"
+    "evidence in your own findings (error text, failing job/service, stack trace):\n\n"
+    '1. Add a todo: "Search OpenSRE episodic memory for similar past investigations"\n'
+    "2. Invoke the `memory-search` skill (not Claude's own memory) with a specific query\n"
+    "   (symptom + component + system)\n\n"
+    "Do not search on vague initial alerts alone — gather facts first (e.g. read build logs).\n"
+    "But once you have evidence in hand, you have either invoked `memory-search` or stated why\n"
+    "you did not — whether you are the root planner presenting a root cause, or a dispatched\n"
+    "specialist reporting findings back. New evidence later in the same investigation may call\n"
+    "for searching again — this is not a one-shot check.\n"
+    "Gathering evidence and concluding without ever checking OpenSRE's episodic memory for a\n"
+    "prior occurrence is not an acceptable investigation.\n"
 )
 
 _KG_GUIDANCE = (
@@ -40,10 +48,26 @@ _KG_GUIDANCE = (
     "Skip if no service/component is known yet. If Neo4j is unavailable, continue without it.\n"
 )
 
+_LESSON_STORE_GUIDANCE = (
+    "\n\n## Where lessons go\n\n"
+    "OpenSRE's own memory is the lesson store. Every conversation is written to it\n"
+    "automatically as an episode when the turn ends — you do not need to persist anything\n"
+    "yourself, and a correction from a human becomes part of that episode.\n\n"
+    "Do NOT write CLAUDE.md or MEMORY.md files to record findings, feedback or lessons.\n"
+    "Those are Claude Code session files: they are scoped to this workspace, they are\n"
+    "discarded with it, and no future investigation will ever read them. Put the correction\n"
+    "in your response instead, so it lands in the episode.\n"
+)
+
 
 def investigation_guidance_append() -> str:
-    """Permanent root-agent guidance for agent-driven memory and KG recall."""
-    return _MEMORY_GUIDANCE + _KG_GUIDANCE
+    """Permanent guidance for agent-driven memory and KG recall.
+
+    Appended to the root system prompt and to every registered sub-agent's
+    prompt — sub-agents get no preset and no append, so guidance omitted from
+    their prompt text does not reach them at all.
+    """
+    return _MEMORY_GUIDANCE + _KG_GUIDANCE + _LESSON_STORE_GUIDANCE
 
 
 def memory_system_prompt_append() -> str:

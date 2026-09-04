@@ -13,34 +13,6 @@ def test_model_config_defaults():
     """Test ModelConfig with default values."""
     model = ModelConfig()
     assert model.name == "claude-sonnet-4-6"
-    assert model.temperature is None
-    assert model.max_tokens is None
-    assert model.top_p is None
-
-
-def test_model_config_custom():
-    """Test ModelConfig with custom values."""
-    model = ModelConfig(
-        name="claude-opus-4",
-        temperature=0.5,
-        max_tokens=4000,
-        top_p=0.9,
-    )
-    assert model.name == "claude-opus-4"
-    assert model.temperature == 0.5
-    assert model.max_tokens == 4000
-    assert model.top_p == 0.9
-
-
-def test_agent_config_with_model():
-    """Test AgentConfig with ModelConfig."""
-    agent = AgentConfig(
-        name="test",
-        enabled=True,
-        model=ModelConfig(temperature=0.3, max_tokens=2000),
-    )
-    assert agent.model.temperature == 0.3
-    assert agent.model.max_tokens == 2000
 
 
 def test_agent_config_with_max_turns():
@@ -65,7 +37,6 @@ def test_agent_config_backward_compatibility():
 
     # New fields should have sensible defaults
     assert agent.model.name == "claude-sonnet-4-6"
-    assert agent.model.temperature is None
     assert agent.max_turns is None
 
 
@@ -76,19 +47,12 @@ def test_agent_config_full_example():
         name="investigator",
         prompt=PromptConfig(
             system="You are an SRE investigator",
-            prefix="Use for incident investigation",
-            suffix="",
         ),
         tools=ToolsConfig(
             enabled=["*"],
             disabled=["Write", "Edit"],
         ),
-        model=ModelConfig(
-            name="claude-sonnet-4-6",
-            temperature=0.3,
-            max_tokens=4000,
-            top_p=0.9,
-        ),
+        model=ModelConfig(name="claude-sonnet-4-6"),
         max_turns=50,
     )
 
@@ -96,34 +60,8 @@ def test_agent_config_full_example():
     assert agent.name == "investigator"
     assert agent.prompt.system == "You are an SRE investigator"
     assert agent.tools.disabled == ["Write", "Edit"]
-    assert agent.model.temperature == 0.3
+    assert agent.model.name == "claude-sonnet-4-6"
     assert agent.max_turns == 50
-
-
-def test_model_config_temperature_bounds():
-    """Test ModelConfig accepts valid temperature values."""
-    # Valid temperatures (0.0-1.0)
-    model1 = ModelConfig(temperature=0.0)
-    assert model1.temperature == 0.0
-
-    model2 = ModelConfig(temperature=1.0)
-    assert model2.temperature == 1.0
-
-    model3 = ModelConfig(temperature=0.5)
-    assert model3.temperature == 0.5
-
-
-def test_model_config_top_p_bounds():
-    """Test ModelConfig accepts valid top_p values."""
-    # Valid top_p (0.0-1.0)
-    model1 = ModelConfig(top_p=0.0)
-    assert model1.top_p == 0.0
-
-    model2 = ModelConfig(top_p=1.0)
-    assert model2.top_p == 1.0
-
-    model3 = ModelConfig(top_p=0.95)
-    assert model3.top_p == 0.95
 
 
 def test_agent_config_max_turns_positive():
@@ -134,11 +72,11 @@ def test_agent_config_max_turns_positive():
 
 def test_multiple_agents_with_different_configs():
     """Test creating multiple agents with different configurations."""
-    # Planner with conservative settings
+    # Planner with a non-default model
     planner = AgentConfig(
         name="planner",
         enabled=True,
-        model=ModelConfig(temperature=0.3, max_tokens=4000),
+        model=ModelConfig(name="opus"),
         max_turns=50,
     )
 
@@ -154,8 +92,8 @@ def test_multiple_agents_with_different_configs():
     metrics = AgentConfig(name="metrics", enabled=True)
 
     # Verify each agent has independent config
-    assert planner.model.temperature == 0.3
-    assert investigation.model.temperature is None
+    assert planner.model.name == "opus"
+    assert investigation.model.name == "claude-sonnet-4-6"
     assert k8s.max_turns is None
     assert metrics.max_turns is None
 
@@ -167,13 +105,9 @@ if __name__ == "__main__":
 
     tests = [
         test_model_config_defaults,
-        test_model_config_custom,
-        test_agent_config_with_model,
         test_agent_config_with_max_turns,
         test_agent_config_backward_compatibility,
         test_agent_config_full_example,
-        test_model_config_temperature_bounds,
-        test_model_config_top_p_bounds,
         test_agent_config_max_turns_positive,
         test_multiple_agents_with_different_configs,
     ]

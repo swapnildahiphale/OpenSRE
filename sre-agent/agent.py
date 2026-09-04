@@ -1012,10 +1012,7 @@ class InteractiveAgentSession:
 
             return PermissionResultAllow(updated_input=input_data)
 
-        # Import AgentDefinition for subagent configuration
-        from claude_agent_sdk import AgentDefinition
-
-        subagents = {}
+        self._can_use_tool_handler = can_use_tool_handler
 
         # Build options for streaming input mode
         # Determine working directory based on mode
@@ -1066,6 +1063,16 @@ class InteractiveAgentSession:
 
             cwd = thread_workspace
 
+        self._cwd = cwd
+
+        self._build_options()
+
+    def _build_options(self):
+        # Import AgentDefinition for subagent configuration
+        from claude_agent_sdk import AgentDefinition
+
+        subagents = {}
+
         # --- Dynamic config from team config service ---
         system_prompt = None
         root_config = None
@@ -1088,6 +1095,7 @@ class InteractiveAgentSession:
                     f"from root agent '{root_config.name}'"
                 )
 
+            from investigation_lifecycle import investigation_guidance_append
             from team_context import render_team_context_block
 
             ctx_block = (
@@ -1101,11 +1109,15 @@ class InteractiveAgentSession:
                 sub_prompt = agent_cfg.prompt.system or ""
                 if ctx_block:
                     sub_prompt = sub_prompt + ctx_block
+                # Sub-agents get no preset and no append — guidance that is not in
+                # their prompt text does not reach them.
+                sub_prompt = sub_prompt + investigation_guidance_append()
                 subagents[name] = AgentDefinition(
-                    description=agent_cfg.prompt.prefix or f"{name} specialist",
+                    description=agent_cfg.description or f"{name} specialist",
                     prompt=sub_prompt,
                     model=resolve_model(agent_cfg.model.name),
                     tools=resolve_agent_tools(agent_cfg.tools),
+                    maxTurns=agent_cfg.max_turns,
                 )
 
             # Authoritative delegation list: overrides any stale static
@@ -1118,8 +1130,6 @@ class InteractiveAgentSession:
             if ctx_block:
                 system_prompt = (system_prompt or "") + ctx_block
                 print(f"📝 [AGENT] Appended team context ({len(ctx_block)} chars)")
-
-            from investigation_lifecycle import investigation_guidance_append
 
             system_prompt = (system_prompt or "") + investigation_guidance_append()
             print(
@@ -1147,12 +1157,11 @@ class InteractiveAgentSession:
                 allowed_tools = [t for t in self.DEFAULT_TOOLS if t not in tc.disabled]
 
         options_kwargs = dict(
-            cwd=cwd,
+            cwd=self._cwd,
             allowed_tools=allowed_tools,
             permission_mode="acceptEdits",
-            can_use_tool=can_use_tool_handler,
+            can_use_tool=self._can_use_tool_handler,
             include_partial_messages=True,  # Needed to get parent_tool_use_id for subagent tracking
-            setting_sources=["user", "project"],  # Loads .claude/skills/
             # Enables the Skill tool + auto-allows it (replaces deprecated "Skill"
             # in allowed_tools). "all" is correct, not a widening: team-level
             # filtering already deleted disabled skill dirs from the thread
@@ -1173,26 +1182,19 @@ class InteractiveAgentSession:
             **({"resume": self.resume} if self.resume else {}),
         )
 
-        # Apply model settings and execution limits from root agent config
+        # Apply execution limits and model selection from root agent config
         if root_config:
             # Apply max_turns to prevent infinite loops
             if root_config.max_turns:
                 options_kwargs["max_turns"] = root_config.max_turns
                 print(f"🔧 [AGENT] Max turns: {root_config.max_turns}")
 
-            # Apply model settings globally via environment variables
-            # Note: These apply to all subagents (Claude SDK limitation)
-            if root_config.model.temperature is not None:
-                os.environ["LLM_TEMPERATURE"] = str(root_config.model.temperature)
-                print(f"🔧 [AGENT] Temperature: {root_config.model.temperature}")
-
-            if root_config.model.max_tokens is not None:
-                os.environ["LLM_MAX_TOKENS"] = str(root_config.model.max_tokens)
-                print(f"🔧 [AGENT] Max tokens: {root_config.model.max_tokens}")
-
-            if root_config.model.top_p is not None:
-                os.environ["LLM_TOP_P"] = str(root_config.model.top_p)
-                print(f"🔧 [AGENT] Top-p: {root_config.model.top_p}")
+            # "inherit" means "use the session default", which is meaningless at
+            # session level — only forward a concrete model.
+            root_model = resolve_model(root_config.model.name)
+            if root_model != "inherit":
+                options_kwargs["model"] = root_model
+                print(f"🔧 [AGENT] Model: {root_model}")
 
         if system_prompt:
             # Method 3: Append custom prompt to claude_code preset

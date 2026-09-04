@@ -208,3 +208,34 @@ def test_resolve_team_identity_falls_back_on_failure(monkeypatch):
 
     assert org_id == "local"
     assert team_node_id == "default"
+
+
+def test_finalize_investigation_strips_fence_and_attaches_structured_report(monkeypatch):
+    monkeypatch.setenv("OPENSRE_TENANT_ID", "local")
+    monkeypatch.setenv("OPENSRE_TEAM_ID", "default")
+    import server_simple
+
+    server_simple._run_id_by_thread["thread-report-test"] = "run-123"
+    monkeypatch.setattr(server_simple._il, "finalize_investigation", lambda **kw: None)
+
+    patched = {}
+
+    def fake_patch(url, json=None, headers=None, timeout=None):
+        patched["body"] = json
+        resp = MagicMock()
+        resp.raise_for_status = MagicMock()
+        return resp
+
+    result_text = '**Headline**\n\nbody\n\n```json\n{"title": "Headline"}\n```\n'
+    with patch.object(server_simple.httpx, "patch", side_effect=fake_patch):
+        server_simple.finalize_investigation(
+            thread_id="thread-report-test",
+            prompt="check pods",
+            result_text=result_text,
+            success=True,
+            tool_calls=[],
+        )
+
+    assert patched["body"]["output_json"] == {"title": "Headline"}
+    assert "```json" not in patched["body"]["output_summary"]
+    assert patched["body"]["output_summary"] == "**Headline**\n\nbody"

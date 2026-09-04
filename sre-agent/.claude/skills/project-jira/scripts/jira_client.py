@@ -207,12 +207,14 @@ def make_text_body(text: str) -> dict | str:
     """Build a write body for description/comment fields, picking the right format
     for the configured Jira API version.
 
-    - Jira Cloud (JIRA_API_VERSION=3, default): returns an ADF document (JSON).
+    - Jira Cloud (JIRA_API_VERSION=3, default): converts Markdown to a real ADF
+      document via markdown_to_adf() - headings, lists, tables, code blocks and
+      inline marks are preserved, not flattened into one plain paragraph. On any
+      converter failure, falls back to the flat single-paragraph wrap so a comment
+      always posts, just without formatting.
     - Jira Data Center (JIRA_API_VERSION=2): returns the plain `text` string,
-      interpreted by Jira DC as Wiki Markup. Wiki Markup supports rich formatting
-      (`*bold*`, `_italic_`, `||...||` tables, `{code}...{code}`, headings, lists),
-      so no formatting capability is lost vs the ADF path (which only wraps the
-      input in a single plain paragraph anyway).
+      interpreted by Jira DC as Wiki Markup. Unchanged - Markdown-to-wiki-markup
+      conversion is not built yet (see spec: deferred).
 
     The caller should assign the return value directly to the `description` /
     `body` field of the Jira REST payload — do not wrap it further.
@@ -221,7 +223,12 @@ def make_text_body(text: str) -> dict | str:
     if api_version == "2":
         # v2 wire format: plain string (Jira Wiki Markup), not ADF JSON.
         return text
-    return make_adf_text(text)
+    try:
+        from markdown_to_adf import markdown_to_adf
+
+        return markdown_to_adf(text)
+    except Exception:
+        return make_adf_text(text)
 
 
 def make_assignee_field(assignee: str) -> dict:

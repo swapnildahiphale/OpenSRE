@@ -26,7 +26,10 @@ Configuration environment variables you CAN check (non-secret):
 Jira Cloud removed classic `/rest/api/3/search` (returns HTTP 410). `search_issues.py` / `list_issues.py` use `POST /rest/api/3/search/jql` when `JIRA_API_VERSION` is unset/`3`. Data Center (`JIRA_API_VERSION=2`) still uses `GET /rest/api/2/search`.
 
 ### Body format note (v2 vs v3)
-Jira Cloud (v3) uses Atlassian Document Format (ADF JSON) for `description`/`body` fields. Jira Data Center (v2) uses **Jira Wiki Markup** — a plain string that supports rich formatting: `*bold*`, `_italic_`, `||...||` tables, `{code}...{code}` blocks, headings, lists, etc. The scripts auto-pick the right format from `JIRA_API_VERSION`, so callers can pass the same `--description` / `--comment` text regardless of flavor; for v2 you may use Wiki Markup syntax to get rich rendering.
+Write `--description` / `--comment` text as plain Markdown (headings, lists, tables, code fences,
+bold/italic, links). The scripts convert it automatically: Cloud (v3) gets a real Atlassian Document
+Format document with your formatting preserved; Data Center (v2) currently receives the text
+as-is, so for v2 you may write Jira Wiki Markup directly if you want rich formatting there.
 
 ### Assignee format note (v2 vs v3)
 The `--assignee` arg also adapts to the API version: Cloud (v3) expects the Atlassian **accountId**; Data Center (v2) expects the **username** (e.g. `jane.doe`). The scripts pick the right field key (`accountId` vs `name`) from `JIRA_API_VERSION`.

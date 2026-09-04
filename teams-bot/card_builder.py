@@ -2,6 +2,8 @@
 
 from typing import Any, Optional
 
+from markdown_converter import markdown_to_adaptive_blocks
+
 
 def _text_block(
     text: str, *, weight: str | None = None, size: str | None = None
@@ -87,7 +89,7 @@ def build_final_card(*, result_text: Optional[str], error: Optional[str]) -> dic
     if error:
         body = [_text_block(error)]
     else:
-        body = [_text_block(result_text or "_No summary returned._")]
+        body = markdown_to_adaptive_blocks(result_text or "_No summary returned._")
     return {
         "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
         "type": "AdaptiveCard",

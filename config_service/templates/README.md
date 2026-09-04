@@ -16,7 +16,7 @@ Templates are pre-configured multi-agent systems optimized for specific use case
 ### 1. 🚨 Slack Incident Triage
 **File**: `01_slack_incident_triage.json`
 **Category**: incident-response
-**Agents**: Planner, Investigation, K8s, AWS, Metrics
+**Agents**: Planner, GitHub, AWS, Metrics, Log Analysis, Coding, Writeup, Kubernetes
 
 Fast root cause analysis for production incidents triggered via Slack. Correlates logs, metrics, and events across Kubernetes and AWS infrastructure.
 
@@ -141,58 +141,17 @@ Analyzes alerting patterns to identify noisy, redundant, or low-value alerts. Re
 
 ---
 
-### 8. 🛡️ Disaster Recovery Validator
-**File**: `08_dr_validator.json`
-**Category**: reliability
-**Agents**: Planner, DR Validator, AWS, K8s
-
-Validates disaster recovery procedures by actually testing backups (not just checking they exist), measuring RTO/RPO, and validating failover procedures.
-
-**Required MCPs**: aws_eks, slack
-**Optional MCPs**: kubernetes
-
-**Use Cases**:
-- Test RDS backup restore
-- Validate multi-region failover
-- Measure actual RTO vs target
-- Verify DR runbook accuracy
-- Quarterly compliance testing
-
----
-
-### 9. 📝 Incident Postmortem Generator
-**File**: `09_incident_postmortem.json`
-**Category**: incident-response
-**Agents**: Planner, Postmortem Writer, Investigation
-
-Automatically generates blameless postmortem reports by analyzing Slack conversations, PagerDuty alerts, logs, and metrics. Creates timeline with evidence and actionable follow-ups.
-
-**Required MCPs**: slack
-**Optional MCPs**: pagerduty, coralogix, grafana, kubernetes
-
-**Use Cases**:
-- Generate postmortem from Slack thread
-- Create timeline from PagerDuty incident
-- Auto-create GitHub issues for action items
-- Blameless RCA with evidence
-
----
-
-### 10. 📊 Universal Telemetry Agent
-**File**: `10_universal_telemetry.json`
+### 10. 📊 Observability Advisor
+**File**: `10_observability_advisor.json`
 **Category**: observability
-**Agents**: Planner, Telemetry
+**Agents**: Observability Advisor (single agent)
 
-**🌟 Innovation**: Works with ANY observability platform! Auto-detects Coralogix, Grafana, Datadog, New Relic and uses a unified 3-layer approach (Metrics → Logs → Traces).
-
-**Required MCPs**: slack + at least one observability platform
-**Optional MCPs**: coralogix, grafana, datadog, newrelic
+Enterprise-grade observability setup and optimization agent. Analyzes historical metrics, computes baselines, and generates alert rules using SRE best practices (RED/USE/Golden Signals). Outputs Prometheus, Datadog, or CloudWatch configurations, or proposal documents for review.
 
 **Use Cases**:
-- Platform-agnostic incident investigation
-- Cross-validate findings across multiple platforms
-- Works during platform migrations
-- Compare metrics between Grafana and Datadog
+- Build data-driven alerting from historical metrics
+- Generate RED/USE/Golden Signals alert rules
+- Produce Prometheus, Datadog, or CloudWatch alert configs
 
 ---
 
@@ -265,11 +224,11 @@ Each template JSON follows this structure:
       "enabled": true,
       "name": "Display Name",
       "description": "What this agent does",
-      "model": { "name": "gpt-5.2", "temperature": 0.3 },
+      "model": { "name": "inherit" },
       "prompt": { "system": "Agent system prompt" },
       "max_turns": 50,
       "tools": { "enabled": [...], "disabled": [] },
-      "sub_agents": [...]
+      "sub_agents": { "child_agent_name": true }
     }
   },
 

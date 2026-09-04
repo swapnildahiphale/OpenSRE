@@ -99,7 +99,7 @@ async def main():
             continue
         if agent_cfg.prompt.system:
             subagents[name] = AgentDefinition(
-                description=agent_cfg.prompt.prefix or f"{name} specialist",
+                description=agent_cfg.description or f"{name} specialist",
                 prompt=agent_cfg.prompt.system,
                 tools=(
                     agent_cfg.tools.enabled
