@@ -25,6 +25,7 @@ WHERE e.org_id = $org_id
   AND ($team_node_id IS NULL OR e.team_node_id = $team_node_id)
   AND ($exclude_cid IS NULL OR e.correlation_id <> $exclude_cid)
   AND ($issue_type IS NULL OR e.issue_type = $issue_type)
+  AND (e.extraction_status IS NULL OR e.extraction_status <> 'failed')
 OPTIONAL MATCH (e)-[:AFFECTED]->(s:Service)
 RETURN e.correlation_id AS correlation_id, e.episode_id AS episode_id,
        e.agent_run_id AS agent_run_id, e.org_id AS org_id, e.team_node_id AS team_node_id,

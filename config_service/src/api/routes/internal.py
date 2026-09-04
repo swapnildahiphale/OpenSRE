@@ -102,6 +102,7 @@ class AgentRunResponse(BaseModel):
     completed_at: Optional[datetime] = None
     duration_seconds: Optional[float] = None
     tool_calls_count: Optional[int] = None
+    trigger_message: Optional[str] = None
     output_summary: Optional[str] = None
     output_json: Optional[dict] = None
     error_message: Optional[str] = None
@@ -140,6 +141,7 @@ def create_agent_run(
         completed_at=run.completed_at,
         duration_seconds=run.duration_seconds,
         tool_calls_count=run.tool_calls_count,
+        trigger_message=run.trigger_message,
         output_summary=run.output_summary,
         output_json=run.output_json,
         error_message=run.error_message,
@@ -183,6 +185,7 @@ def complete_agent_run(
         completed_at=run.completed_at,
         duration_seconds=run.duration_seconds,
         tool_calls_count=run.tool_calls_count,
+        trigger_message=run.trigger_message,
         output_summary=run.output_summary,
         output_json=run.output_json,
         error_message=run.error_message,
@@ -296,6 +299,7 @@ def list_agent_runs_internal(
                 completed_at=run.completed_at,
                 duration_seconds=run.duration_seconds,
                 tool_calls_count=run.tool_calls_count,
+                trigger_message=run.trigger_message,
                 output_summary=run.output_summary,
                 error_message=run.error_message,
             )
@@ -391,6 +395,34 @@ def get_stale_runs_count(
     return StaleRunsCountResponse(
         stale_count=count,
         max_age_seconds=max_age_seconds,
+    )
+
+
+@router.get("/agent-runs/{run_id}", response_model=AgentRunResponse)
+def get_agent_run(
+    run_id: str,
+    session: Session = Depends(get_db),
+    service: str = Depends(require_internal_service),
+):
+    """Get a single agent run by ID (internal service-to-service)."""
+    run = repository.get_agent_run(session, run_id=run_id)
+    if not run:
+        raise HTTPException(status_code=404, detail="Agent run not found")
+    return AgentRunResponse(
+        id=run.id,
+        org_id=run.org_id,
+        team_node_id=run.team_node_id,
+        correlation_id=run.correlation_id,
+        agent_name=run.agent_name,
+        status=run.status,
+        started_at=run.started_at,
+        completed_at=run.completed_at,
+        duration_seconds=run.duration_seconds,
+        tool_calls_count=run.tool_calls_count,
+        trigger_message=run.trigger_message,
+        output_summary=run.output_summary,
+        output_json=run.output_json,
+        error_message=run.error_message,
     )
 
 
