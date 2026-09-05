@@ -398,6 +398,31 @@ app = FastAPI(
     description="AI SRE agent for incident investigation - in-process mode (no sandboxes)",
     version="0.3.0",
 )
+# ---------------------------------------------------------------------------
+# ⚠️  DoS / hardening note (follow-up: issue #36)
+#
+# This server intentionally omits network-level protections that are the
+# responsibility of the reverse proxy / ingress in any production-adjacent
+# deployment:
+#
+#   • Rate limiting   — add per-IP limits at nginx/Caddy/AWS ALB/WAF in front
+#                       of this service.  The /investigate endpoint in particular
+#                       triggers expensive LLM completions and should be throttled
+#                       aggressively (e.g. nginx limit_req_zone, Caddy rate_limit).
+#
+#   • Request body caps — set client_max_body_size (nginx) or equivalent at the
+#                         proxy; no cap is enforced here.
+#
+#   • Concurrency limits — Uvicorn worker count and max-connections should be
+#                          tuned at the proxy/process level; asyncio tasks are
+#                          currently unbounded.
+#
+#   • TLS              — simple-mode serves cleartext HTTP and is designed for
+#                        localhost use only.  Terminate TLS at the ingress.
+#
+# See SECURITY.md §"Simple-Mode / Local-Dev Security Posture" and
+# §"Hardening Checklist" for guidance before exposing this service on a network.
+# ---------------------------------------------------------------------------
 
 
 @app.on_event("startup")

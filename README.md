@@ -44,6 +44,9 @@ OpenSRE is an open-source AI SRE agent that automatically investigates productio
 
 ## Quick Start
 
+> **⚠️ Local-dev mode — not for production exposure.**
+> `make dev` starts the agent in **simple-mode** (cleartext HTTP, no rate limiting, no sandbox isolation). It is designed for use on `localhost` only. Before exposing OpenSRE on any network, read the [Simple-Mode / Local-Dev Security Posture](SECURITY.md#simple-mode--local-dev-security-posture) and [Hardening Checklist](SECURITY.md#hardening-checklist) in [SECURITY.md](SECURITY.md).
+
 ```bash
 git clone https://github.com/swapnildahiphale/OpenSRE.git
 cd OpenSRE
