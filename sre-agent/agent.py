@@ -48,6 +48,7 @@ from claude_agent_sdk import (
     ClaudeSDKClient,
     HookMatcher,
     ResultMessage,
+    SystemMessage,
     TaskNotificationMessage,
     TaskProgressMessage,
     TaskStartedMessage,
@@ -62,6 +63,7 @@ from events import (
     message_queued_event,
     question_event,
     result_event,
+    sdk_session_event,
     task_notification_event,
     task_started_event,
     thought_event,
@@ -830,8 +832,23 @@ def format_investigation_timeout_message(timeout_seconds: int) -> str:
 
 
 def capture_session_id_from_result(session_id: str | None, message) -> str | None:
-    """Replicate ResultMessage session_id capture from execute()."""
-    return getattr(message, "session_id", None) or session_id
+    """Prefer a session_id on this message; otherwise keep the existing value."""
+    from_msg = getattr(message, "session_id", None)
+    if not from_msg and isinstance(message, SystemMessage):
+        data = getattr(message, "data", None) or {}
+        if isinstance(data, dict):
+            from_msg = data.get("session_id")
+    return from_msg or session_id
+
+
+def session_id_event_if_changed(
+    thread_id: str, session_id: str | None, message
+) -> tuple[str | None, StreamEvent | None]:
+    """Apply capture. Yield sdk_session only when the stored id changes."""
+    new_id = capture_session_id_from_result(session_id, message)
+    if new_id and new_id != session_id:
+        return new_id, sdk_session_event(thread_id, new_id)
+    return new_id, None
 
 
 class TextSegmentBuffer:
@@ -909,8 +926,7 @@ class InteractiveAgentSession:
         self.thread_id = thread_id
         self.team_config = team_config
         self.resume = resume
-        # Captured from the SDK ResultMessage; persisted so the conversation can
-        # be resumed after this process recycles.
+        # Captured from init SystemMessage (and ResultMessage as backup).
         self.session_id: str | None = None
 
         self.client: ClaudeSDKClient | None = None
@@ -1787,11 +1803,21 @@ class InteractiveAgentSession:
                                             yield question_event(
                                                 self.thread_id, questions
                                             )
+                            elif isinstance(message, SystemMessage):
+                                new_id, ev = session_id_event_if_changed(
+                                    self.thread_id, self.session_id, message
+                                )
+                                self.session_id = new_id
+                                if ev is not None:
+                                    yield ev
                             elif isinstance(message, ResultMessage):
                                 # Capture the SDK session id for durable resume.
-                                self.session_id = capture_session_id_from_result(
-                                    self.session_id, message
+                                new_id, ev = session_id_event_if_changed(
+                                    self.thread_id, self.session_id, message
                                 )
+                                self.session_id = new_id
+                                if ev is not None:
+                                    yield ev
                                 # Keep the latest result so finally can emit one
                                 # Langfuse generation with this turn's cost.
                                 last_result_message = message

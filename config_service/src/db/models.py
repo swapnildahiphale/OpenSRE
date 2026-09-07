@@ -647,9 +647,8 @@ class AgentRun(Base):
         JSON().with_variant(JSONB, "postgresql"), nullable=True
     )
 
-    # SDK session id for resuming a conversation after the agent process
-    # recycles (ClaudeAgentOptions.resume). Captured at completion; one per
-    # thread/correlation, so the latest run for a correlation_id carries it.
+    # SDK session id for ClaudeAgentOptions.resume. Captured from init
+    # SystemMessage (ResultMessage as backup); may be set while status=running.
     sdk_session_id: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
 
     # Extra metadata

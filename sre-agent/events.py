@@ -279,6 +279,15 @@ def message_queued_event(thread_id: str, *, pending_count: int) -> StreamEvent:
     )
 
 
+def sdk_session_event(thread_id: str, session_id: str) -> StreamEvent:
+    """Notify the server that the SDK session id is known (persist; clients ignore)."""
+    return StreamEvent(
+        type="sdk_session",
+        data={"session_id": session_id},
+        thread_id=thread_id,
+    )
+
+
 def task_started_event(
     thread_id: str,
     *,

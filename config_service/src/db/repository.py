@@ -1194,6 +1194,112 @@ def complete_agent_run(
     return run
 
 
+def set_agent_run_sdk_session_id(
+    session: Session,
+    *,
+    run_id: str,
+    sdk_session_id: str,
+) -> Optional[AgentRun]:
+    """Set sdk_session_id on a run without changing status or completed_at."""
+    run = session.execute(
+        select(AgentRun).where(AgentRun.id == run_id)
+    ).scalar_one_or_none()
+    if run is None:
+        return None
+    sid = (sdk_session_id or "").strip()
+    if not sid:
+        return run
+    run.sdk_session_id = sid
+    session.flush()
+    return run
+
+
+def get_latest_sdk_session_id(
+    session: Session,
+    *,
+    correlation_id: str,
+    org_id: str,
+    team_node_id: str,
+) -> Optional[str]:
+    """Latest non-empty sdk_session_id for a tenant thread, including running rows."""
+    run = session.execute(
+        select(AgentRun)
+        .where(
+            AgentRun.correlation_id == correlation_id,
+            AgentRun.org_id == org_id,
+            AgentRun.team_node_id == team_node_id,
+            AgentRun.sdk_session_id.isnot(None),
+            AgentRun.sdk_session_id != "",
+        )
+        .order_by(AgentRun.started_at.desc())
+        .limit(1)
+    ).scalar_one_or_none()
+    if run is None:
+        return None
+    return run.sdk_session_id
+
+
+ABANDON_ERROR_MESSAGE = "Investigation interrupted (session no longer active)"
+SUPERSEDED_ERROR_MESSAGE = "Superseded by new turn"
+
+
+def abandon_agent_run(
+    session: Session,
+    *,
+    run_id: str,
+    org_id: str,
+    team_node_id: str,
+) -> Optional[AgentRun]:
+    """Mark one tenant running run interrupted. None if missing/wrong tenant."""
+    run = session.execute(
+        select(AgentRun).where(
+            AgentRun.id == run_id,
+            AgentRun.org_id == org_id,
+            AgentRun.team_node_id == team_node_id,
+        )
+    ).scalar_one_or_none()
+    if run is None:
+        return None
+    if run.status != "running":
+        return run
+    return complete_agent_run(
+        session,
+        run_id=run_id,
+        status="interrupted",
+        error_message=ABANDON_ERROR_MESSAGE,
+    )
+
+
+def finalize_running_runs_for_thread(
+    session: Session,
+    *,
+    correlation_id: str,
+    org_id: str,
+    team_node_id: str,
+    status: str = "interrupted",
+    error_message: str = SUPERSEDED_ERROR_MESSAGE,
+) -> int:
+    """Complete every running row for one tenant thread. Returns how many were updated."""
+    runs = list(
+        session.execute(
+            select(AgentRun).where(
+                AgentRun.correlation_id == correlation_id,
+                AgentRun.org_id == org_id,
+                AgentRun.team_node_id == team_node_id,
+                AgentRun.status == "running",
+            )
+        ).scalars().all()
+    )
+    for run in runs:
+        complete_agent_run(
+            session,
+            run_id=run.id,
+            status=status,
+            error_message=error_message,
+        )
+    return len(runs)
+
+
 def append_agent_run_thoughts(
     session: Session,
     *,

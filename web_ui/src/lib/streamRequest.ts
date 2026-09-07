@@ -23,12 +23,25 @@ export function isResumable(sessionId: string | null | undefined): boolean {
   return typeof sessionId === 'string' && sessionId.length > 0;
 }
 
-/** Cold resume (sdk_session_id) or warm in-process session still alive in sre-agent. */
+/** Latest non-empty sdkSessionId in startedAt-ascending runs (running row included). */
+export function pickLatestSdkSessionId(
+  runs: Array<{ sdkSessionId?: string | null }>,
+): string | null {
+  return [...runs].reverse().map((r) => r.sdkSessionId).find(Boolean) ?? null;
+}
+
+/** Cold resume, warm in-process session, or same-thread follow-up after the turn is not live. */
 export function canContinueConversation(opts: {
   sessionId?: string | null;
   sessionAlive?: boolean;
+  threadId?: string | null;
+  isLive?: boolean;
 }): boolean {
-  return isResumable(opts.sessionId) || opts.sessionAlive === true;
+  if (opts.isLive === true) return true;
+  if (isResumable(opts.sessionId)) return true;
+  if (opts.sessionAlive === true) return true;
+  if (opts.threadId && opts.isLive === false) return true;
+  return false;
 }
 
 const INTERRUPT_RETRY_MS = 50;
@@ -51,4 +64,17 @@ export async function interruptThread(threadId: string): Promise<void> {
     await new Promise((resolve) => setTimeout(resolve, INTERRUPT_RETRY_MS));
   }
   throw new Error('No active session to interrupt');
+}
+
+/** Mark a zombie agent run interrupted (config-service abandon). */
+export async function abandonRun(runId: string): Promise<void> {
+  const res = await fetch(`/api/team/agent-runs/${runId}/abandon`, {
+    method: 'POST',
+  });
+  if (res.ok) return;
+  if (res.status === 409) return; // already terminal
+  const err = await res.json().catch(() => ({}));
+  throw new Error((err as { error?: string; detail?: string }).error
+    || (err as { detail?: string }).detail
+    || `Abandon failed (${res.status})`);
 }

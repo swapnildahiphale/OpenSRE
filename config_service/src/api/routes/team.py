@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 
 from ...core.config_cache import get_config_cache
 from ...core.security import get_token_pepper
+from ...db import repository
 from ...db.models import (
     AgentRun,
     KnowledgeDocument,
@@ -681,6 +682,30 @@ class AgentRunResponse(BaseModel):
     sdkSessionId: Optional[str] = None
 
 
+def _agent_run_to_response(run: AgentRun) -> AgentRunResponse:
+    duration = None
+    if run.completed_at and run.started_at:
+        duration = int((run.completed_at - run.started_at).total_seconds())
+    return AgentRunResponse(
+        id=str(run.id),
+        correlationId=run.correlation_id or "",
+        agentName=run.agent_name or "unknown",
+        triggerSource=run.trigger_source or "api",
+        triggerActor=run.trigger_actor,
+        triggerMessage=run.trigger_message,
+        status=run.status,
+        startedAt=run.started_at.isoformat(),
+        completedAt=run.completed_at.isoformat() if run.completed_at else None,
+        durationSeconds=duration,
+        toolCallsCount=run.tool_calls_count,
+        outputSummary=run.output_summary,
+        outputJson=run.output_json,
+        errorMessage=run.error_message,
+        confidence=run.confidence,
+        sdkSessionId=run.sdk_session_id,
+    )
+
+
 @router.get("/agent-runs", response_model=List[AgentRunResponse])
 async def list_agent_runs(
     limit: int = 50,
@@ -701,34 +726,7 @@ async def list_agent_runs(
         .all()
     )
 
-    result = []
-    for run in runs:
-        duration = None
-        if run.completed_at and run.started_at:
-            duration = int((run.completed_at - run.started_at).total_seconds())
-
-        result.append(
-            AgentRunResponse(
-                id=str(run.id),
-                correlationId=run.correlation_id or "",
-                agentName=run.agent_name or "unknown",
-                triggerSource=run.trigger_source or "api",
-                triggerActor=run.trigger_actor,
-                triggerMessage=run.trigger_message,
-                status=run.status,
-                startedAt=run.started_at.isoformat(),
-                completedAt=run.completed_at.isoformat() if run.completed_at else None,
-                durationSeconds=duration,
-                toolCallsCount=run.tool_calls_count,
-                outputSummary=run.output_summary,
-                outputJson=run.output_json,
-                errorMessage=run.error_message,
-                confidence=run.confidence,
-                sdkSessionId=run.sdk_session_id,
-            )
-        )
-
-    return result
+    return [_agent_run_to_response(run) for run in runs]
 
 
 @router.get("/agent-runs/{run_id}", response_model=AgentRunResponse)
@@ -751,28 +749,29 @@ async def get_agent_run(
     if not run:
         raise HTTPException(status_code=404, detail="Agent run not found")
 
-    duration = None
-    if run.completed_at and run.started_at:
-        duration = int((run.completed_at - run.started_at).total_seconds())
+    return _agent_run_to_response(run)
 
-    return AgentRunResponse(
-        id=str(run.id),
-        correlationId=run.correlation_id or "",
-        agentName=run.agent_name or "unknown",
-        triggerSource=run.trigger_source or "api",
-        triggerActor=run.trigger_actor,
-        triggerMessage=run.trigger_message,
-        status=run.status,
-        startedAt=run.started_at.isoformat(),
-        completedAt=run.completed_at.isoformat() if run.completed_at else None,
-        durationSeconds=duration,
-        toolCallsCount=run.tool_calls_count,
-        outputSummary=run.output_summary,
-        outputJson=run.output_json,
-        errorMessage=run.error_message,
-        confidence=run.confidence,
-        sdkSessionId=run.sdk_session_id,
+
+@router.post("/agent-runs/{run_id}/abandon", response_model=AgentRunResponse)
+async def abandon_agent_run(
+    run_id: str,
+    db: Session = Depends(get_db),
+    team: TeamPrincipal = Depends(require_team_auth),
+):
+    """Mark a running agent run interrupted (zombie Stop). Tenant-scoped."""
+    run = repository.abandon_agent_run(
+        db,
+        run_id=run_id,
+        org_id=team.org_id,
+        team_node_id=team.team_node_id,
     )
+    if run is None:
+        raise HTTPException(status_code=404, detail="Agent run not found")
+    # abandon_agent_run only sets interrupted when the row was running.
+    if run.status != "interrupted":
+        raise HTTPException(status_code=409, detail="Run is not in running state")
+    db.commit()
+    return _agent_run_to_response(run)
 
 
 # =============================================================================
