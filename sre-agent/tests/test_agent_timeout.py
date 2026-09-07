@@ -1,5 +1,7 @@
 """Timeout message formatting and session_id capture helpers."""
 
+from claude_agent_sdk import SystemMessage
+
 from agent import capture_session_id_from_result, format_investigation_timeout_message
 
 
@@ -27,3 +29,18 @@ def test_capture_session_id_from_result_message():
 def test_capture_session_id_does_not_overwrite_existing():
     sid = capture_session_id_from_result("prev-sess", _FakeResultMessage(None))
     assert sid == "prev-sess"
+
+
+def test_capture_session_id_from_system_message_init():
+    msg = SystemMessage(subtype="init", data={"session_id": "sess-init"})
+    assert capture_session_id_from_result(None, msg) == "sess-init"
+
+
+def test_capture_system_message_without_data_keeps_prior():
+    msg = SystemMessage(subtype="init", data={})
+    assert capture_session_id_from_result("prev-sess", msg) == "prev-sess"
+
+
+def test_capture_system_message_does_not_clobber_with_none_data():
+    msg = SystemMessage(subtype="init", data={"other": "x"})
+    assert capture_session_id_from_result(None, msg) is None

@@ -194,6 +194,61 @@ def test_complete_agent_run_includes_sdk_session_id(monkeypatch):
     assert captured["body"]["sdk_session_id"] == "sess-z"
 
 
+def test_persist_sdk_session_id_puts_expected_body():
+    with patch("server_simple.httpx.put") as mock_put:
+        mock_put.return_value = MagicMock(raise_for_status=lambda: None)
+        server_simple._persist_sdk_session_id("run-1", "sess-abc")
+    url = (
+        mock_put.call_args.args[0]
+        if mock_put.call_args.args
+        else mock_put.call_args.kwargs.get("url")
+    )
+    assert url.endswith("/api/v1/internal/agent-runs/run-1/sdk-session")
+    assert mock_put.call_args.kwargs["json"] == {"sdk_session_id": "sess-abc"}
+    assert mock_put.call_args.kwargs["headers"] == server_simple._INTERNAL_HEADERS
+    assert mock_put.call_args.kwargs["timeout"] == 5.0
+
+
+def test_persist_sdk_session_id_skips_empty():
+    with patch("server_simple.httpx.put") as mock_put:
+        server_simple._persist_sdk_session_id("run-1", "")
+        server_simple._persist_sdk_session_id("run-1", None)  # type: ignore[arg-type]
+    mock_put.assert_not_called()
+
+
+def test_persist_sdk_session_id_swallows_http_errors():
+    with patch("server_simple.httpx.put") as mock_put:
+        mock_put.side_effect = Exception("down")
+        server_simple._persist_sdk_session_id("run-1", "sess-abc")  # must not raise
+
+
+def test_exception_complete_includes_sdk_session_id(monkeypatch):
+    """The except-path PATCH must send a captured session id (not omit the field)."""
+    import server_simple
+
+    captured = {}
+
+    class _Resp:
+        def raise_for_status(self):
+            pass
+
+    def _fake_patch(url, json=None, headers=None, timeout=None):
+        captured["body"] = json
+        return _Resp()
+
+    monkeypatch.setattr(server_simple.httpx, "patch", _fake_patch)
+    server_simple._run_id_by_thread["thread-ex-sid"] = "run-ex-sid"
+    server_simple._complete_agent_run(
+        thread_id="thread-ex-sid",
+        success=False,
+        result_text="Investigation failed: boom",
+        tool_calls=[],
+        duration_seconds=0.0,
+        sdk_session_id="sess-ex",
+    )
+    assert captured["body"]["sdk_session_id"] == "sess-ex"
+
+
 def test_exception_path_finalizes_run_as_failed(monkeypatch):
     """When agent_background_task raises, _complete_agent_run is called with success=False."""
     import server_simple

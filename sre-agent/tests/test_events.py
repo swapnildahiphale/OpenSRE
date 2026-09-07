@@ -1,4 +1,4 @@
-from events import tool_end_event, tool_start_event
+from events import sdk_session_event, tool_end_event, tool_start_event
 
 
 def test_tool_start_event_carries_agent_fields():
@@ -46,3 +46,10 @@ def test_tool_start_event_defaults_root_when_no_agent_kwargs():
     assert evt.data["parent_agent_id"] is None
     assert evt.data["parent_agent_type"] is None
     assert evt.data["depth"] == 0
+
+
+def test_sdk_session_event_shape():
+    ev = sdk_session_event("thread-1", "sess-abc")
+    assert ev.type == "sdk_session"
+    assert ev.data == {"session_id": "sess-abc"}
+    assert ev.thread_id == "thread-1"

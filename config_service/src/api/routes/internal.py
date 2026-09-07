@@ -12,7 +12,7 @@ from typing import Any, Dict, List, Optional
 
 import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from src.db import repository
@@ -215,6 +215,29 @@ def append_agent_run_thoughts(
     return {"success": True, "count": len(run.thoughts or [])}
 
 
+class AgentRunSdkSessionRequest(BaseModel):
+    sdk_session_id: str = Field(min_length=1, max_length=128)
+
+
+@router.put("/agent-runs/{run_id}/sdk-session")
+def set_agent_run_sdk_session(
+    run_id: str,
+    request: AgentRunSdkSessionRequest,
+    session: Session = Depends(get_db),
+    service: str = Depends(require_internal_service),
+):
+    """Set sdk_session_id on a running (or any) agent run without completing it."""
+    run = repository.set_agent_run_sdk_session_id(
+        session,
+        run_id=run_id,
+        sdk_session_id=request.sdk_session_id,
+    )
+    if not run:
+        raise HTTPException(status_code=404, detail="Agent run not found")
+    session.commit()
+    return {"success": True, "sdk_session_id": run.sdk_session_id}
+
+
 class AgentRunListResponse(BaseModel):
     """Response for listing agent runs."""
 
@@ -310,6 +333,31 @@ def list_agent_runs_internal(
     )
 
 
+class LatestSdkSessionResponse(BaseModel):
+    sdk_session_id: Optional[str] = None
+
+
+@router.get(
+    "/agent-runs/latest-sdk-session",
+    response_model=LatestSdkSessionResponse,
+)
+def get_latest_sdk_session(
+    correlation_id: str,
+    org_id: str,
+    team_node_id: str,
+    session: Session = Depends(get_db),
+    service: str = Depends(require_internal_service),
+):
+    """Latest non-empty sdk_session_id for a tenant thread, including running rows."""
+    sid = repository.get_latest_sdk_session_id(
+        session,
+        correlation_id=correlation_id,
+        org_id=org_id,
+        team_node_id=team_node_id,
+    )
+    return LatestSdkSessionResponse(sdk_session_id=sid)
+
+
 # ==================== Stale Run Cleanup ====================
 
 
@@ -373,6 +421,40 @@ def cleanup_stale_agent_runs(
         max_age_seconds=request.max_age_seconds,
         message=f"Marked {marked_count} stale runs as timeout",
     )
+
+
+class FinalizeRunningForThreadRequest(BaseModel):
+    correlation_id: str
+    org_id: str
+    team_node_id: str
+    status: str = "interrupted"
+    error_message: str = "Superseded by new turn"
+
+
+class FinalizeRunningForThreadResponse(BaseModel):
+    finalized_count: int
+
+
+@router.post(
+    "/agent-runs/finalize-running-for-thread",
+    response_model=FinalizeRunningForThreadResponse,
+)
+def finalize_running_for_thread(
+    request: FinalizeRunningForThreadRequest,
+    session: Session = Depends(get_db),
+    service: str = Depends(require_internal_service),
+):
+    """sre-agent only: mark leftover running rows for a thread interrupted."""
+    count = repository.finalize_running_runs_for_thread(
+        session,
+        correlation_id=request.correlation_id,
+        org_id=request.org_id,
+        team_node_id=request.team_node_id,
+        status=request.status,
+        error_message=request.error_message,
+    )
+    session.commit()
+    return FinalizeRunningForThreadResponse(finalized_count=count)
 
 
 @router.get("/agent-runs/stale-count", response_model=StaleRunsCountResponse)

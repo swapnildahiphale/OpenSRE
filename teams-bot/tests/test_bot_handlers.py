@@ -220,6 +220,66 @@ async def test_on_message_active_thread_queues_instead_of_investigation():
 
 
 @pytest.mark.asyncio
+async def test_on_message_queue_404_starts_follow_up_investigation():
+    """404 from queue-message means no live session (orphaned run).
+    The message must start a follow-up run (same thread_id keeps agent context);
+    no error text should be sent to the user."""
+    on_message_handler = None
+
+    class FakeApp:
+        def on_message(self, fn):
+            nonlocal on_message_handler
+            on_message_handler = fn
+            return fn
+
+        def on_card_action_execute(self, _verb):
+            def decorator(fn):
+                return fn
+
+            return decorator
+
+    register_handlers(FakeApp())
+    assert on_message_handler is not None
+
+    conversation_id = "19:404@thread.tacv2"
+    thread_id = sanitize_thread_id(conversation_id)
+    active_investigations.add(thread_id)
+
+    ctx = MagicMock()
+    ctx.send = AsyncMock(return_value=MagicMock(id="act-404"))
+    ctx.stream = MagicMock()
+    ctx.activity = MagicMock(
+        text="follow up after orphan",
+        entities=[],
+        conversation=MagicMock(
+            id=conversation_id, conversation_type="personal", conversationType=None
+        ),
+        channel_id=None,
+        channelId=None,
+    )
+
+    import aiohttp
+
+    try:
+        with patch("bot_handlers.queue_message", new_callable=AsyncMock) as mock_queue:
+            mock_queue.side_effect = aiohttp.ClientResponseError(
+                request_info=MagicMock(),
+                history=(),
+                status=404,
+                message="Not Found",
+            )
+            with patch(
+                "bot_handlers.run_investigation", new_callable=AsyncMock
+            ) as mock_run:
+                await on_message_handler(ctx)
+
+        mock_run.assert_awaited_once()
+        ctx.send.assert_not_awaited()
+    finally:
+        active_investigations.discard(thread_id)
+
+
+@pytest.mark.asyncio
 async def test_on_message_queue_409_starts_follow_up_investigation():
     """409 from queue-message means investigation just finished.
     The message must start a follow-up run (same thread_id keeps agent context);

@@ -102,10 +102,11 @@ def register_handlers(app) -> None:
             try:
                 await queue_message(thread_id=thread_id, text=cleaned)
             except aiohttp.ClientResponseError as exc:
-                if exc.status == 409:
-                    # Race: investigation finished in the window between our check and
-                    # the queue call. Fall through so the message starts a follow-up run
-                    # with the same thread_id (agent retains conversation context).
+                if exc.status in (404, 409):
+                    # 409: race — investigation finished between our check and queue call.
+                    # 404: no in-process session (orphaned run after restart/crash).
+                    # Fall through so the message starts a follow-up run with the same
+                    # thread_id (agent retains conversation context).
                     pass
                 else:
                     logger.exception("queue_message failed for thread %s", thread_id)

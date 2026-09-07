@@ -92,7 +92,7 @@ export function NewInvestigationDrawer({ open, onClose, onComplete }: Props) {
             onSend={sendMessage}
             onQueueMessage={queueMessage}
             queuedMessages={queuedMessages}
-            onStop={stop}
+            onStop={isStreaming ? stop : undefined}
             busy={isStreaming}
             placeholder="Describe the issue to investigate..."
           />
