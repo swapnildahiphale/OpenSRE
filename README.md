@@ -194,7 +194,7 @@ We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
 ## Contributors
 
-Thanks to all clawtributors:
+Thanks to everyone who helps improve OpenSRE:
 
 <p align="center">
   <a href="https://github.com/swapnildahiphale"><img src="https://avatars.githubusercontent.com/u/13692814?s=64" width="64" alt="swapnildahiphale" /></a>
