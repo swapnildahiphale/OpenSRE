@@ -196,9 +196,11 @@ We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
 Thanks to all clawtributors:
 
-<a href="https://github.com/swapnildahiphale/OpenSRE/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=swapnildahiphale/OpenSRE&max=30&columns=8" alt="OpenSRE contributors" />
-</a>
+<p align="center">
+  <a href="https://github.com/swapnildahiphale"><img src="https://avatars.githubusercontent.com/u/13692814?s=64" width="64" alt="swapnildahiphale" /></a>
+  <a href="https://github.com/snowyukitty"><img src="https://avatars.githubusercontent.com/u/270071858?s=64" width="64" alt="snowyukitty" /></a>
+  <a href="https://github.com/amolkekan"><img src="https://avatars.githubusercontent.com/u/25413488?s=64" width="64" alt="amolkekan" /></a>
+</p>
 
 ## Creator
 
