@@ -191,6 +191,15 @@ OpenSRE is built on top of proven open-source technologies:
 
 We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines. Please open an issue before starting major work.
 
+
+## Contributors
+
+Thanks to all clawtributors:
+
+<a href="https://github.com/swapnildahiphale/OpenSRE/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=swapnildahiphale/OpenSRE&max=30&columns=8" alt="OpenSRE contributors" />
+</a>
+
 ## Creator
 
 <table>
