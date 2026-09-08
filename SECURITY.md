@@ -74,7 +74,7 @@ Security issues in:
 
 > **⚠️ Simple-mode is for local development only.**
 
-`sre-agent/server_simple.py` (activated by `USE_SIMPLE_MODE=true` or `make dev`) runs the agent in-process, without Kubernetes sandboxes, and with **no TLS, no rate limiting, and no request-body size caps** by design. This is intentional for a single-developer laptop workflow where the compose stack is not exposed beyond `localhost`.
+`sre-agent/server_simple.py` (default via `make dev` / Docker image CMD) runs the agent in-process, without Kubernetes sandboxes, and with **no TLS, no rate limiting, and no request-body size caps** by design. This is intentional for a single-developer laptop workflow where the compose stack is not exposed beyond `localhost`.
 
 ### What this means
 
@@ -90,15 +90,15 @@ Security issues in:
 
 If you expose OpenSRE on a network (VM, VPS, cloud instance), follow these steps:
 
-1. **Bind to localhost only** — do not publish port 8000 to `0.0.0.0`:
+1. **Bind to localhost only** — do not publish host port 8001 to `0.0.0.0`:
 
    ```yaml
    # docker-compose.yml override
    services:
      sre-agent:
        ports:
-         - "127.0.0.1:8000:8000"   # ✅ loopback only
-         # - "8000:8000"            # ❌ exposed on all interfaces
+         - "127.0.0.1:8001:8000"   # ✅ loopback only
+         # - "8001:8000"            # ❌ exposed on all interfaces
    ```
 
 2. **Terminate TLS at a reverse proxy** (nginx, Caddy, Traefik, AWS ALB, GCP Load Balancer, etc.) — do **not** run simple-mode directly on a public port. Simple-mode has no built-in TLS support.
@@ -128,8 +128,7 @@ Use this checklist before exposing any OpenSRE deployment beyond a personal lapt
 
 ### Request body size caps
 
-- [ ] Reverse proxy `client_max_body_size` (nginx) or equivalent set to a reasonable limit (e.g. 10 MB for file attachments).
-- [ ] Server-side validation rejects unexpectedly large payloads before they reach the agent.
+- [ ] Reverse proxy `client_max_body_size` (nginx) or equivalent set to a reasonable limit (e.g. 10 MB for file attachments), as simple-mode does not enforce in-app body size limits.
 
 ### Concurrency limits at the edge
 
@@ -140,7 +139,7 @@ Use this checklist before exposing any OpenSRE deployment beyond a personal lapt
 ### Authentication & network controls
 
 - [ ] Admin token rotated from the auto-generated default before first exposure.
-- [ ] Port 8000 not published to `0.0.0.0`; all traffic enters via the proxy.
+- [ ] Agent port (8001/8000) not published to `0.0.0.0`; all traffic enters via the proxy.
 - [ ] Firewall / security group allows only the proxy's IP range to reach the agent.
 - [ ] SSO / OIDC enabled for multi-user deployments (see [docs/SSO_SETUP.md](docs/SSO_SETUP.md)).
 
