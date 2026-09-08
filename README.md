@@ -182,7 +182,7 @@ OpenSRE is built on top of proven open-source technologies:
     <picture>
       <source media="(prefers-color-scheme: dark)" srcset=".github/assets/star-history-dark.svg" />
       <source media="(prefers-color-scheme: light)" srcset=".github/assets/star-history-light.svg" />
-      <img alt="OpenSRE GitHub star history — 129 stars as of 7 Sep 2026" src=".github/assets/star-history-light.svg" width="800" />
+      <img alt="OpenSRE GitHub star history — 132 stars as of 8 Sep 2026" src=".github/assets/star-history-light.svg" width="800" />
     </picture>
   </a>
 </p>
@@ -190,6 +190,17 @@ OpenSRE is built on top of proven open-source technologies:
 ## Contributing
 
 We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines. Please open an issue before starting major work.
+
+
+## Contributors
+
+Thanks to everyone who helps improve OpenSRE:
+
+<p align="center">
+  <a href="https://github.com/swapnildahiphale"><img src="https://avatars.githubusercontent.com/u/13692814?s=64" width="64" alt="swapnildahiphale" /></a>
+  <a href="https://github.com/snowyukitty"><img src="https://avatars.githubusercontent.com/u/270071858?s=64" width="64" alt="snowyukitty" /></a>
+  <a href="https://github.com/amolkekan"><img src="https://avatars.githubusercontent.com/u/25413488?s=64" width="64" alt="amolkekan" /></a>
+</p>
 
 ## Creator
 
