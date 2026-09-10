@@ -16,6 +16,11 @@ from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
+from src.api.auth import AdminPrincipal, require_admin
+from src.core.github_install_state import (
+    mint_install_state,
+    validate_and_consume_install_state,
+)
 from src.db.models import GitHubInstallation
 from src.db.session import get_db
 
@@ -41,6 +46,13 @@ def _get_github_app_config() -> dict:
     }
 
 
+class GitHubInstallStartResponse(BaseModel):
+    """Response for starting a GitHub App installation flow."""
+
+    state: str
+    install_url: str
+
+
 class GitHubInstallationInfo(BaseModel):
     """Information about a GitHub App installation."""
 
@@ -53,6 +65,34 @@ class GitHubInstallationInfo(BaseModel):
     linked: bool = False
     org_id: Optional[str] = None
     team_node_id: Optional[str] = None
+
+
+@router.get("/install/start", response_model=GitHubInstallStartResponse)
+async def github_install_start(
+    admin: AdminPrincipal = Depends(require_admin),
+):
+    """
+    Mint CSRF state and return the GitHub App installation URL.
+
+    Call this before redirecting the user to GitHub. The returned state must be
+    echoed back on GET /github/callback.
+    """
+    config = _get_github_app_config()
+    app_name = config.get("app_name") or "opensre"
+    state = mint_install_state(created_by=admin.auth_kind)
+
+    install_url = (
+        f"https://github.com/apps/{app_name}/installations/new"
+        f"?{urlencode({'state': state})}"
+    )
+
+    logger.info(
+        "github_install_start",
+        auth_kind=admin.auth_kind,
+        app_name=app_name,
+    )
+
+    return GitHubInstallStartResponse(state=state, install_url=install_url)
 
 
 @router.get("/callback")
@@ -89,6 +129,26 @@ async def github_callback(
         raise HTTPException(
             status_code=400,
             detail="Missing installation_id. This endpoint should be called by GitHub.",
+        )
+
+    if not state:
+        logger.warning(
+            "github_callback_missing_state",
+            installation_id=installation_id,
+        )
+        raise HTTPException(
+            status_code=400,
+            detail="Missing state parameter. Start install via GET /github/install/start.",
+        )
+
+    if not validate_and_consume_install_state(state):
+        logger.warning(
+            "github_callback_invalid_state",
+            installation_id=installation_id,
+        )
+        raise HTTPException(
+            status_code=403,
+            detail="Invalid or expired state parameter.",
         )
 
     # Fetch installation details from GitHub API
@@ -209,6 +269,7 @@ async def github_callback(
 async def get_installation_info(
     installation_id: int,
     session: Session = Depends(get_db),
+    admin: AdminPrincipal = Depends(require_admin),
 ):
     """
     Get information about a GitHub installation.
