@@ -35,6 +35,14 @@ export function AccountMenu() {
         className="w-full flex items-center justify-between gap-2 px-2 py-2 rounded-lg hover:bg-white/5 transition-colors"
       >
         <div className="min-w-0 text-left">
+          {(identity?.name || identity?.email) && (
+            <div
+              className="text-sm font-semibold text-white truncate"
+              title={identity.name ? (identity.email ?? undefined) : undefined}
+            >
+              {identity.name || identity.email}
+            </div>
+          )}
           <div className="flex items-center gap-1.5">
             <span className="text-[10px] uppercase tracking-wider text-stone-500 font-medium">Org</span>
             <span className="text-sm font-semibold text-white truncate">

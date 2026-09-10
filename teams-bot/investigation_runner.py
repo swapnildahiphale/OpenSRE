@@ -107,6 +107,7 @@ async def run_investigation(
     send_text: SendText,
     update_card: UpdateCard,
     plain_text_final: bool = False,
+    trigger_actor: Optional[str] = None,
 ) -> None:
     active_investigations.add(thread_id)
     try:
@@ -119,6 +120,7 @@ async def run_investigation(
             send_text=send_text,
             update_card=update_card,
             plain_text_final=plain_text_final,
+            trigger_actor=trigger_actor,
         )
     finally:
         active_investigations.discard(thread_id)
@@ -134,6 +136,7 @@ async def _run_investigation_body(
     send_text: SendText,
     update_card: UpdateCard,
     plain_text_final: bool,
+    trigger_actor: Optional[str] = None,
 ) -> None:
     cfg = Config()
     state = InvestigationState(thread_id=thread_id)
@@ -143,6 +146,9 @@ async def _run_investigation_body(
         "thread_id": thread_id,
         "trigger_source": "teams",
     }
+    actor = (trigger_actor or "").strip()
+    if actor:
+        payload["trigger_actor"] = actor[:128]
     last_update = 0.0
 
     async def send_final_reply() -> None:

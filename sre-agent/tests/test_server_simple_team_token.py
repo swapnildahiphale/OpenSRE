@@ -239,3 +239,190 @@ def test_finalize_investigation_strips_fence_and_attaches_structured_report(monk
     assert patched["body"]["output_json"] == {"title": "Headline"}
     assert "```json" not in patched["body"]["output_summary"]
     assert patched["body"]["output_summary"] == "**Headline**\n\nbody"
+
+
+def test_normalize_trigger_actor():
+    import server_simple
+
+    assert server_simple._normalize_trigger_actor(None) is None
+    assert server_simple._normalize_trigger_actor("   ") is None
+    assert server_simple._normalize_trigger_actor("  Jane Doe  ") == "Jane Doe"
+    assert server_simple._normalize_trigger_actor("x" * 200) == "x" * 128
+
+
+def test_actor_from_auth_me_prefers_name():
+    import server_simple
+
+    assert server_simple._actor_from_auth_me({"name": "Jane", "email": "j@x.com"}) == "Jane"
+    assert server_simple._actor_from_auth_me({"email": "j@x.com"}) == "j@x.com"
+    assert server_simple._actor_from_auth_me({}) is None
+    assert server_simple._actor_from_auth_me({"name": "  "}) is None
+
+
+def test_create_agent_run_uses_per_thread_actor(monkeypatch):
+    monkeypatch.setenv("OPENSRE_TENANT_ID", "local")
+    monkeypatch.setenv("OPENSRE_TEAM_ID", "default")
+    import server_simple
+
+    server_simple._team_identity_by_thread["thread-actor"] = ("pilot", "SRE")
+    server_simple._trigger_actor_by_thread["thread-actor"] = "Jane Doe"
+    posted = {}
+
+    def fake_post(url, json=None, headers=None, timeout=None):
+        posted["body"] = json
+        resp = MagicMock()
+        resp.raise_for_status = MagicMock()
+        return resp
+
+    with patch.object(server_simple.httpx, "post", side_effect=fake_post):
+        run_id = server_simple._create_agent_run(
+            thread_id="thread-actor",
+            prompt="check pods",
+        )
+
+    assert run_id is not None
+    assert posted["body"]["trigger_actor"] == "Jane Doe"
+
+
+def test_create_agent_run_actor_none_when_unset(monkeypatch):
+    monkeypatch.setenv("OPENSRE_TENANT_ID", "local")
+    monkeypatch.setenv("OPENSRE_TEAM_ID", "default")
+    import server_simple
+
+    server_simple._team_identity_by_thread["thread-no-actor"] = ("pilot", "SRE")
+    server_simple._trigger_actor_by_thread.pop("thread-no-actor", None)
+    posted = {}
+
+    def fake_post(url, json=None, headers=None, timeout=None):
+        posted["body"] = json
+        resp = MagicMock()
+        resp.raise_for_status = MagicMock()
+        return resp
+
+    with patch.object(server_simple.httpx, "post", side_effect=fake_post):
+        server_simple._create_agent_run(thread_id="thread-no-actor", prompt="x")
+
+    assert posted["body"]["trigger_actor"] is None
+
+
+def test_investigate_explicit_trigger_actor_wins(monkeypatch):
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-test")
+    import server_simple
+
+    async def fake_bg(thread_id, resume_session_id=None):
+        pass
+
+    monkeypatch.setattr(server_simple, "agent_background_task", fake_bg)
+    monkeypatch.setattr(server_simple, "_background_tasks", {})
+    monkeypatch.setattr(server_simple, "_message_queues", {})
+    monkeypatch.setattr(server_simple, "_response_queues", {})
+    monkeypatch.setattr(server_simple, "_team_identity_by_thread", {})
+    monkeypatch.setattr(server_simple, "_trigger_actor_by_thread", {})
+    monkeypatch.setattr(
+        server_simple,
+        "_resolve_team_identity",
+        lambda _t: ("pilot", "SRE"),
+    )
+    monkeypatch.setattr(
+        server_simple,
+        "_actor_from_auth_me",
+        lambda _d: "Service Token User",
+    )
+    monkeypatch.setattr(
+        server_simple,
+        "_fetch_auth_me",
+        lambda _t: {"name": "Service Token User", "email": "bot@example.com"},
+    )
+
+    client = TestClient(server_simple.app)
+    with patch.object(
+        server_simple, "create_investigation_stream", return_value=iter([])
+    ):
+        resp = client.post(
+            "/investigate",
+            json={
+                "prompt": "oc-1234",
+                "thread_id": "thread-teams-actor",
+                "trigger_source": "teams",
+                "trigger_actor": "Jane Doe",
+            },
+            headers={"Authorization": "Bearer service-token"},
+        )
+    assert resp.status_code == 200
+    assert server_simple._trigger_actor_by_thread["thread-teams-actor"] == "Jane Doe"
+
+
+def test_investigate_infers_actor_from_auth_me(monkeypatch):
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-test")
+    import server_simple
+
+    async def fake_bg(thread_id, resume_session_id=None):
+        pass
+
+    monkeypatch.setattr(server_simple, "agent_background_task", fake_bg)
+    monkeypatch.setattr(server_simple, "_background_tasks", {})
+    monkeypatch.setattr(server_simple, "_message_queues", {})
+    monkeypatch.setattr(server_simple, "_response_queues", {})
+    monkeypatch.setattr(server_simple, "_team_identity_by_thread", {})
+    monkeypatch.setattr(server_simple, "_trigger_actor_by_thread", {})
+    monkeypatch.setattr(
+        server_simple,
+        "_resolve_team_identity",
+        lambda _t: ("pilot", "SRE"),
+    )
+    monkeypatch.setattr(
+        server_simple,
+        "_fetch_auth_me",
+        lambda _t: {"name": "Jane Doe", "email": "jane@example.com"},
+    )
+
+    client = TestClient(server_simple.app)
+    with patch.object(
+        server_simple, "create_investigation_stream", return_value=iter([])
+    ):
+        resp = client.post(
+            "/investigate",
+            json={"prompt": "test", "thread_id": "thread-web-actor"},
+            headers={"Authorization": "Bearer sso-token"},
+        )
+    assert resp.status_code == 200
+    assert server_simple._trigger_actor_by_thread["thread-web-actor"] == "Jane Doe"
+
+
+def test_investigate_empty_actor_clears_thread(monkeypatch):
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-test")
+    import server_simple
+
+    async def fake_bg(thread_id, resume_session_id=None):
+        pass
+
+    monkeypatch.setattr(server_simple, "agent_background_task", fake_bg)
+    monkeypatch.setattr(server_simple, "_background_tasks", {})
+    monkeypatch.setattr(server_simple, "_message_queues", {})
+    monkeypatch.setattr(server_simple, "_response_queues", {})
+    monkeypatch.setattr(server_simple, "_team_identity_by_thread", {})
+    monkeypatch.setattr(
+        server_simple, "_trigger_actor_by_thread", {"thread-clear-actor": "Old"}
+    )
+    monkeypatch.setattr(
+        server_simple,
+        "_resolve_team_identity",
+        lambda _t: ("pilot", "SRE"),
+    )
+    monkeypatch.setattr(server_simple, "_fetch_auth_me", lambda _t: {})
+
+    client = TestClient(server_simple.app)
+    with patch.object(
+        server_simple, "create_investigation_stream", return_value=iter([])
+    ):
+        resp = client.post(
+            "/investigate",
+            json={
+                "prompt": "test",
+                "thread_id": "thread-clear-actor",
+                "trigger_actor": "   ",
+            },
+            headers={"Authorization": "Bearer minted-token"},
+        )
+    assert resp.status_code == 200
+    assert "thread-clear-actor" not in server_simple._trigger_actor_by_thread

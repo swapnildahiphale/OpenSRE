@@ -524,6 +524,12 @@ export default function TeamAgentRunsPage() {
                                 {triggerIcon(conv.latestRun.triggerSource)}
                                 {conv.latestRun.triggerSource.replace(/_/g, ' ')}
                               </span>
+                              {conv.firstRun.triggerActor?.trim() ? (
+                                <>
+                                  <span>·</span>
+                                  <span>{conv.firstRun.triggerActor.trim()}</span>
+                                </>
+                              ) : null}
                               {duration && !isRunning && (
                                 <>
                                   <span>·</span>

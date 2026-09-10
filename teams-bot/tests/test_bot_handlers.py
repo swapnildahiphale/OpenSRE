@@ -2,6 +2,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from bot_handlers import (
+    activity_sender_name,
     is_azure_webchat,
     is_direct_bot_chat,
     is_personal_chat,
@@ -11,6 +12,29 @@ from bot_handlers import (
 )
 from investigation_runner import sanitize_thread_id
 from state import active_investigations
+
+
+def test_activity_sender_name_from_property():
+    # MagicMock(name=...) sets the mock id, not ChannelAccount.name.
+    sender = MagicMock()
+    sender.name = "Jane Doe"
+    activity = MagicMock()
+    activity.from_property = sender
+    assert activity_sender_name(activity) == "Jane Doe"
+
+
+def test_activity_sender_name_missing():
+    activity = MagicMock(spec=["text"])
+    assert activity_sender_name(activity) is None
+
+
+def test_activity_sender_name_strips_and_caps():
+    activity = MagicMock()
+    activity.from_property = MagicMock()
+    activity.from_property.name = "  " + ("x" * 200)
+    got = activity_sender_name(activity)
+    assert got is not None
+    assert len(got) == 128
 
 
 def test_strip_bot_mention():
@@ -75,11 +99,14 @@ async def test_channel_investigation_does_not_use_activity_stream():
         channel_id="msteams",
         channelId="msteams",
     )
+    ctx.activity.from_property = MagicMock()
+    ctx.activity.from_property.name = "Jane Doe"
     with patch("bot_handlers.run_investigation", new_callable=AsyncMock) as mock_run:
         await on_message_handler(ctx)
 
     mock_run.assert_awaited_once()
     kwargs = mock_run.await_args.kwargs
+    assert kwargs["trigger_actor"] == "Jane Doe"
     assert kwargs["plain_text_final"] is True
     ctx.stream.update.assert_not_called()
     # Ack is one send; progress edits reuse that activity id (PUT, not stream).
@@ -141,6 +168,45 @@ async def test_personal_investigation_keeps_activity_stream():
     ctx.stream.update.assert_called_once()
     ctx.stream.close.assert_called_once()
     assert kwargs["plain_text_final"] is False
+
+
+@pytest.mark.asyncio
+async def test_personal_investigation_omits_actor_when_name_missing():
+    on_message_handler = None
+
+    class FakeApp:
+        def on_message(self, fn):
+            nonlocal on_message_handler
+            on_message_handler = fn
+            return fn
+
+        def on_card_action_execute(self, _verb):
+            def decorator(fn):
+                return fn
+
+            return decorator
+
+    register_handlers(FakeApp())
+    ctx = MagicMock()
+    ctx.send = AsyncMock(return_value=MagicMock(id="act-p"))
+    ctx.stream = MagicMock()
+    ctx.stream.update = MagicMock()
+    ctx.stream.close = MagicMock()
+    ctx.activity = MagicMock(
+        text="check redis",
+        entities=[],
+        conversation=MagicMock(
+            id="a:personal-synthetic",
+            conversation_type="personal",
+            conversationType=None,
+        ),
+        channel_id="msteams",
+        channelId="msteams",
+        from_property=None,
+    )
+    with patch("bot_handlers.run_investigation", new_callable=AsyncMock) as mock_run:
+        await on_message_handler(ctx)
+    assert mock_run.await_args.kwargs.get("trigger_actor") in (None, "")
 
 
 def test_is_personal_chat():

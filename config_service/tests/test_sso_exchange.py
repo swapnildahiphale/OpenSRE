@@ -1,10 +1,12 @@
 from src.api.routes.sso import (
+    _apply_sso_display_name,
     _resolve_sso_email,
     _sso_client_secret,
     _sso_team_node_id,
     _sso_token_hash,
 )
 from src.core.security import hash_token
+from src.db.models import TeamToken
 
 
 def test_resolve_sso_email_prefers_email_claim():
@@ -74,3 +76,34 @@ def test_sso_client_secret_empty_when_unset(monkeypatch):
 def test_sso_client_secret_empty_when_blank(monkeypatch):
     monkeypatch.setenv("SSO_CLIENT_SECRET", "   ")
     assert _sso_client_secret() == ""
+
+
+def _token() -> TeamToken:
+    return TeamToken(
+        org_id="org1",
+        team_node_id="default",
+        token_id="sso_tok",
+        token_hash="hash",
+        label="sso:jane@example.com",
+    )
+
+
+def test_apply_sso_display_name_sets_stripped_name():
+    token = _token()
+    _apply_sso_display_name(token, "  Jane Doe  ")
+    assert token.display_name == "Jane Doe"
+
+
+def test_apply_sso_display_name_ignores_blank_and_non_string():
+    token = _token()
+    token.display_name = "Jane Doe"
+    _apply_sso_display_name(token, "   ")
+    _apply_sso_display_name(token, None)
+    _apply_sso_display_name(token, 123)
+    assert token.display_name == "Jane Doe"
+
+
+def test_apply_sso_display_name_truncates_to_256():
+    token = _token()
+    _apply_sso_display_name(token, "x" * 300)
+    assert token.display_name == "x" * 256

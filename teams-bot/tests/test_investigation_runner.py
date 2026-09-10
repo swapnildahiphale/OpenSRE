@@ -1,3 +1,4 @@
+from typing import Optional
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -79,6 +80,7 @@ async def _make_sse_runner(
     send_text=None,
     plain_text_final: bool = False,
     web_ui_base_url: str = "",
+    trigger_actor: Optional[str] = None,
 ):
     """Helper: mock aiohttp to stream sse_lines then close, run investigation."""
     if send_text is None:
@@ -119,9 +121,53 @@ async def _make_sse_runner(
                 send_text=send_text,
                 update_card=AsyncMock(),
                 plain_text_final=plain_text_final,
+                trigger_actor=trigger_actor,
             )
             assert mock_session.post.call_args.kwargs["json"]["trigger_source"] == "teams"
     return send_text
+
+
+@pytest.mark.asyncio
+async def test_run_investigation_includes_trigger_actor():
+    send_card = AsyncMock()
+    sse_lines = ['data: {"type": "result", "data": {"text": "done"}}']
+    sse_bytes = ("\n".join(sse_lines) + "\n").encode()
+
+    async def _iter_any():
+        yield sse_bytes
+
+    mock_resp = MagicMock()
+    mock_resp.raise_for_status = MagicMock()
+    mock_resp.content.iter_any = _iter_any
+    mock_post_ctx = AsyncMock()
+    mock_post_ctx.__aenter__ = AsyncMock(return_value=mock_resp)
+    mock_post_ctx.__aexit__ = AsyncMock(return_value=None)
+    mock_session = MagicMock()
+    mock_session.post = MagicMock(return_value=mock_post_ctx)
+    mock_session_ctx = AsyncMock()
+    mock_session_ctx.__aenter__.return_value = mock_session
+    mock_session_ctx.__aexit__.return_value = None
+
+    with patch(
+        "investigation_runner.aiohttp.ClientSession", return_value=mock_session_ctx
+    ):
+        with patch("investigation_runner.Config") as mock_cfg:
+            mock_cfg.return_value.SRE_AGENT_URL = "http://agent:8001"
+            mock_cfg.return_value.INVESTIGATE_AUTH_TOKEN = ""
+            mock_cfg.return_value.WEB_UI_PUBLIC_BASE_URL = ""
+            await run_investigation(
+                thread_id="teams-test",
+                prompt="investigate latency",
+                stream_update=AsyncMock(),
+                stream_close=AsyncMock(),
+                send_card=send_card,
+                send_text=AsyncMock(),
+                update_card=AsyncMock(),
+                trigger_actor="Jane Doe",
+            )
+    payload = mock_session.post.call_args.kwargs["json"]
+    assert payload["trigger_source"] == "teams"
+    assert payload["trigger_actor"] == "Jane Doe"
 
 
 @pytest.mark.asyncio
