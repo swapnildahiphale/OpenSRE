@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import secrets
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
@@ -405,7 +406,7 @@ def authenticate_org_admin_token(
     if row is None:
         raise ValueError("Token not found")
 
-    if row.token_hash != expected_hash:
+    if not secrets.compare_digest(row.token_hash, expected_hash):
         raise ValueError("Invalid token")
 
     if row.revoked_at is not None:
@@ -760,7 +761,9 @@ def authenticate_bearer_token(
         raise ValueError("Invalid token")
     if row.revoked_at is not None:
         raise ValueError("Token revoked")
-    if row.token_hash != hash_token(token_secret, pepper=pepper):
+    if not secrets.compare_digest(
+        row.token_hash, hash_token(token_secret, pepper=pepper)
+    ):
         raise ValueError("Invalid token")
 
     # Check expiration
@@ -812,7 +815,9 @@ def authenticate_bearer_token_extended(
         raise ValueError("Invalid token")
     if row.revoked_at is not None:
         raise ValueError("Token revoked")
-    if row.token_hash != hash_token(token_secret, pepper=pepper):
+    if not secrets.compare_digest(
+        row.token_hash, hash_token(token_secret, pepper=pepper)
+    ):
         raise ValueError("Invalid token")
 
     # Check expiration
