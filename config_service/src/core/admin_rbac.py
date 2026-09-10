@@ -48,6 +48,9 @@ def resolve_admin_permissions(
     Defaults:
     - ADMIN_PERMISSIONS_DEFAULT: "admin:*" (preserves current behavior)
     - ADMIN_GROUP_PERMISSIONS_JSON: optional fine-grained mapping.
+
+    Note: permission strings are informational for /auth/me unless a route
+    enforces them explicitly. Org boundaries are enforced via check_org_access.
     """
     # Break-glass tokens keep full access by default.
     if auth_kind == "admin_token":
