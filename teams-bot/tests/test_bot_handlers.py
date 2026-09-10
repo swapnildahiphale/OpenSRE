@@ -18,8 +18,26 @@ def test_activity_sender_name_from_property():
     # MagicMock(name=...) sets the mock id, not ChannelAccount.name.
     sender = MagicMock()
     sender.name = "Jane Doe"
-    activity = MagicMock()
+    activity = MagicMock(spec=["from_property", "from"])
     activity.from_property = sender
+    assert activity_sender_name(activity) == "Jane Doe"
+
+
+def test_activity_sender_name_message_activity_from_alias():
+    """Real SDK MessageActivity stores sender on from_, not from_property."""
+    from microsoft_teams.api import MessageActivity
+
+    activity = MessageActivity.model_validate(
+        {
+            "type": "message",
+            "id": "msg-1",
+            "timestamp": "2026-09-10T07:30:00Z",
+            "from": {"id": "user1", "name": "Jane Doe"},
+            "recipient": {"id": "bot-1", "name": "OpenSRE"},
+            "conversation": {"id": "conv-1"},
+            "text": "hello",
+        }
+    )
     assert activity_sender_name(activity) == "Jane Doe"
 
 
@@ -29,9 +47,9 @@ def test_activity_sender_name_missing():
 
 
 def test_activity_sender_name_strips_and_caps():
-    activity = MagicMock()
-    activity.from_property = MagicMock()
-    activity.from_property.name = "  " + ("x" * 200)
+    activity = MagicMock(spec=["from_"])
+    activity.from_ = MagicMock()
+    activity.from_.name = "  " + ("x" * 200)
     got = activity_sender_name(activity)
     assert got is not None
     assert len(got) == 128
@@ -99,8 +117,8 @@ async def test_channel_investigation_does_not_use_activity_stream():
         channel_id="msteams",
         channelId="msteams",
     )
-    ctx.activity.from_property = MagicMock()
-    ctx.activity.from_property.name = "Jane Doe"
+    ctx.activity.from_ = MagicMock()
+    ctx.activity.from_.name = "Jane Doe"
     with patch("bot_handlers.run_investigation", new_callable=AsyncMock) as mock_run:
         await on_message_handler(ctx)
 
