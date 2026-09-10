@@ -49,7 +49,10 @@ def should_handle_message(
 
 def activity_sender_name(activity: Any) -> Optional[str]:
     """Teams display name from the activity sender. Never return the user id."""
-    sender = getattr(activity, "from_property", None)
+    # microsoft-teams-apps 2.x exposes JSON "from" as from_ on MessageActivity.
+    sender = getattr(activity, "from_", None)
+    if sender is None:
+        sender = getattr(activity, "from_property", None)
     if sender is None:
         sender = getattr(activity, "from", None)
     name = getattr(sender, "name", None) if sender is not None else None
