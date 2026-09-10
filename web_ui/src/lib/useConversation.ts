@@ -13,6 +13,7 @@ interface ListRun {
   id: string; correlationId: string; agentName: string; status: string;
   startedAt: string; triggerMessage?: string;
   triggerSource?: string;
+  triggerActor?: string;
   outputSummary?: string | null; outputJson?: Record<string, unknown> | null;
   errorMessage?: string | null;
   sdkSessionId?: string | null;
@@ -45,6 +46,7 @@ export function useConversation(runId: string | undefined) {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [episode, setEpisode] = useState<ThreadEpisode | null>(null);
   const [triggerSource, setTriggerSource] = useState<string | null>(null);
+  const [triggerActor, setTriggerActor] = useState<string | null>(null);
 
   // isCancelled defaults to () => false for the public reload path.
   // The polling effect passes its own cancelled flag so in-flight fetches
@@ -137,6 +139,7 @@ export function useConversation(runId: string | undefined) {
       setStatus(asRunStatus(runs[runs.length - 1]?.status ?? 'idle'));
       setEpisode(episode ?? null);
       setTriggerSource(runs[0]?.triggerSource ?? null);
+      setTriggerActor(runs[0]?.triggerActor ?? null);
     } catch (e) {
       if (!isCancelled()) setError(e instanceof Error ? e.message : 'Failed to load conversation');
     } finally {
@@ -161,7 +164,7 @@ export function useConversation(runId: string | undefined) {
   return {
     turns, title, agentName, status,
     sessionId, threadId, sessionAlive, errorMessage,
-    episode, triggerSource,
+    episode, triggerSource, triggerActor,
     continuable: canContinueConversation({
       sessionId,
       sessionAlive,

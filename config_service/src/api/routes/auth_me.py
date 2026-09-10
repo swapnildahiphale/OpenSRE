@@ -32,8 +32,27 @@ class AuthMeResponse(BaseModel):
     team_node_id: Optional[str] = None
     subject: Optional[str] = None
     email: Optional[str] = None
+    name: Optional[str] = None
     can_write: bool = False
     permissions: List[str] = Field(default_factory=list)
+
+
+def sso_persona_from_token(
+    label: Optional[str], display_name: Optional[str]
+) -> tuple[Optional[str], Optional[str], Optional[str]]:
+    """Return (email, name, subject) for sso:{email} labels. Else all None.
+
+    Do not treat an arbitrary token label as an email.
+    """
+    if not isinstance(label, str) or not label.startswith("sso:"):
+        return None, None, None
+    remainder = label[4:]
+    if "@" not in remainder:
+        return None, None, None
+    name = None
+    if isinstance(display_name, str) and display_name.strip():
+        name = display_name.strip()
+    return remainder, name, remainder
 
 
 def _extract_token(authorization: str, x_admin_token: str) -> str:
@@ -142,11 +161,27 @@ def auth_me_impl(
             raise HTTPException(status_code=503, detail=str(e))
         except ValueError:
             raise HTTPException(status_code=401, detail="Invalid token")
+
+        from sqlalchemy import select
+
+        from src.db.models import TeamToken
+
+        token_id = raw.split(".", 1)[0]
+        row = session.execute(
+            select(TeamToken).where(TeamToken.token_id == token_id)
+        ).scalar_one_or_none()
+        email, name, subject = sso_persona_from_token(
+            getattr(row, "label", None) if row is not None else None,
+            getattr(row, "display_name", None) if row is not None else None,
+        )
         return AuthMeResponse(
             role="team",
             auth_kind="team_token",
             org_id=principal.org_id,
             team_node_id=principal.team_node_id,
+            email=email,
+            name=name,
+            subject=subject,
             can_write=True,
             permissions=["team:read", "team:write"],
         )

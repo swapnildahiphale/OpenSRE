@@ -12,9 +12,30 @@ jwt = pytest.importorskip("jwt")
 cryptography = pytest.importorskip("cryptography")
 from cryptography.hazmat.primitives.asymmetric import rsa
 from src.api.main import create_app
+from src.api.routes.auth_me import sso_persona_from_token
 from src.core.security import hash_token
-from src.db.base import Base
-from src.db.models import NodeConfig, NodeType, OrgNode, TeamToken
+from src.db.models import NodeType, OrgNode, TeamToken
+
+
+def test_sso_persona_from_sso_label_with_name():
+    email, name, subject = sso_persona_from_token("sso:jane@example.com", "Jane Doe")
+    assert email == "jane@example.com"
+    assert name == "Jane Doe"
+    assert subject == "jane@example.com"
+
+
+def test_sso_persona_from_sso_label_without_name():
+    email, name, subject = sso_persona_from_token("sso:jane@example.com", None)
+    assert email == "jane@example.com"
+    assert name is None
+    assert subject == "jane@example.com"
+
+
+def test_sso_persona_ignores_non_sso_label():
+    assert sso_persona_from_token("local-dev", "ShouldIgnore") == (None, None, None)
+    assert sso_persona_from_token("jane@example.com", None) == (None, None, None)
+    assert sso_persona_from_token("sso:not-an-email", "Jane") == (None, None, None)
+    assert sso_persona_from_token(None, "Jane") == (None, None, None)
 
 
 @pytest.fixture()
@@ -24,7 +45,9 @@ def app_db_team(monkeypatch):
         connect_args={"check_same_thread": False},
         poolclass=StaticPool,
     )
-    Base.metadata.create_all(bind=engine)
+    # Only create tables needed for token auth; full create_all fails on SQLite JSONB.
+    for table in (OrgNode, TeamToken):
+        table.__table__.create(bind=engine)
     SessionLocal = sessionmaker(bind=engine)
 
     monkeypatch.setenv("TOKEN_PEPPER", "test-pepper")
@@ -49,8 +72,6 @@ def app_db_team(monkeypatch):
                 name="Team A",
             )
         )
-        s.add(NodeConfig(org_id="org1", node_id="root", config_json={}, version=1))
-        s.add(NodeConfig(org_id="org1", node_id="teamA", config_json={}, version=1))
         s.add(
             TeamToken(
                 org_id="org1",
@@ -61,7 +82,7 @@ def app_db_team(monkeypatch):
         )
         s.commit()
 
-    from src.api.routes import auth_me, config_me
+    from src.api.routes import auth_me
 
     def override_get_db():
         with SessionLocal() as s:
@@ -73,7 +94,6 @@ def app_db_team(monkeypatch):
                 raise
 
     app = create_app()
-    app.dependency_overrides[config_me.get_db] = override_get_db
     app.dependency_overrides[auth_me.get_db] = override_get_db
     return app
 
@@ -90,6 +110,95 @@ def test_auth_me_team_token(app_db_team):
     assert body["org_id"] == "org1"
     assert body["team_node_id"] == "teamA"
     assert body["can_write"] is True
+    assert body.get("name") is None
+    assert body.get("email") is None
+    assert body.get("subject") is None
+
+
+def test_auth_me_team_token_has_no_persona(app_db_team):
+    client = TestClient(app_db_team)
+    r = client.get(
+        "/api/v1/auth/me", headers={"Authorization": "Bearer tokid.toksecret"}
+    )
+    body = r.json()
+    assert body.get("name") is None
+    assert body.get("email") is None
+    assert body.get("subject") is None
+
+
+@pytest.fixture()
+def app_db_sso(monkeypatch):
+    engine = create_engine(
+        "sqlite+pysqlite:///:memory:",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
+    # Only create tables needed for token auth; full create_all fails on SQLite JSONB.
+    for table in (OrgNode, TeamToken):
+        table.__table__.create(bind=engine)
+    SessionLocal = sessionmaker(bind=engine)
+
+    monkeypatch.setenv("TOKEN_PEPPER", "test-pepper")
+    monkeypatch.setenv("TEAM_AUTH_MODE", "token")
+
+    with SessionLocal() as s:
+        s.add(
+            OrgNode(
+                org_id="org1",
+                node_id="root",
+                parent_id=None,
+                node_type=NodeType.org,
+                name="Root",
+            )
+        )
+        s.add(
+            OrgNode(
+                org_id="org1",
+                node_id="default",
+                parent_id="root",
+                node_type=NodeType.team,
+                name="Default",
+            )
+        )
+        s.add(
+            TeamToken(
+                org_id="org1",
+                team_node_id="default",
+                token_id="ssotok",
+                token_hash=hash_token("ssosecret", pepper="test-pepper"),
+                label="sso:jane@example.com",
+                display_name="Jane Doe",
+            )
+        )
+        s.commit()
+
+    from src.api.routes import auth_me
+
+    def override_get_db():
+        with SessionLocal() as s:
+            try:
+                yield s
+                s.commit()
+            except Exception:
+                s.rollback()
+                raise
+
+    app = create_app()
+    app.dependency_overrides[auth_me.get_db] = override_get_db
+    return app
+
+
+def test_auth_me_sso_token_returns_name_and_email(app_db_sso):
+    client = TestClient(app_db_sso)
+    r = client.get(
+        "/api/v1/auth/me", headers={"Authorization": "Bearer ssotok.ssosecret"}
+    )
+    assert r.status_code == 200
+    body = r.json()
+    assert body["role"] == "team"
+    assert body["email"] == "jane@example.com"
+    assert body["name"] == "Jane Doe"
+    assert body["subject"] == "jane@example.com"
 
 
 def test_auth_me_admin_token(monkeypatch):

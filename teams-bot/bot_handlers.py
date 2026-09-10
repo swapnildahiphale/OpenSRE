@@ -2,7 +2,7 @@
 
 import logging
 import re
-from typing import Any
+from typing import Any, Optional
 
 import aiohttp
 from card_builder import build_welcome_card
@@ -45,6 +45,22 @@ def should_handle_message(
     if is_direct_bot_chat(conversation_type, channel_id):
         return bool((text or "").strip())
     return mentioned and bool((text or "").strip())
+
+
+def activity_sender_name(activity: Any) -> Optional[str]:
+    """Teams display name from the activity sender. Never return the user id."""
+    sender = getattr(activity, "from_property", None)
+    if sender is None:
+        sender = getattr(activity, "from", None)
+    name = getattr(sender, "name", None) if sender is not None else None
+    if isinstance(sender, dict):
+        name = sender.get("name")
+    if not isinstance(name, str):
+        return None
+    stripped = name.strip()
+    if not stripped:
+        return None
+    return stripped[:128]
 
 
 def strip_bot_mention(text: str, bot_name: str = "OpenSRE") -> str:
@@ -190,6 +206,7 @@ def register_handlers(app) -> None:
             send_text=send_text,
             update_card=update_card,
             plain_text_final=not use_stream,
+            trigger_actor=activity_sender_name(activity),
         )
 
     @app.on_card_action_execute(SUBMIT_VERB)

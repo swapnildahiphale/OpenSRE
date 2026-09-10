@@ -124,6 +124,8 @@ class TeamToken(Base):
         default=lambda: TokenPermission.DEFAULT_TEAM,
     )
     label: Mapped[Optional[str]] = mapped_column(String(256), nullable=True)
+    # Entra display name for SSO-minted tokens (label sso:{email}). Null for minted team tokens.
+    display_name: Mapped[Optional[str]] = mapped_column(String(256), nullable=True)
 
     __table_args__ = (
         ForeignKeyConstraint(

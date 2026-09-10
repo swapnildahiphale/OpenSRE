@@ -6,6 +6,9 @@ export type Identity = {
   auth_kind: "admin_token" | "team_token" | "oidc" | "impersonation";
   org_id?: string | null;
   team_node_id?: string | null;
+  subject?: string | null;
+  email?: string | null;
+  name?: string | null;
   can_write: boolean;
   permissions: string[];
 };

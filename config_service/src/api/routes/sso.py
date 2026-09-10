@@ -98,6 +98,16 @@ def _resolve_sso_email(
     return None
 
 
+def _apply_sso_display_name(token: TeamToken, name: object) -> None:
+    """Persist Entra display name when present. Never clear a stored name."""
+    if not isinstance(name, str):
+        return
+    stripped = name.strip()
+    if not stripped:
+        return
+    token.display_name = stripped[:256]
+
+
 @router.post("/exchange", response_model=TokenExchangeResponse)
 async def exchange_auth_code(
     body: TokenExchangeRequest,
@@ -243,6 +253,7 @@ async def exchange_auth_code(
         existing_token.token_hash = _sso_token_hash(token_secret)
         existing_token.last_used_at = datetime.utcnow()
         existing_token.expires_at = datetime.utcnow() + timedelta(days=7)
+        _apply_sso_display_name(existing_token, name)
         token_id = existing_token.token_id
     else:
         # Create new token
@@ -269,6 +280,7 @@ async def exchange_auth_code(
             expires_at=datetime.utcnow() + timedelta(days=7),
             issued_by=f"sso:{email}",
         )
+        _apply_sso_display_name(new_token, name)
         db.add(new_token)
 
     db.commit()

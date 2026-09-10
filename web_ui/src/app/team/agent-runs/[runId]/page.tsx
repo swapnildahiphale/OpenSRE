@@ -15,6 +15,7 @@ import {
 } from '@/components/RunStatusBadge';
 import { Skeleton, TeamPageShell } from '@/components/ui-flow';
 import { ArrowLeft } from 'lucide-react';
+import { formatTriggerMeta } from '@/lib/triggerMeta';
 
 const NO_RESUME = "This conversation can't be continued (no saved session). Start a new investigation.";
 const INTERRUPTED_HALT =
@@ -28,7 +29,7 @@ export default function AgentRunDetailPage() {
     turns: historicalTurns, title, status,
     sessionId, threadId, sessionAlive, continuable, errorMessage, loading, error, reload,
     activeKnown, consecutiveInactivePolls,
-    episode, triggerSource,
+    episode, triggerSource, triggerActor,
   } = useConversation(runId);
 
   const stream = useAgentStream({
@@ -135,7 +136,6 @@ export default function AgentRunDetailPage() {
     displayStatus === 'timeout' || displayStatus === 'failed' || displayStatus === 'interrupted'
   );
 
-  const channelLabel = (triggerSource ?? 'web_ui').replace(/_/g, ' ');
   const turnLabel = `${turns.length} turn${turns.length === 1 ? '' : 's'}`;
 
   return (
@@ -190,7 +190,7 @@ export default function AgentRunDetailPage() {
               />
             )}
             <span className="text-xs text-slate-400 font-mono tabular-nums">
-              · {turnLabel} · {channelLabel}
+              · {turnLabel} · {formatTriggerMeta(triggerSource, triggerActor)}
             </span>
           </div>
         </header>
