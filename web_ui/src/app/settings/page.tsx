@@ -614,7 +614,7 @@ export default function SettingsPage() {
           {activeTab === 'general' && (
             <div className="space-y-6">
               <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-6 shadow-sm">
-                <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">Preferences</h2>
+                <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">Settings</h2>
 
                 <div className="space-y-4">
                   <div className="flex items-center justify-between py-3">
