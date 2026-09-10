@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { AccountMenu } from './AccountMenu';
 import { useIdentity } from '@/lib/useIdentity';
 
@@ -16,12 +16,16 @@ const baseTeam = {
   permissions: [] as string[],
 };
 
+function openMenu() {
+  fireEvent.click(screen.getByRole('button'));
+}
+
 describe('AccountMenu', () => {
   beforeEach(() => {
     vi.mocked(useIdentity).mockReset();
   });
 
-  it('shows display name with email tooltip for SSO', () => {
+  it('shows display name only on collapsed button for SSO', () => {
     vi.mocked(useIdentity).mockReturnValue({
       identity: { ...baseTeam, name: 'Jane Doe', email: 'jane@example.com' },
       error: null,
@@ -32,6 +36,11 @@ describe('AccountMenu', () => {
     const persona = screen.getByText('Jane Doe');
     expect(persona).toBeInTheDocument();
     expect(persona).toHaveAttribute('title', 'jane@example.com');
+    expect(screen.queryByText('local')).not.toBeInTheDocument();
+    expect(screen.queryByText('default')).not.toBeInTheDocument();
+
+    openMenu();
+    expect(screen.getByText('jane@example.com')).toBeInTheDocument();
     expect(screen.getByText('local')).toBeInTheDocument();
     expect(screen.getByText('default')).toBeInTheDocument();
   });
@@ -46,6 +55,11 @@ describe('AccountMenu', () => {
     render(<AccountMenu />);
     expect(screen.getByText('jane@example.com')).toBeInTheDocument();
     expect(screen.queryByText('Jane Doe')).not.toBeInTheDocument();
+    expect(screen.queryByText('local')).not.toBeInTheDocument();
+
+    openMenu();
+    expect(screen.getByText('local')).toBeInTheDocument();
+    expect(screen.getByText('default')).toBeInTheDocument();
   });
 
   it('omits a persona row for token-paste team login', () => {
@@ -57,8 +71,12 @@ describe('AccountMenu', () => {
     });
     render(<AccountMenu />);
     expect(screen.queryByText('jane@example.com')).not.toBeInTheDocument();
+    expect(screen.queryByText('local')).not.toBeInTheDocument();
+    expect(screen.queryByText('default')).not.toBeInTheDocument();
+    expect(screen.queryByText('—')).not.toBeInTheDocument();
+
+    openMenu();
     expect(screen.getByText('local')).toBeInTheDocument();
     expect(screen.getByText('default')).toBeInTheDocument();
-    expect(screen.queryByText('—')).not.toBeInTheDocument();
   });
 });

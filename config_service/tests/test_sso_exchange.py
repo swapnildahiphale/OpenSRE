@@ -1,6 +1,7 @@
 from src.api.routes.sso import (
     _apply_sso_display_name,
     _resolve_sso_email,
+    _resolve_sso_name,
     _sso_client_secret,
     _sso_team_node_id,
     _sso_token_hash,
@@ -44,6 +45,43 @@ def test_resolve_sso_email_skips_non_email_preferred_username():
 
 def test_resolve_sso_email_none_when_no_at():
     assert _resolve_sso_email({"preferred_username": "alice"}, None, "email") is None
+
+
+def test_resolve_sso_name_from_userinfo_name():
+    assert (
+        _resolve_sso_name(
+            {"name": "Jane Doe", "given_name": "Jane", "family_name": "Doe"},
+            None,
+            "name",
+        )
+        == "Jane Doe"
+    )
+
+
+def test_resolve_sso_name_composes_given_and_family():
+    assert (
+        _resolve_sso_name(
+            {"given_name": "Jane", "family_name": "Doe"},
+            None,
+            "name",
+        )
+        == "Jane Doe"
+    )
+
+
+def test_resolve_sso_name_falls_back_to_display_name_in_id_token():
+    assert (
+        _resolve_sso_name(
+            {},
+            {"displayName": "Jane Doe"},
+            "name",
+        )
+        == "Jane Doe"
+    )
+
+
+def test_resolve_sso_name_none_when_blank():
+    assert _resolve_sso_name({"name": "   "}, {"displayName": ""}, "name") is None
 
 
 def test_sso_team_node_id_defaults_to_default(monkeypatch):
