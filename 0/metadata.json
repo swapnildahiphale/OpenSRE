@@ -1,0 +1,81 @@
+{
+  "cli_version": "0.10.0",
+  "checkpoint_id": "01M2HSWPG2MMEMTWH2XFZBAJXQ",
+  "session_id": "e9509bab-5fa1-4510-b7b4-4a07761ea13e",
+  "strategy": "manual-commit",
+  "created_at": "2026-09-15T05:50:59.58108Z",
+  "branch": "chore/readme-contributors-star-history",
+  "checkpoints_count": 4,
+  "save_step_count": 5,
+  "files_touched": [
+    ".github/assets/star-history-dark.svg",
+    ".github/assets/star-history-light.svg",
+    "README.md"
+  ],
+  "agent": "Cursor",
+  "model": "composer-2.5",
+  "turn_id": "2d75625fa9b9",
+  "compact_transcript_start": 0,
+  "token_usage": {
+    "input_tokens": 140506,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 450660,
+    "output_tokens": 5438,
+    "api_call_count": 5
+  },
+  "session_metrics": {
+    "turn_count": 4
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-09-15T05:50:59.550969Z",
+    "agent_lines": 21,
+    "agent_removed": 17,
+    "human_added": 0,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 21,
+    "total_lines_changed": 38,
+    "agent_percentage": 100,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 9,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        "sre-agent/.claude/skills/project-jira/SKILL.md": 9
+      }
+    },
+    {
+      "checkpoint_number": 2,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 9,
+      "agent_lines_removed": 0
+    },
+    {
+      "checkpoint_number": 3,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 9,
+      "agent_lines_removed": 0
+    },
+    {
+      "checkpoint_number": 4,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 9,
+      "agent_lines_removed": 0
+    },
+    {
+      "checkpoint_number": 5,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 9,
+      "agent_lines_removed": 0
+    }
+  ]
+}
