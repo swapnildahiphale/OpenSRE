@@ -11,7 +11,11 @@ from fastapi.responses import Response
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
-from src.api.auth import AdminPrincipal, authenticate_admin_request
+from src.api.auth import (
+    AdminPrincipal,
+    authenticate_admin_request,
+    resolve_admin_audit_actor,
+)
 from src.core.audit_log import audit_logger
 from src.core.config_cache import get_config_cache
 from src.core.metrics import ADMIN_ACTIONS_TOTAL
@@ -661,10 +665,10 @@ def admin_patch_node_config(
     body: PatchConfigRequest,
     principal: AdminPrincipal = Depends(require_admin),
     session: Session = Depends(get_db),
-    x_admin_actor: str = Header(default="admin", convert_underscores=False),
     x_bypass_approval: str = Header(default="", convert_underscores=False),
 ):
     check_org_access(principal, org_id)
+    admin_actor = resolve_admin_audit_actor(principal)
     try:
         # Check if this change requires approval
         bypass = x_bypass_approval.lower() == "true"
@@ -710,7 +714,7 @@ def admin_patch_node_config(
                         change_path=f"agents.{agent_id}.prompt.system",
                         proposed_value={"agent": agent_id, "prompt": new_text},
                         previous_value={"agent": agent_id, "prompt": prev_text},
-                        requested_by=x_admin_actor,
+                        requested_by=admin_actor,
                     )
                     pending_ids.append(pending.id)
                 session.commit()
@@ -726,7 +730,7 @@ def admin_patch_node_config(
                         to_emails=[admin_email],
                         change_type="Prompt",
                         team_name=node_id,
-                        requested_by=x_admin_actor,
+                        requested_by=admin_actor,
                         change_summary="Change to "
                         + ", ".join(sorted(prompt_edits.keys()))
                         + " prompt(s)",
@@ -756,7 +760,7 @@ def admin_patch_node_config(
                         change_path="enabled_tools",
                         proposed_value=body.patch.get("enabled_tools"),
                         previous_value=current_config.get("enabled_tools"),
-                        requested_by=x_admin_actor,
+                        requested_by=admin_actor,
                     )
                     session.commit()
 
@@ -771,7 +775,7 @@ def admin_patch_node_config(
                             to_emails=[admin_email],
                             change_type="Tool Enablement",
                             team_name=node_id,
-                            requested_by=x_admin_actor,
+                            requested_by=admin_actor,
                             change_summary="Changes to enabled tools",
                             dashboard_url=dashboard_url,
                         )
@@ -788,7 +792,7 @@ def admin_patch_node_config(
             org_id=org_id,
             node_id=node_id,
             config_patch=body.patch,
-            updated_by=x_admin_actor,
+            updated_by=admin_actor,
             skip_validation=True,  # Admin can bypass validation
         )
         merged = updated_config.config_json
@@ -807,7 +811,7 @@ def admin_patch_node_config(
             audit=True,
             org_id=org_id,
             node_id=node_id,
-            updated_by=x_admin_actor,
+            updated_by=admin_actor,
             auth_kind=principal.auth_kind,
             actor=principal.email or principal.subject,
         )
@@ -824,16 +828,16 @@ def admin_rollback_node_config(
     body: RollbackConfigRequest,
     principal: AdminPrincipal = Depends(require_admin),
     session: Session = Depends(get_db),
-    x_admin_actor: str = Header(default="admin", convert_underscores=False),
 ):
     check_org_access(principal, org_id)
+    admin_actor = resolve_admin_audit_actor(principal)
     try:
         updated_config, diff = rollback_to_version(
             session,
             org_id=org_id,
             node_id=node_id,
             version=body.version,
-            rolled_back_by=x_admin_actor,
+            rolled_back_by=admin_actor,
         )
         cfg = updated_config.config_json
         session.commit()
@@ -852,7 +856,7 @@ def admin_rollback_node_config(
             org_id=org_id,
             node_id=node_id,
             rollback_version=body.version,
-            updated_by=x_admin_actor,
+            updated_by=admin_actor,
             auth_kind=principal.auth_kind,
             actor=principal.email or principal.subject,
         )
@@ -870,15 +874,15 @@ def admin_issue_team_token(
     team_node_id: str,
     principal: AdminPrincipal = Depends(require_admin),
     session: Session = Depends(get_db),
-    x_admin_actor: str = Header(default="admin", convert_underscores=False),
 ):
     check_org_access(principal, org_id)
+    admin_actor = resolve_admin_audit_actor(principal)
     pepper = get_token_pepper()
     token = issue_team_token(
         session,
         org_id=org_id,
         team_node_id=team_node_id,
-        issued_by=x_admin_actor,
+        issued_by=admin_actor,
         pepper=pepper,
     )
     ADMIN_ACTIONS_TOTAL.labels("issue_team_token", "ok").inc()
@@ -887,7 +891,7 @@ def admin_issue_team_token(
         audit=True,
         org_id=org_id,
         team_node_id=team_node_id,
-        issued_by=x_admin_actor,
+        issued_by=admin_actor,
         auth_kind=principal.auth_kind,
         actor=principal.email or principal.subject,
     )
@@ -902,7 +906,6 @@ def admin_issue_team_impersonation_token(
     org_id: str,
     team_node_id: str,
     principal: AdminPrincipal = Depends(require_admin),
-    x_admin_actor: str = Header(default="admin", convert_underscores=False),
     session: Session = Depends(get_db),
 ):
     """
@@ -911,6 +914,7 @@ def admin_issue_team_impersonation_token(
     This avoids long-lived team token sprawl when orchestrator needs to call team-scoped endpoints.
     """
     check_org_access(principal, org_id)
+    admin_actor = resolve_admin_audit_actor(principal)
     from src.core.impersonation import mint_team_impersonation_token
     from src.db.repository import record_impersonation_jti
 
@@ -951,7 +955,7 @@ def admin_issue_team_impersonation_token(
         audit=True,
         org_id=org_id,
         team_node_id=team_node_id,
-        issued_by=x_admin_actor,
+        issued_by=admin_actor,
         auth_kind=principal.auth_kind,
         actor=principal.email or principal.subject,
         jti=jti,
@@ -969,9 +973,9 @@ def admin_revoke_team_token(
     token_id: str,
     principal: AdminPrincipal = Depends(require_admin),
     session: Session = Depends(get_db),
-    x_admin_actor: str = Header(default="admin", convert_underscores=False),
 ):
     check_org_access(principal, org_id)
+    admin_actor = resolve_admin_audit_actor(principal)
     revoke_team_token_scoped(
         session, org_id=org_id, team_node_id=team_node_id, token_id=token_id
     )
@@ -982,7 +986,7 @@ def admin_revoke_team_token(
         org_id=org_id,
         team_node_id=team_node_id,
         token_id=token_id,
-        revoked_by=x_admin_actor,
+        revoked_by=admin_actor,
         auth_kind=principal.auth_kind,
         actor=principal.email or principal.subject,
     )
@@ -1124,10 +1128,10 @@ def admin_extend_token(
     body: dict,
     principal: AdminPrincipal = Depends(require_admin),
     session: Session = Depends(get_db),
-    x_admin_actor: str = Header(default="admin", convert_underscores=False),
 ):
     """Extend token expiration by specified number of days."""
     check_org_access(principal, org_id)
+    admin_actor = resolve_admin_audit_actor(principal)
     from src.db.repository import extend_token_expiration, get_token_by_id
 
     # Verify token belongs to org
@@ -1143,7 +1147,7 @@ def admin_extend_token(
         session,
         token_id=token_id,
         days=days,
-        extended_by=x_admin_actor,
+        extended_by=admin_actor,
     )
 
     if not updated_token:
@@ -1160,7 +1164,7 @@ def admin_extend_token(
         org_id=org_id,
         token_id=token_id,
         days=days,
-        extended_by=x_admin_actor,
+        extended_by=admin_actor,
         auth_kind=principal.auth_kind,
         actor=principal.email or principal.subject,
     )
@@ -1180,10 +1184,10 @@ def admin_bulk_revoke_tokens(
     body: dict,
     principal: AdminPrincipal = Depends(require_admin),
     session: Session = Depends(get_db),
-    x_admin_actor: str = Header(default="admin", convert_underscores=False),
 ):
     """Bulk revoke multiple tokens."""
     check_org_access(principal, org_id)
+    admin_actor = resolve_admin_audit_actor(principal)
     from src.db.repository import bulk_revoke_tokens, get_token_by_id
 
     token_ids = body.get("token_ids", [])
@@ -1204,7 +1208,7 @@ def admin_bulk_revoke_tokens(
     count = bulk_revoke_tokens(
         session,
         token_ids=token_ids,
-        revoked_by=x_admin_actor,
+        revoked_by=admin_actor,
     )
 
     session.commit()
@@ -1215,7 +1219,7 @@ def admin_bulk_revoke_tokens(
         audit=True,
         org_id=org_id,
         token_count=count,
-        revoked_by=x_admin_actor,
+        revoked_by=admin_actor,
         auth_kind=principal.auth_kind,
         actor=principal.email or principal.subject,
     )
@@ -1760,13 +1764,13 @@ def admin_issue_org_admin_token(
     org_id: str,
     principal: AdminPrincipal = Depends(require_admin),
     session: Session = Depends(get_db),
-    x_admin_actor: str = Header(default="admin", convert_underscores=False),
 ):
     """Issue a new org admin token.
 
     Only super-admins (global admin token) can issue org admin tokens.
     Org admins cannot issue new admin tokens for their own org.
     """
+    admin_actor = resolve_admin_audit_actor(principal)
     # Only super-admin can issue org admin tokens
     if principal.org_id is not None:
         raise HTTPException(
@@ -1779,7 +1783,7 @@ def admin_issue_org_admin_token(
     token = issue_org_admin_token(
         session,
         org_id=org_id,
-        issued_by=x_admin_actor,
+        issued_by=admin_actor,
         pepper=pepper,
     )
     ADMIN_ACTIONS_TOTAL.labels("issue_org_admin_token", "ok").inc()
@@ -1787,7 +1791,7 @@ def admin_issue_org_admin_token(
         "admin_issue_org_admin_token",
         audit=True,
         org_id=org_id,
-        issued_by=x_admin_actor,
+        issued_by=admin_actor,
         auth_kind=principal.auth_kind,
         actor=principal.email or principal.subject,
     )
@@ -1800,12 +1804,12 @@ def admin_revoke_org_admin_token(
     token_id: str,
     principal: AdminPrincipal = Depends(require_admin),
     session: Session = Depends(get_db),
-    x_admin_actor: str = Header(default="admin", convert_underscores=False),
 ):
     """Revoke an org admin token.
 
     Can be done by super-admin or by another org admin of the same org.
     """
+    admin_actor = resolve_admin_audit_actor(principal)
     # Super-admin can revoke any, org admin can only revoke their own org's tokens
     if principal.org_id is not None and principal.org_id != org_id:
         raise HTTPException(
@@ -1815,7 +1819,7 @@ def admin_revoke_org_admin_token(
     from src.db.repository import revoke_org_admin_token
 
     revoke_org_admin_token(
-        session, org_id=org_id, token_id=token_id, revoked_by=x_admin_actor
+        session, org_id=org_id, token_id=token_id, revoked_by=admin_actor
     )
     ADMIN_ACTIONS_TOTAL.labels("revoke_org_admin_token", "ok").inc()
     audit_logger().info(
@@ -1823,7 +1827,7 @@ def admin_revoke_org_admin_token(
         audit=True,
         org_id=org_id,
         token_id=token_id,
-        revoked_by=x_admin_actor,
+        revoked_by=admin_actor,
         auth_kind=principal.auth_kind,
         actor=principal.email or principal.subject,
     )
