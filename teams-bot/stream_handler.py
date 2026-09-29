@@ -19,7 +19,6 @@ def parse_sse_event(line: str) -> Optional[dict]:
 @dataclass
 class StreamStepResult:
     update_progress: bool = False
-    immediate_progress: bool = False
     post_question: Optional[list] = None
     question_timed_out: bool = False
     finished: bool = False  # result or error received
@@ -51,8 +50,6 @@ def handle_stream_event(state: InvestigationState, event: dict) -> StreamStepRes
         run_id = data.get("run_id")
         if run_id:
             state.run_id = str(run_id)
-            # Immediate refresh adds the run link without consuming the throttle window.
-            return StreamStepResult(update_progress=True, immediate_progress=True)
         return StreamStepResult()
 
     if event_type == "thought":

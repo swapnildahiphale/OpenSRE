@@ -153,15 +153,6 @@ spec:
             # =================================================================
             - name: HEALTH_SERVER_PORT
               value: {{ .Values.services.agent.healthServer.port | default 8081 | quote }}
-            - name: WEB_UI_PUBLIC_BASE_URL
-              {{- $oidcBase := default "" .Values.services.webUi.oidc.publicBaseUrl }}
-              {{- if $oidcBase }}
-              value: {{ $oidcBase | quote }}
-              {{- else if .Values.ingress.host }}
-              value: {{ printf "https://%s" .Values.ingress.host | quote }}
-              {{- else }}
-              value: ""
-              {{- end }}
             # =================================================================
             # Sandbox Mode Configuration
             # =================================================================

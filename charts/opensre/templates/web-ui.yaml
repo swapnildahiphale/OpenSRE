@@ -74,8 +74,6 @@ spec:
               {{- else }}
               value: ""
               {{- end }}
-            - name: OPENSRE_VERSION
-              value: {{ .Chart.AppVersion | quote }}
             - name: WEB_UI_OIDC_AUTHORIZATION_ENDPOINT
               value: {{ default "" .Values.services.webUi.oidc.authorizationEndpoint | quote }}
             - name: WEB_UI_OIDC_TOKEN_ENDPOINT

@@ -59,6 +59,21 @@ _LESSON_STORE_GUIDANCE = (
     "in your response instead, so it lands in the episode.\n"
 )
 
+_RESOLUTION_GUIDANCE = (
+    "\n\n## Confirming a production fix (`resolve_episode`)\n\n"
+    "When the human's message describes what actually fixed the production issue\n"
+    "(e.g. \"restarted the pod\", \"rolled back the deploy\", \"onboarded the secret\"),\n"
+    "call the `resolve_episode` tool with their words — do not re-diagnose.\n"
+    "Set `matched_suggestion` to yes/no/unsure vs your earlier recommended actions.\n"
+    "After a successful resolve_episode, thank them briefly and confirm you stored\n"
+    "the fix in memory; invite them to reply in this same thread if they need more help.\n"
+    "If they only say \"it's fixed\" with no reason, ask what the fix was — do not call\n"
+    "the tool until you have a fix summary.\n"
+    "If they say it is still open / not fixed, acknowledge and help; do not resolve.\n"
+    "If the message is otherwise ambiguous, ask a clarifying question instead of\n"
+    "calling the tool.\n"
+)
+
 
 def investigation_guidance_append() -> str:
     """Permanent guidance for agent-driven memory and KG recall.
@@ -67,8 +82,12 @@ def investigation_guidance_append() -> str:
     prompt — sub-agents get no preset and no append, so guidance omitted from
     their prompt text does not reach them at all.
     """
-    return _MEMORY_GUIDANCE + _KG_GUIDANCE + _LESSON_STORE_GUIDANCE
-
+    return (
+        _MEMORY_GUIDANCE
+        + _KG_GUIDANCE
+        + _LESSON_STORE_GUIDANCE
+        + _RESOLUTION_GUIDANCE
+    )
 
 def memory_system_prompt_append() -> str:
     """Backward-compatible alias — use investigation_guidance_append() in new code."""
@@ -89,7 +108,14 @@ def ensure_memory_schema() -> None:
 def _embed_episode_text(ep: Episode) -> List[float]:
     text = " ".join(
         filter(
-            None, [ep.issue_type, ep.issue_description, ep.summary, ep.root_cause or ""]
+            None,
+            [
+                ep.issue_type,
+                ep.issue_description,
+                ep.summary,
+                ep.root_cause or "",
+                ep.fix_summary or "",
+            ],
         )
     )
     return get_default_embedder().embed(text)
@@ -117,6 +143,9 @@ def finalize_investigation(
         if prior:
             skills = list(dict.fromkeys((prior.skills_used or []) + skills))
 
+        # resolution_status / history / fix fields are NOT set by extraction —
+        # only resolve_episode and the scheduler's abandon path mutate them.
+        # Default "open" on first upsert; otherwise preserve prior values.
         ep = Episode(
             episode_id=(prior.episode_id if prior else str(uuid.uuid4())),
             correlation_id=correlation_id,
@@ -134,6 +163,12 @@ def finalize_investigation(
             summary=ext.summary,
             effectiveness_score=compute_effectiveness(ext.resolved, ext.root_cause),
             extraction_status=ext.status,
+            recommended_actions=ext.recommended_actions,
+            resolution_status=("open" if prior is None else prior.resolution_status),
+            resolution_note_raw=(prior.resolution_note_raw if prior else None),
+            fix_summary=(prior.fix_summary if prior else None),
+            matched_suggestion=(prior.matched_suggestion if prior else None),
+            resolution_history=(list(prior.resolution_history) if prior else []),
             duration_seconds=duration_seconds,
             created_at=(prior.created_at if prior else now),
             updated_at=now,
@@ -141,10 +176,11 @@ def finalize_investigation(
         ep.embedding = _embed_episode_text(ep)
         _store.upsert_episode(ep)
         logger.info(
-            "[MEMORY-STORE] corr=%s resolved=%s type=%s",
+            "[MEMORY-STORE] corr=%s resolved=%s type=%s resolution_status=%s",
             correlation_id,
             ep.resolved,
             ep.issue_type,
+            ep.resolution_status,
         )
     except Exception as e:
         logger.error(

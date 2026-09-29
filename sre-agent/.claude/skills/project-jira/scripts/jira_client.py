@@ -11,45 +11,9 @@ In proxy mode (production), credentials are injected transparently by the proxy 
 
 import base64
 import os
-from pathlib import Path
 from typing import Any
 
 import httpx
-
-RUN_ID_FILENAME = ".opensre_agent_run_id"
-VIEW_LINK_LABEL = "View in OpenSRE"
-
-
-def investigation_link_footer(base_url: str, run_id: str) -> str | None:
-    base = (base_url or "").strip().rstrip("/")
-    rid = (run_id or "").strip()
-    if not base or not rid:
-        return None
-    return f"---\n[{VIEW_LINK_LABEL}]({base}/team/agent-runs/{rid})"
-
-
-def with_investigation_link(description: str, footer: str | None) -> str:
-    if not footer:
-        return description
-    desc = (description or "").rstrip()
-    if desc:
-        return f"{desc}\n\n{footer}"
-    return footer
-
-
-def read_thread_run_id(cwd: Path | None = None) -> str:
-    # Skill scripts may run from a subdirectory of the thread workspace;
-    # .opensre_agent_run_id lives at the workspace root, not always in cwd.
-    start = (cwd or Path.cwd()).resolve()
-    for directory in [start, *start.parents]:
-        path = directory / RUN_ID_FILENAME
-        try:
-            content = path.read_text(encoding="utf-8").strip()
-            if content:
-                return content
-        except OSError:
-            continue
-    return ""
 
 
 def get_config() -> dict[str, str | None]:
@@ -161,22 +125,7 @@ def jira_request(
             params=params,
             json=json_body,
         )
-        if response.is_error:
-            body_snippet = response.text or ""
-            if len(body_snippet) > 800:
-                body_snippet = body_snippet[:800] + "..."
-            error_kind = (
-                "Client error" if response.status_code < 500 else "Server error"
-            )
-            message = (
-                f"{error_kind} '{response.status_code} {response.reason_phrase}' "
-                f"for url '{response.url}'"
-            )
-            if body_snippet:
-                message = f"{message}\n{body_snippet}"
-            raise httpx.HTTPStatusError(
-                message, request=response.request, response=response
-            )
+        response.raise_for_status()
         if response.status_code == 204:
             return None
         return response.json()

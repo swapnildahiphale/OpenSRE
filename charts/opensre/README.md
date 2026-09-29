@@ -37,8 +37,6 @@ For enterprise safety, the recommended flow is:
 
 This avoids exposing team tokens to browsers.
 
-The web-ui Deployment sets `OPENSRE_VERSION` from the chart `appVersion` (shown on Settings → About); if you override the image tag without updating `appVersion`, About will still display the chart version.
-
 ## Admin auth (OIDC-first) + RBAC
 
 OpenSRE supports **OIDC JWTs** for admin auth (recommended for enterprise). The `config_service` is the source of truth for admin permissions via `GET /api/v1/auth/me`.
@@ -104,7 +102,7 @@ If you do use the PKCE path:
 
 Self-hosted Entra login for the team console:
 
-- Chart already sets `WEB_UI_SSO_ORG_ID` from `global.configService.orgId` and `WEB_UI_PUBLIC_BASE_URL` from `ingress.host` (or `oidc.publicBaseUrl` if you set one) on **web-ui**, **teams-bot** (Teams “View in OpenSRE” run links), and **sre-agent** (Jira investigation links)
+- Chart already sets `WEB_UI_SSO_ORG_ID` from `global.configService.orgId` and `WEB_UI_PUBLIC_BASE_URL` from `ingress.host` (or `oidc.publicBaseUrl` if you set one) on **web-ui** and **teams-bot** (Teams “View in OpenSRE” run links)
 - Paste tenant / client id in **Admin → SSO**. Do not put them in values files
 - Put `SSO_CLIENT_SECRET` and `TOKEN_PEPPER` in the config-service secret
 - Keep `services.webUi.oidc.enabled: false`

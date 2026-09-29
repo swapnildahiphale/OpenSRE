@@ -57,30 +57,8 @@ python .claude/skills/project-jira/scripts/get_issue.py --issue-key PROJ-123
 
 ### create_issue.py - Create New Issue
 ```bash
-python .claude/skills/project-jira/scripts/create_issue.py --project PROJ --summary "Title" --description "Details" [--type Bug] [--priority High] [--labels "incident,p1"] [--fields '{"customfield_12345": {"value": "Yes"}}']
+python .claude/skills/project-jira/scripts/create_issue.py --project PROJ --summary "Title" --description "Details" [--type Bug] [--priority High] [--labels "incident,p1"]
 ```
-
-`--fields` accepts a JSON object merged into the create payload (after built-in
-fields) for required project custom fields. Use `--description` for the issue body;
-do not put `description` in `--fields` (the script appends the OpenSRE link there).
-
-**Troubleshooting:** HTTP 400 on create usually means the project requires extra
-fields. Query `GET /rest/api/2/issue/createmeta` or `/rest/api/3/issue/createmeta`
-(with `projectKeys` / `expand=projects.issuetypes.fields`) to find required fields,
-then pass them via `--fields` instead of calling the REST API directly.
-
-### OpenSRE investigation tickets
-
-When creating an issue from an OpenSRE investigation (any channel), put this in
-`--description` as Markdown:
-
-- What was already discussed
-- Likely causes and what was ruled out
-- Evidence (errors, env, jobs, dashboards, log lines)
-
-Do **not** invent or paste an OpenSRE dashboard URL. `create_issue.py` appends
-`[View in OpenSRE](...)` when `WEB_UI_PUBLIC_BASE_URL` and this thread's run id
-are available.
 
 ### update_issue.py - Update Existing Issue
 ```bash

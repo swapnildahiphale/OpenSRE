@@ -16,7 +16,7 @@ Set these in the repo root `.env` (see `env.example`):
 | `TEAMS_TENANT_ID` | Azure AD tenant ID |
 | `SRE_AGENT_URL` | sre-agent base URL (default `http://localhost:8000`) |
 | `INVESTIGATE_AUTH_TOKEN` | Bearer token for `/investigate` and `/answer` |
-| `WEB_UI_PUBLIC_BASE_URL` | Web console origin for “View in OpenSRE” links on live progress and final replies (e.g. `http://localhost:3002`) |
+| `WEB_UI_PUBLIC_BASE_URL` | Web console origin for “View in OpenSRE” links on final replies (e.g. `http://localhost:3002`) |
 | `PORT` | HTTP listen port (default `3978`) |
 
 `config.py` maps `TEAMS_*` to the SDK's `CLIENT_ID`, `CLIENT_SECRET`, and

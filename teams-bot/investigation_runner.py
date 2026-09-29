@@ -108,6 +108,8 @@ async def run_investigation(
     update_card: UpdateCard,
     plain_text_final: bool = False,
     trigger_actor: Optional[str] = None,
+    trigger_actor_teams_id: Optional[str] = None,
+    conversation_ref: Optional[dict] = None,
 ) -> None:
     active_investigations.add(thread_id)
     try:
@@ -121,6 +123,8 @@ async def run_investigation(
             update_card=update_card,
             plain_text_final=plain_text_final,
             trigger_actor=trigger_actor,
+            trigger_actor_teams_id=trigger_actor_teams_id,
+            conversation_ref=conversation_ref,
         )
     finally:
         active_investigations.discard(thread_id)
@@ -137,6 +141,8 @@ async def _run_investigation_body(
     update_card: UpdateCard,
     plain_text_final: bool,
     trigger_actor: Optional[str] = None,
+    trigger_actor_teams_id: Optional[str] = None,
+    conversation_ref: Optional[dict] = None,
 ) -> None:
     cfg = Config()
     state = InvestigationState(thread_id=thread_id)
@@ -149,6 +155,11 @@ async def _run_investigation_body(
     actor = (trigger_actor or "").strip()
     if actor:
         payload["trigger_actor"] = actor[:128]
+    teams_id = (trigger_actor_teams_id or "").strip()
+    if teams_id:
+        payload["trigger_actor_teams_id"] = teams_id[:128]
+    if conversation_ref:
+        payload["conversation_ref"] = conversation_ref
     last_update = 0.0
 
     async def send_final_reply() -> None:
@@ -180,14 +191,8 @@ async def _run_investigation_body(
 
         if step.update_progress:
             now = time.monotonic()
-            if step.immediate_progress:
-                await stream_update(
-                    build_progress_text(state, run_url=_run_url(cfg, state))
-                )
-            elif now - last_update >= UPDATE_INTERVAL_SECONDS:
-                await stream_update(
-                    build_progress_text(state, run_url=_run_url(cfg, state))
-                )
+            if now - last_update >= UPDATE_INTERVAL_SECONDS:
+                await stream_update(build_progress_text(state))
                 last_update = now
 
         if step.post_question is not None:

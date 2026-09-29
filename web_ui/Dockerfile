@@ -36,10 +36,5 @@ COPY --from=build /app/.next/standalone ./
 COPY --from=build /app/.next/static ./.next/static
 COPY --from=build /app/public ./public
 
-ARG OPENSRE_VERSION=dev
-ARG OPENSRE_GIT_SHA=
-ENV OPENSRE_VERSION=${OPENSRE_VERSION}
-ENV OPENSRE_GIT_SHA=${OPENSRE_GIT_SHA}
-
 EXPOSE 3000
 CMD ["node", "server.js"]

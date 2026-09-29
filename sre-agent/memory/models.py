@@ -1,8 +1,8 @@
 """Data models for the episodic memory system (Neo4j-backed)."""
 
-from typing import List, Optional
+from typing import List, Literal, Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class Component(BaseModel):
@@ -44,6 +44,14 @@ class Episode(BaseModel):
     summary: str = ""
     effectiveness_score: float = 0.1
     extraction_status: str = "ok"
+
+    # Production-resolution loop (distinct from diagnosis `resolved`).
+    recommended_actions: List[str] = Field(default_factory=list)
+    resolution_status: Literal["open", "confirmed", "abandoned", "ignored"] = "open"
+    resolution_note_raw: Optional[str] = None
+    fix_summary: Optional[str] = None
+    matched_suggestion: Optional[Literal["yes", "no", "unsure"]] = None
+    resolution_history: List[dict] = Field(default_factory=list)
 
     duration_seconds: Optional[float] = None
     created_at: str = ""

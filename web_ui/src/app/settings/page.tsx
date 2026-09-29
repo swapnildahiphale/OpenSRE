@@ -48,14 +48,7 @@ import {
 import { PageHeader } from '@/components/ui-flow';
 
 // Tab type
-type SettingsTab =
-  | 'general'
-  | 'routing'
-  | 'notifications'
-  | 'telemetry'
-  | 'features'
-  | 'advanced'
-  | 'about';
+type SettingsTab = 'general' | 'routing' | 'notifications' | 'telemetry' | 'features' | 'advanced';
 
 // Feature configs
 interface IngestorSourceConfig {
@@ -138,21 +131,12 @@ export default function SettingsPage() {
   // Use searchParams.toString() as dependency for reliable updates
   const searchParamsString = searchParams.toString();
   useEffect(() => {
-    const validTabs: SettingsTab[] = [
-      'general',
-      'routing',
-      'notifications',
-      'telemetry',
-      'features',
-      'advanced',
-      'about',
-    ];
+    const validTabs: SettingsTab[] = ['general', 'routing', 'notifications', 'telemetry', 'features', 'advanced'];
     const urlTab = searchParams.get('tab') as SettingsTab | null;
     if (urlTab && validTabs.includes(urlTab)) {
       setActiveTab(urlTab);
     }
   }, [searchParamsString, searchParams]);
-
   const [theme, setTheme] = useState<'dark' | 'light'>('dark');
   const [showQuickStart, setShowQuickStart] = useState(false);
   const [quickStartInitialStep, setQuickStartInitialStep] = useState(1);
@@ -161,35 +145,6 @@ export default function SettingsPage() {
   const [telemetryEnabled, setTelemetryEnabled] = useState(true);
   const [telemetryLoading, setTelemetryLoading] = useState(false);
   const [showTelemetryInfo, setShowTelemetryInfo] = useState(false);
-
-  const [aboutVersion, setAboutVersion] = useState<string | null>(null);
-  const [aboutGitSha, setAboutGitSha] = useState<string | null>(null);
-  const [aboutError, setAboutError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (activeTab !== 'about') return;
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await apiFetch('/api/version');
-        if (!res.ok) {
-          if (!cancelled) setAboutError('Could not load version');
-          return;
-        }
-        const data = await res.json();
-        if (!cancelled) {
-          setAboutVersion(data.version ?? 'dev');
-          setAboutGitSha(data.gitSha ?? null);
-          setAboutError(null);
-        }
-      } catch {
-        if (!cancelled) setAboutError('Could not load version');
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [activeTab]);
 
   // Output configuration (Delivery & Notifications)
   const [outputConfig, setOutputConfig] = useState<{
@@ -595,7 +550,6 @@ export default function SettingsPage() {
     { id: 'telemetry', name: 'Telemetry', icon: Radio },
     { id: 'features', name: 'Advanced Features', icon: Zap },
     { id: 'advanced', name: 'Debug Tools', icon: Bot, adminOnly: true },
-    { id: 'about', name: 'About', icon: Info },
   ];
 
   const filteredTabs = tabs.filter(t => !t.adminOnly || isAdmin);
@@ -1818,27 +1772,6 @@ export default function SettingsPage() {
               </div>
 
           </div>
-          )}
-
-          {activeTab === 'about' && (
-            <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-6 shadow-sm">
-              <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">About</h2>
-              <div className="space-y-3">
-                <div className="text-sm text-slate-500">OpenSRE</div>
-                {aboutError ? (
-                  <div className="text-sm text-rose-600">{aboutError}</div>
-                ) : (
-                  <>
-                    <div className="text-2xl font-semibold text-emerald-700 dark:text-emerald-400">
-                      {aboutVersion ?? '…'}
-                    </div>
-                    {aboutGitSha && (
-                      <div className="text-sm text-slate-500 font-mono">{aboutGitSha}</div>
-                    )}
-                  </>
-                )}
-              </div>
-            </div>
           )}
         </div>
       </div>

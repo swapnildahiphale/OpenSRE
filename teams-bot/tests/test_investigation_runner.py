@@ -123,9 +123,7 @@ async def _make_sse_runner(
                 plain_text_final=plain_text_final,
                 trigger_actor=trigger_actor,
             )
-            assert (
-                mock_session.post.call_args.kwargs["json"]["trigger_source"] == "teams"
-            )
+            assert mock_session.post.call_args.kwargs["json"]["trigger_source"] == "teams"
     return send_text
 
 
@@ -170,6 +168,57 @@ async def test_run_investigation_includes_trigger_actor():
     payload = mock_session.post.call_args.kwargs["json"]
     assert payload["trigger_source"] == "teams"
     assert payload["trigger_actor"] == "Jane Doe"
+
+
+@pytest.mark.asyncio
+async def test_run_investigation_includes_teams_id_and_conversation_ref():
+    send_card = AsyncMock()
+    sse_lines = ['data: {"type": "result", "data": {"text": "done"}}']
+    sse_bytes = ("\n".join(sse_lines) + "\n").encode()
+
+    async def _iter_any():
+        yield sse_bytes
+
+    mock_resp = MagicMock()
+    mock_resp.raise_for_status = MagicMock()
+    mock_resp.content.iter_any = _iter_any
+    mock_post_ctx = AsyncMock()
+    mock_post_ctx.__aenter__ = AsyncMock(return_value=mock_resp)
+    mock_post_ctx.__aexit__ = AsyncMock(return_value=None)
+    mock_session = MagicMock()
+    mock_session.post = MagicMock(return_value=mock_post_ctx)
+    mock_session_ctx = AsyncMock()
+    mock_session_ctx.__aenter__.return_value = mock_session
+    mock_session_ctx.__aexit__.return_value = None
+
+    ref = {
+        "conversation_id": "19:abc@thread.tacv2",
+        "service_url": "https://smba.example/",
+        "channel_id": "msteams",
+        "tenant_id": "tenant-1",
+    }
+    with patch(
+        "investigation_runner.aiohttp.ClientSession", return_value=mock_session_ctx
+    ):
+        with patch("investigation_runner.Config") as mock_cfg:
+            mock_cfg.return_value.SRE_AGENT_URL = "http://agent:8001"
+            mock_cfg.return_value.INVESTIGATE_AUTH_TOKEN = ""
+            mock_cfg.return_value.WEB_UI_PUBLIC_BASE_URL = ""
+            await run_investigation(
+                thread_id="teams-test",
+                prompt="investigate latency",
+                stream_update=AsyncMock(),
+                stream_close=AsyncMock(),
+                send_card=send_card,
+                send_text=AsyncMock(),
+                update_card=AsyncMock(),
+                trigger_actor="Jane Doe",
+                trigger_actor_teams_id="29:jane",
+                conversation_ref=ref,
+            )
+    payload = mock_session.post.call_args.kwargs["json"]
+    assert payload["trigger_actor_teams_id"] == "29:jane"
+    assert payload["conversation_ref"] == ref
 
 
 @pytest.mark.asyncio
@@ -306,9 +355,7 @@ async def test_plain_text_final_uses_send_text_with_run_link():
     send_text.assert_awaited_once()
     body = send_text.await_args.args[0]
     assert "All clear" in body
-    assert (
-        "[View in OpenSRE](https://opensre.example.com/team/agent-runs/run-abc)" in body
-    )
+    assert "[View in OpenSRE](https://opensre.example.com/team/agent-runs/run-abc)" in body
 
 
 @pytest.mark.asyncio
@@ -330,118 +377,6 @@ async def test_card_final_includes_run_link_footer():
     )
 
     assert len(cards_sent) == 1
-    assert (
-        "[View in OpenSRE](https://opensre.example.com/team/agent-runs/run-xyz)"
-        in str(cards_sent[0])
+    assert "[View in OpenSRE](https://opensre.example.com/team/agent-runs/run-xyz)" in str(
+        cards_sent[0]
     )
-
-
-@pytest.mark.asyncio
-async def test_progress_updates_include_run_link():
-    """Live progress carries the run link once run_started supplies run_id."""
-    sse_lines = [
-        'data: {"type": "run_started", "data": {"run_id": "run-abc"}}',
-        'data: {"type": "thought", "data": {"text": "Checking pods"}}',
-        'data: {"type": "result", "data": {"text": "done"}}',
-    ]
-    updates: list[str] = []
-
-    async def capture_update(content: str) -> None:
-        updates.append(content)
-
-    sse_bytes = ("\n".join(sse_lines) + "\n").encode()
-
-    async def _iter_any():
-        yield sse_bytes
-
-    mock_resp = MagicMock()
-    mock_resp.raise_for_status = MagicMock()
-    mock_resp.content.iter_any = _iter_any
-    mock_post_ctx = AsyncMock()
-    mock_post_ctx.__aenter__ = AsyncMock(return_value=mock_resp)
-    mock_post_ctx.__aexit__ = AsyncMock(return_value=None)
-    mock_session = MagicMock()
-    mock_session.post = MagicMock(return_value=mock_post_ctx)
-    mock_session_ctx = AsyncMock()
-    mock_session_ctx.__aenter__.return_value = mock_session
-    mock_session_ctx.__aexit__.return_value = None
-
-    run_link = "[View in OpenSRE](https://opensre.example.com/team/agent-runs/run-abc)"
-
-    with patch(
-        "investigation_runner.aiohttp.ClientSession", return_value=mock_session_ctx
-    ):
-        with patch("investigation_runner.Config") as mock_cfg:
-            mock_cfg.return_value.SRE_AGENT_URL = "http://agent:8001"
-            mock_cfg.return_value.INVESTIGATE_AUTH_TOKEN = ""
-            mock_cfg.return_value.WEB_UI_PUBLIC_BASE_URL = "https://opensre.example.com"
-            with patch("investigation_runner.UPDATE_INTERVAL_SECONDS", 0):
-                await run_investigation(
-                    thread_id="teams-test",
-                    prompt="investigate latency",
-                    stream_update=capture_update,
-                    stream_close=AsyncMock(),
-                    send_card=AsyncMock(),
-                    send_text=AsyncMock(),
-                    update_card=AsyncMock(),
-                )
-
-    thought_with_link = [u for u in updates if "Checking pods" in u and run_link in u]
-    assert (
-        thought_with_link
-    ), "expected a thought-driven progress update that includes the run link"
-
-
-@pytest.mark.asyncio
-async def test_run_started_immediate_progress_leaves_throttle_for_thought():
-    """Immediate run_started refresh must not swallow the next throttled thought."""
-    sse_lines = [
-        'data: {"type": "run_started", "data": {"run_id": "run-abc"}}',
-        'data: {"type": "thought", "data": {"text": "Checking pods"}}',
-        'data: {"type": "result", "data": {"text": "done"}}',
-    ]
-    updates: list[str] = []
-
-    async def capture_update(content: str) -> None:
-        updates.append(content)
-
-    sse_bytes = ("\n".join(sse_lines) + "\n").encode()
-
-    async def _iter_any():
-        yield sse_bytes
-
-    mock_resp = MagicMock()
-    mock_resp.raise_for_status = MagicMock()
-    mock_resp.content.iter_any = _iter_any
-    mock_post_ctx = AsyncMock()
-    mock_post_ctx.__aenter__ = AsyncMock(return_value=mock_resp)
-    mock_post_ctx.__aexit__ = AsyncMock(return_value=None)
-    mock_session = MagicMock()
-    mock_session.post = MagicMock(return_value=mock_post_ctx)
-    mock_session_ctx = AsyncMock()
-    mock_session_ctx.__aenter__.return_value = mock_session
-    mock_session_ctx.__aexit__.return_value = None
-
-    with patch(
-        "investigation_runner.aiohttp.ClientSession", return_value=mock_session_ctx
-    ):
-        with patch("investigation_runner.Config") as mock_cfg:
-            mock_cfg.return_value.SRE_AGENT_URL = "http://agent:8001"
-            mock_cfg.return_value.INVESTIGATE_AUTH_TOKEN = ""
-            mock_cfg.return_value.WEB_UI_PUBLIC_BASE_URL = "https://opensre.example.com"
-            await run_investigation(
-                thread_id="teams-test",
-                prompt="investigate latency",
-                stream_update=capture_update,
-                stream_close=AsyncMock(),
-                send_card=AsyncMock(),
-                send_text=AsyncMock(),
-                update_card=AsyncMock(),
-            )
-
-    assert any(
-        "Starting investigation" in u for u in updates
-    ), "expected immediate run_started progress update"
-    assert any(
-        "Checking pods" in u for u in updates
-    ), "expected thought progress update not swallowed by throttle"

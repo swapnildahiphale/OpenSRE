@@ -8,17 +8,13 @@ Usage:
 
 import argparse
 import json
-import os
 import sys
 
 from jira_client import (
     get_browse_url,
-    investigation_link_footer,
     jira_request,
     make_assignee_field,
     make_text_body,
-    read_thread_run_id,
-    with_investigation_link,
 )
 
 
@@ -37,11 +33,6 @@ def main():
         default="",
         help="Assignee: Atlassian account ID (Cloud) or username (Data Center)",
     )
-    parser.add_argument(
-        "--fields",
-        default="",
-        help='Extra Jira fields as a JSON object, e.g. \'{"customfield_12345": {"value": "Yes"}}\'',
-    )
     parser.add_argument("--json", action="store_true", help="Output as JSON")
     args = parser.parse_args()
 
@@ -51,38 +42,13 @@ def main():
             "summary": args.summary,
             "issuetype": {"name": args.type},
         }
-        description = with_investigation_link(
-            args.description,
-            investigation_link_footer(
-                os.environ.get("WEB_UI_PUBLIC_BASE_URL", ""),
-                read_thread_run_id(),
-            ),
-        )
-        if description:
+        if args.description:
             # make_text_body picks ADF (Cloud v3) or Wiki Markup string (DC v2).
-            fields["description"] = make_text_body(description)
+            fields["description"] = make_text_body(args.description)
         if args.priority:
             fields["priority"] = {"name": args.priority}
         if args.labels:
             fields["labels"] = [l.strip() for l in args.labels.split(",")]
-
-        if args.fields:
-            try:
-                extra_fields = json.loads(args.fields)
-            except json.JSONDecodeError as exc:
-                print(f"Error: invalid JSON for --fields: {exc}", file=sys.stderr)
-                sys.exit(1)
-            if not isinstance(extra_fields, dict):
-                print("Error: --fields must be a JSON object", file=sys.stderr)
-                sys.exit(1)
-            if "description" in extra_fields:
-                print(
-                    "Error: use --description for issue description "
-                    "(do not pass description in --fields)",
-                    file=sys.stderr,
-                )
-                sys.exit(1)
-            fields.update(extra_fields)
 
         data = jira_request("POST", "/issue", json_body={"fields": fields})
         issue_key = data["key"]

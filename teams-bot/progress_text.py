@@ -7,9 +7,6 @@ Tools are humanized and Bash is nested under Skill — see tool_display.py.
 
 from __future__ import annotations
 
-from typing import Optional
-
-from run_links import format_view_link_markdown
 from state import InvestigationState, ThoughtSection, ToolCall
 from tool_display import (
     DisplayTool,
@@ -101,21 +98,13 @@ def _render_thought_tools(thought: ThoughtSection, *, is_current: bool) -> list[
     return lines
 
 
-def _with_run_link(lines: list[str], run_url: Optional[str]) -> str:
-    if run_url:
-        lines.extend(["", format_view_link_markdown(run_url)])
-    return "\n".join(lines)
-
-
-def build_progress_text(
-    state: InvestigationState, run_url: Optional[str] = None
-) -> str:
+def build_progress_text(state: InvestigationState) -> str:
     lines = ["**OpenSRE — Investigating…**", ""]
     # Last 3 thoughts; chronological → current thought ends the stream body
     thoughts = state.thoughts[-3:]
     if not thoughts:
         lines.append("_Starting investigation…_")
-        return _with_run_link(lines, run_url)
+        return "\n".join(lines)
     for index, thought in enumerate(thoughts):
         mark = "✓" if thought.completed else "…"
         lines.append(f"{mark} {thought.text}")
@@ -128,4 +117,4 @@ def build_progress_text(
     if state.background_waiting_label:
         lines.append("")
         lines.append(f"_{state.background_waiting_label}_")
-    return _with_run_link(lines, run_url)
+    return "\n".join(lines)

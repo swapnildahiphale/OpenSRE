@@ -87,3 +87,54 @@ def test_extraction_status_roundtrip(clean_store):
     clean_store.upsert_episode(ep)
     got = clean_store.get_by_correlation("c-fail")
     assert got is not None and got.extraction_status == "failed"
+
+
+def test_episode_resolution_defaults():
+    from memory.models import Episode
+
+    ep = Episode(episode_id="e1", correlation_id="c1")
+    assert ep.resolution_status == "open"
+    assert ep.recommended_actions == []
+    assert ep.resolution_history == []
+    assert ep.fix_summary is None
+    assert ep.matched_suggestion is None
+    assert ep.resolution_note_raw is None
+
+
+def test_resolution_history_round_trips(clean_store):
+    ep = _episode("c-hist", "redis", True, 0.8)
+    assert ep.resolution_status == "open"
+    ep.recommended_actions = ["restart pod", "check secret"]
+    ep.resolution_history = [
+        {
+            "ts": "2026-09-16T10:00:00Z",
+            "resolved_by": "Alice",
+            "text": "restarted checkout",
+            "fix_summary": "restarted checkout",
+            "matched_suggestion": "yes",
+        },
+        {
+            "ts": "2026-09-16T11:00:00Z",
+            "resolved_by": "Bob",
+            "text": "also onboarded secret",
+            "fix_summary": "onboarded secret",
+            "matched_suggestion": "no",
+        },
+    ]
+    ep.resolution_status = "confirmed"
+    ep.resolution_note_raw = "also onboarded secret"
+    ep.fix_summary = "onboarded secret"
+    ep.matched_suggestion = "no"
+    clean_store.upsert_episode(ep)
+
+    got = clean_store.get_by_correlation("c-hist")
+    assert got is not None
+    assert got.resolution_status == "confirmed"
+    assert got.recommended_actions == ["restart pod", "check secret"]
+    assert len(got.resolution_history) == 2
+    assert got.resolution_history[0]["resolved_by"] == "Alice"
+    assert got.resolution_history[0]["text"] == "restarted checkout"
+    assert got.resolution_history[1]["resolved_by"] == "Bob"
+    assert got.fix_summary == "onboarded secret"
+    assert got.matched_suggestion == "no"
+    assert got.resolution_note_raw == "also onboarded secret"

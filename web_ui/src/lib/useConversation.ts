@@ -47,6 +47,12 @@ export function useConversation(runId: string | undefined) {
   const [episode, setEpisode] = useState<ThreadEpisode | null>(null);
   const [triggerSource, setTriggerSource] = useState<string | null>(null);
   const [triggerActor, setTriggerActor] = useState<string | null>(null);
+  const [followupStatus, setFollowupStatus] = useState<{
+    nudgeCount: number;
+    lastNudgeText: string | null;
+    stoppedAt: string | null;
+    ticketKey: string | null;
+  } | null>(null);
 
   // isCancelled defaults to () => false for the public reload path.
   // The polling effect passes its own cancelled flag so in-flight fetches
@@ -63,7 +69,7 @@ export function useConversation(runId: string | undefined) {
       const convRuns = allRuns
         .filter((r) => r.correlationId && r.correlationId === thisRun.correlationId)
         .sort((a, b) => a.startedAt.localeCompare(b.startedAt));
-      const runs = convRuns.length > 0 ? convRuns : [thisRun];
+      let runs = convRuns.length > 0 ? convRuns : [thisRun];
 
       const withTraces: RunWithTrace[] = await Promise.all(runs.map(async (r) => {
         const tRes = await apiFetch(`/api/team/agent-runs/${r.id}/trace`);
@@ -74,6 +80,7 @@ export function useConversation(runId: string | undefined) {
           outputSummary: r.outputSummary ?? null,
           outputJson: (r.outputJson ?? null) as RunWithTrace['outputJson'],
           items: traceToTimeline(trace),
+          triggerSource: r.triggerSource,
         };
       }));
 
@@ -82,6 +89,38 @@ export function useConversation(runId: string | undefined) {
       const episode = (epData.episodes ?? []).find(
         (e: { correlation_id?: string }) => e.correlation_id === thisRun.correlationId,
       );
+
+      let nextFollowup: {
+        nudgeCount: number;
+        lastNudgeText: string | null;
+        stoppedAt: string | null;
+        ticketKey: string | null;
+      } | null = null;
+      if (thisRun.correlationId) {
+        const fuRes = await apiFetch(
+          `/api/team/investigation-followups/${encodeURIComponent(thisRun.correlationId)}`,
+        );
+        if (fuRes.ok) {
+          const fu = await fuRes.json() as {
+            nudge_count?: number;
+            last_nudge_text?: string | null;
+            stopped_at?: string | null;
+            ticket_key?: string | null;
+          };
+          nextFollowup = {
+            nudgeCount: Number(fu.nudge_count ?? 0),
+            lastNudgeText: fu.last_nudge_text ?? null,
+            stoppedAt: fu.stopped_at ?? null,
+            ticketKey: fu.ticket_key ?? null,
+          };
+        }
+      }
+
+      // Ticket-linked investigations deliver nudges on Jira only — hide web
+      // followup_nudge bubbles (including ones delivered before auto-attach).
+      const turnsSource = nextFollowup?.ticketKey
+        ? withTraces.filter((r) => r.triggerSource !== 'followup_nudge')
+        : withTraces;
 
       let alive = false;
       let inMemorySessionId: string | null = null;
@@ -106,7 +145,7 @@ export function useConversation(runId: string | undefined) {
 
       // Guard: don't setState if the component unmounted or runId changed mid-fetch.
       if (isCancelled()) return;
-      setTurns(runsToTurns(withTraces));
+      setTurns(runsToTurns(turnsSource));
       const latestRun = runs[runs.length - 1];
       setTitle(
         pickThreadSummary(
@@ -138,6 +177,7 @@ export function useConversation(runId: string | undefined) {
       setErrorMessage(latestRun.errorMessage ?? null);
       setStatus(asRunStatus(runs[runs.length - 1]?.status ?? 'idle'));
       setEpisode(episode ?? null);
+      setFollowupStatus(nextFollowup);
       setTriggerSource(runs[0]?.triggerSource ?? null);
       setTriggerActor(runs[0]?.triggerActor ?? null);
     } catch (e) {
@@ -164,7 +204,7 @@ export function useConversation(runId: string | undefined) {
   return {
     turns, title, agentName, status,
     sessionId, threadId, sessionAlive, errorMessage,
-    episode, triggerSource, triggerActor,
+    episode, triggerSource, triggerActor, followupStatus,
     continuable: canContinueConversation({
       sessionId,
       sessionAlive,

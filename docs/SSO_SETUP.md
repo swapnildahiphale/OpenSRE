@@ -71,7 +71,6 @@ Optional portal follow-up (not required): **Token configuration** → add option
 |----------|--------|---------|
 | `WEB_UI_SSO_ORG_ID` | web-ui | Org whose `sso_configs` row drives the login button. Helm sets this from `global.configService.orgId`. Compose default: `local`. If unset, the SSO button stays hidden. |
 | `WEB_UI_PUBLIC_BASE_URL` | web-ui | Browser origin used as Entra `redirect_uri`. Required when the process binds `0.0.0.0` (Docker/K8s). Helm uses `services.webUi.oidc.publicBaseUrl` if set, otherwise `https://<ingress.host>`. Compose default: `http://localhost:3002`. |
-| `WEB_UI_PUBLIC_BASE_URL` | sre-agent | Same origin; Jira `create_issue.py` footer. Helm derives it like teams-bot. |
 | `WEB_UI_COOKIE_SECURE` | web-ui | `1` on HTTPS so the session cookie is `Secure`. Keep `0` for http://localhost. |
 | `SSO_DEFAULT_TEAM_NODE_ID` | config-service | Team node SSO sessions attach to (default `default`). |
 | `SSO_CLIENT_SECRET` | config-service | Entra/OIDC client secret (env only — not stored in DB or Admin form). |

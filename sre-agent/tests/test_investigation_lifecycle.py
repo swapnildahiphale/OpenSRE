@@ -145,3 +145,114 @@ def test_guidance_names_opensre_memory_as_the_lesson_store():
     out = investigation_guidance_append()
     assert "MEMORY.md" in out
     assert "CLAUDE.md" in out
+
+
+def test_finalize_defaults_resolution_status_open_on_first_upsert(monkeypatch):
+    import investigation_lifecycle as il
+    from memory.extraction import Extraction
+
+    captured = {}
+
+    class FakeStore:
+        def get_by_correlation(self, cid):
+            return None
+
+        def upsert_episode(self, ep):
+            captured["ep"] = ep
+
+    monkeypatch.setattr(il, "_store", FakeStore())
+    monkeypatch.setattr(
+        il,
+        "extract_investigation",
+        lambda *a, **k: Extraction(
+            status="ok",
+            issue_type="db",
+            root_cause="redis",
+            resolved=True,
+            summary="found",
+            recommended_actions=["restart redis"],
+        ),
+    )
+    monkeypatch.setattr(il, "_embed_episode_text", lambda ep: [0.0] * 384)
+    il.finalize_investigation(
+        "c-new",
+        "run1",
+        "redis down",
+        "root cause is redis " * 5,
+        [],
+        org_id="acme",
+        team_node_id="t1",
+    )
+    assert captured["ep"].resolution_status == "open"
+    assert captured["ep"].recommended_actions == ["restart redis"]
+    assert captured["ep"].resolution_history == []
+
+
+def test_finalize_preserves_confirmed_resolution_status(monkeypatch):
+    import investigation_lifecycle as il
+    from memory.extraction import Extraction
+    from memory.models import Episode
+
+    captured = {}
+
+    class FakeStore:
+        def get_by_correlation(self, cid):
+            return Episode(
+                episode_id="e1",
+                correlation_id=cid,
+                org_id="acme",
+                issue_type="db",
+                issue_description="d",
+                root_cause="redis",
+                resolved=True,
+                summary="s",
+                recommended_actions=["restart redis"],
+                resolution_status="confirmed",
+                fix_summary="restarted redis",
+                resolution_note_raw="I restarted redis",
+                matched_suggestion="yes",
+                resolution_history=[
+                    {
+                        "ts": "t",
+                        "resolved_by": "Jane",
+                        "text": "I restarted redis",
+                        "fix_summary": "restarted redis",
+                        "matched_suggestion": "yes",
+                    }
+                ],
+                created_at="t0",
+                updated_at="t0",
+            )
+
+        def upsert_episode(self, ep):
+            captured["ep"] = ep
+
+    monkeypatch.setattr(il, "_store", FakeStore())
+    monkeypatch.setattr(
+        il,
+        "extract_investigation",
+        lambda *a, **k: Extraction(
+            status="ok",
+            issue_type="db",
+            root_cause="redis",
+            resolved=True,
+            summary="still ok",
+            recommended_actions=[],
+        ),
+    )
+    monkeypatch.setattr(il, "_embed_episode_text", lambda ep: [0.0] * 384)
+    il.finalize_investigation(
+        "c1",
+        "run2",
+        "follow-up",
+        "all good now " * 5,
+        [],
+        org_id="acme",
+        team_node_id="t1",
+    )
+    ep = captured["ep"]
+    assert ep.resolution_status == "confirmed"
+    assert ep.fix_summary == "restarted redis"
+    assert ep.matched_suggestion == "yes"
+    assert len(ep.resolution_history) == 1
+    assert ep.resolution_history[0]["resolved_by"] == "Jane"
