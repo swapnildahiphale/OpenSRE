@@ -924,6 +924,7 @@ class InteractiveAgentSession:
         "TaskUpdate",
         "TaskList",
         "TaskGet",
+        "resolve_episode",
     ]
 
     def __init__(self, thread_id: str, team_config=None, resume: str | None = None):
@@ -1164,6 +1165,11 @@ class InteractiveAgentSession:
         # Resolve allowed tools from config or defaults.
         # resolve_agent_tools returns None for wildcard/bogus (LangGraph) names,
         # or a real SDK-tool subset when the config explicitly names valid tools.
+        from resolution_tool import (
+            RESOLVE_EPISODE_TOOL_NAME,
+            build_resolution_mcp_server,
+        )
+
         allowed_tools = self.DEFAULT_TOOLS
         if root_config:
             resolved = resolve_agent_tools(root_config.tools)
@@ -1176,9 +1182,14 @@ class InteractiveAgentSession:
                 tc = root_config.tools
                 allowed_tools = [t for t in self.DEFAULT_TOOLS if t not in tc.disabled]
 
+        # Always expose resolve_episode to the root investigator (MCP tool).
+        if RESOLVE_EPISODE_TOOL_NAME not in allowed_tools:
+            allowed_tools = list(allowed_tools) + [RESOLVE_EPISODE_TOOL_NAME]
+
         options_kwargs = dict(
             cwd=self._cwd,
             allowed_tools=allowed_tools,
+            mcp_servers={"resolution": build_resolution_mcp_server()},
             permission_mode="acceptEdits",
             can_use_tool=self._can_use_tool_handler,
             include_partial_messages=True,  # Needed to get parent_tool_use_id for subagent tracking
@@ -1354,6 +1365,25 @@ class InteractiveAgentSession:
         output_str, _ = sanitize_tool_end_payload(
             tool_name, tool_input, output_str, None
         )
+
+        # Auto-attach Jira keys created mid-investigation → ticket-only follow-ups.
+        try:
+            from ticket_followup import (
+                attach_ticket_to_followup,
+                extract_created_issue_key,
+            )
+
+            created_key = extract_created_issue_key(
+                tool_name, tool_input, output_str or ""
+            )
+            if created_key:
+                attach_ticket_to_followup(self.thread_id, created_key)
+        except Exception as e:
+            logger.warning(
+                "[FOLLOWUP] create_issue auto-attach failed thread=%s: %s",
+                self.thread_id,
+                e,
+            )
 
         self._pending_tool_ends.append(
             {

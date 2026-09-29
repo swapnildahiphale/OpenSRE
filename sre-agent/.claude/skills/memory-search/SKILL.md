@@ -55,13 +55,16 @@ Each match includes:
 |-------|-------------|
 | `issue_type` | Classified issue category |
 | `root_cause` | Root cause from the past investigation |
-| `resolved` | Whether the prior incident was resolved |
+| `resolved` | Whether the diagnosis concluded (symptoms explained) — **not** whether production was fixed |
+| `resolution_status` | Production fix loop: `open` / `confirmed` / `abandoned` |
+| `fix_summary` | What the human said fixed it (when `confirmed`) |
+| `recommended_actions` | Actions OpenSRE suggested during diagnosis |
 | `summary` | Brief investigation summary |
-| `skills_used` | Skills that helped resolve it |
+| `skills_used` | Skills that helped diagnose it |
 | `services` | Affected services |
 | `score` | Similarity score (higher = closer match) |
 
-Prioritize resolved episodes with matching root cause and `skills_used`.
+Prefer **`resolution_status=confirmed`** episodes (real production fixes) over diagnosis-only `resolved=true`. Still use unconfirmed episodes for root-cause / skills hints — do not ignore them.
 
 ### `strategy` (when available)
 

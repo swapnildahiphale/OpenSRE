@@ -34,7 +34,7 @@ from fastapi.responses import StreamingResponse
 from memory.neo4j_conn import NEO4J_DATABASE, get_driver
 from memory.retrieval import EpisodeRetriever
 from memory.store import EpisodeStore
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from report import clean_and_extract
 from tool_output_sanitize import sanitize_tool_end_payload
 
@@ -187,6 +187,93 @@ def _normalize_trigger_actor(value: Optional[str]) -> Optional[str]:
     return stripped[:_TRIGGER_ACTOR_MAX]
 
 
+_PENDING_CONFIRM_PRIME = (
+    "[Pending fix-confirmation for this investigation.]\n"
+    "- If the user says it is fixed AND gives what was done → call resolve_episode "
+    "with that fix text, then briefly thank them and say you recorded it in memory; "
+    "invite them to reply here if they need more help.\n"
+    "- If they only say it is fixed (no fix details) → ask what the fix was; "
+    "do NOT call resolve_episode yet.\n"
+    "- If they say it is still open / not fixed → acknowledge and continue helping; "
+    "do NOT call resolve_episode.\n"
+    "- Do not start a fresh full investigation unless they ask for more diagnosis.\n\n"
+)
+
+
+def _entry_channel_from_trigger_source(trigger_source: Optional[str]) -> str:
+    """Map investigate trigger_source to investigation_followups.entry_channel."""
+    return "teams" if (trigger_source or "").strip().lower() == "teams" else "web"
+
+
+def _episode_store_for_followup():
+    """Indirection so tests can stub EpisodeStore without Neo4j."""
+    from memory.store import EpisodeStore
+
+    return EpisodeStore()
+
+
+def _upsert_investigation_followup(
+    *,
+    correlation_id: str,
+    org_id: str,
+    team_node_id: str,
+    entry_channel: str,
+    still_open: bool,
+    trigger_actor_name: Optional[str] = None,
+    trigger_actor_teams_id: Optional[str] = None,
+    conversation_ref: Optional[dict] = None,
+    ticket_key: Optional[str] = None,
+) -> Optional[dict]:
+    """Create-or-touch investigation_followups via config-service. Best-effort."""
+    payload = {
+        "correlation_id": correlation_id,
+        "org_id": org_id,
+        "team_node_id": team_node_id,
+        "entry_channel": entry_channel,
+        "still_open": still_open,
+        "trigger_actor_name": trigger_actor_name,
+        "trigger_actor_teams_id": trigger_actor_teams_id,
+        "conversation_ref": conversation_ref,
+    }
+    if ticket_key:
+        payload["ticket_key"] = ticket_key
+        payload["ticket_provider"] = "jira"
+    try:
+        resp = httpx.post(
+            f"{_CONFIG_SERVICE_URL}/api/v1/internal/investigation-followups/upsert",
+            headers=_INTERNAL_HEADERS,
+            json=payload,
+            timeout=5.0,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        return data if isinstance(data, dict) else None
+    except Exception as e:
+        logger.warning(
+            "[FOLLOWUP] upsert failed for corr=%s: %s", correlation_id, e
+        )
+        return None
+
+
+def _attach_ticket_to_followup(correlation_id: str, ticket_key: str) -> None:
+    """Best-effort bind explicit Jira key onto an existing followup row."""
+    from ticket_followup import attach_ticket_to_followup
+
+    attach_ticket_to_followup(correlation_id, ticket_key)
+
+
+def _prime_prompt_if_pending_confirm(
+    prompt: str,
+    *,
+    resolution_status: Optional[str],
+    nudge_count: int,
+) -> str:
+    """Prepend pending-confirm note when Episode is open and a nudge has fired."""
+    if resolution_status == "open" and nudge_count > 0:
+        return _PENDING_CONFIRM_PRIME + prompt
+    return prompt
+
+
 def _fetch_auth_me(token: str) -> dict:
     """GET /auth/me as a dict. Empty dict on failure (do not raise)."""
     try:
@@ -213,11 +300,14 @@ def _actor_from_auth_me(data: dict) -> Optional[str]:
 
 
 def _create_agent_run(
-    thread_id: str, prompt: str, agent_name: str = "sre-agent"
+    thread_id: str,
+    prompt: str,
+    agent_name: str = "sre-agent",
+    trigger_source: Optional[str] = None,
 ) -> Optional[str]:
     """POST to config-service to create an agent run record. Returns run_id or None."""
     org_id, team_node_id = _thread_tenancy(thread_id)
-    trigger_source = _trigger_source_by_thread.get(thread_id, "web_ui")
+    source = trigger_source or _trigger_source_by_thread.get(thread_id, "web_ui")
     try:
         run_id = uuid.uuid4().hex
         body = {
@@ -225,7 +315,7 @@ def _create_agent_run(
             "org_id": org_id,
             "team_node_id": team_node_id,
             "correlation_id": thread_id,
-            "trigger_source": trigger_source,
+            "trigger_source": source,
             "trigger_actor": _trigger_actor_by_thread.get(thread_id),
             "trigger_message": prompt,
             "trigger_channel_id": None,
@@ -244,6 +334,56 @@ def _create_agent_run(
     except Exception as e:
         logger.warning(f"[RUNS] create_agent_run failed (non-fatal): {e}")
         return None
+
+
+def _patch_agent_run_complete(
+    run_id: str,
+    *,
+    result_text: str,
+    status: str = "completed",
+) -> bool:
+    """Complete a known run_id (does not use _run_id_by_thread)."""
+    try:
+        resp = httpx.patch(
+            f"{_CONFIG_SERVICE_URL}/api/v1/internal/agent-runs/{run_id}",
+            json={
+                "status": status,
+                "duration_seconds": 0.0,
+                "tool_calls_count": 0,
+                "output_summary": result_text or None,
+                "output_json": None,
+                "error_message": None,
+                "confidence": None,
+                "thoughts": None,
+                "sdk_session_id": None,
+            },
+            headers=_INTERNAL_HEADERS,
+            timeout=5.0,
+        )
+        resp.raise_for_status()
+        return True
+    except Exception as e:
+        logger.warning(f"[RUNS] patch complete failed for {run_id}: {e}")
+        return False
+
+
+def post_web_nudge_chat_bubble(thread_id: str, text: str) -> Optional[str]:
+    """Persist a completed agent-run so the Web transcript shows a chat bubble.
+
+    Empty trigger_message → UI hides the user row; output_summary is the
+    OpenSRE message. Returns run_id or None.
+    """
+    run_id = _create_agent_run(
+        thread_id,
+        prompt="",  # no user bubble
+        agent_name="sre-agent",
+        trigger_source="followup_nudge",
+    )
+    if not run_id:
+        return None
+    if not _patch_agent_run_complete(run_id, result_text=text):
+        return None
+    return run_id
 
 
 def _finalize_running_rows_for_thread(thread_id: str) -> None:
@@ -650,6 +790,10 @@ class InvestigateRequest(BaseModel):
     trigger_source: Optional[str] = None
     # Optional. Teams sends activity.from.name. Web omits; we infer from /auth/me.
     trigger_actor: Optional[str] = None
+    # Optional. Teams activity.from.id (Task 8); used for nudge @mention.
+    trigger_actor_teams_id: Optional[str] = None
+    # Optional. Teams ConversationReference dict (Task 8) for outbound nudge.
+    conversation_ref: Optional[dict] = None
 
 
 class InterruptRequest(BaseModel):
@@ -697,6 +841,83 @@ async def thread_active(thread_id: str):
     return {
         "active": thread_id in _background_tasks,
         "sdk_session_id": getattr(session, "session_id", None) if session else None,
+    }
+
+
+@app.get("/internal/episodes/{thread_id}/nudge-context")
+async def nudge_context(thread_id: str):
+    """Cheap snapshot for opensre-scheduler nudge wording + skip-if-busy.
+
+    has_active_run is true only while a turn is in flight (_run_id_by_thread),
+    not merely because a warm multi-turn BG session exists. Warm sessions would
+    otherwise block nudges forever while the drawer stays open. Read-only —
+    does not classify fixes.
+    """
+    episode = EpisodeStore().get_by_correlation(thread_id)
+    return {
+        "summary": episode.summary if episode else None,
+        "root_cause": episode.root_cause if episode else None,
+        "recommended_actions": list(episode.recommended_actions)
+        if episode
+        else [],
+        "has_active_run": thread_id in _run_id_by_thread,
+    }
+
+
+class TicketFollowupRequest(BaseModel):
+    ticket_key: str
+    nudge_count: int = 0
+
+
+class WebNudgeRequest(BaseModel):
+    text: str = Field(..., min_length=1, max_length=1024)
+
+
+@app.post("/internal/episodes/{thread_id}/ticket-followup")
+async def ticket_followup(thread_id: str, body: TicketFollowupRequest):
+    """Scheduler → agent: inspect Jira, maybe resolve memory and/or comment."""
+    from ticket_followup import run_ticket_followup
+
+    result = await run_ticket_followup(
+        correlation_id=thread_id,
+        ticket_key=body.ticket_key.strip().upper(),
+        has_active_run=thread_id in _run_id_by_thread,
+        nudge_count=int(body.nudge_count or 0),
+    )
+    return result
+
+
+@app.post("/internal/episodes/{thread_id}/web-nudge")
+async def web_nudge(thread_id: str, body: WebNudgeRequest):
+    """Scheduler → agent: post a chat-bubble nudge into the Web transcript."""
+    if thread_id in _run_id_by_thread:
+        return {"ok": False, "skipped": True, "reason": "active_run"}
+    text = (body.text or "").strip()
+    if not text:
+        return {"ok": False, "error": "empty text"}
+    run_id = post_web_nudge_chat_bubble(thread_id, text)
+    if not run_id:
+        return {"ok": False, "error": "failed to persist nudge run"}
+    return {"ok": True, "run_id": run_id, "text": text}
+
+
+@app.post("/internal/episodes/{thread_id}/abandon")
+async def abandon_episode(thread_id: str):
+    """Silence→abandoned transition for opensre-scheduler.
+
+    Sets Episode.resolution_status=abandoned when an episode exists.
+    Idempotent. Does not invent a fix_summary. Config-service stopped_at
+    is set separately by the scheduler via the followups abandon route.
+    """
+    store = EpisodeStore()
+    episode = store.get_by_correlation(thread_id)
+    if episode is None:
+        return {"correlation_id": thread_id, "resolution_status": None}
+    episode.resolution_status = "abandoned"
+    store.upsert_episode(episode)
+    return {
+        "correlation_id": thread_id,
+        "resolution_status": episode.resolution_status,
     }
 
 
@@ -821,16 +1042,17 @@ async def agent_background_task(
         except Exception as e:
             logger.warning(f"[BG] Failed to load team config (continuing without): {e}")
 
-    session = await _start_interactive_session(
-        thread_id, team_config, resume_session_id
-    )
-    logger.info(f"[BG] Session started for thread {thread_id}")
-    _active_sessions[thread_id] = session
-
-    message_queue = _message_queues[thread_id]
-    response_queue = _response_queues[thread_id]
-
+    session = None
     try:
+        session = await _start_interactive_session(
+            thread_id, team_config, resume_session_id
+        )
+        logger.info(f"[BG] Session started for thread {thread_id}")
+        _active_sessions[thread_id] = session
+
+        message_queue = _message_queues[thread_id]
+        response_queue = _response_queues[thread_id]
+
         while True:
             # Wait for next message
             logger.info(f"[BG] Waiting for message on thread {thread_id}")
@@ -1020,9 +1242,11 @@ async def agent_background_task(
             result_text=f"Investigation failed: {e}",
             tool_calls=[],
             duration_seconds=0.0,
-            sdk_session_id=getattr(session, "session_id", None),
+            sdk_session_id=getattr(session, "session_id", None) if session else None,
         )
-        await response_queue.put({"error": str(e)})
+        response_queue = _response_queues.get(thread_id)
+        if response_queue is not None:
+            await response_queue.put({"error": str(e)})
     finally:
         if thread_token:
             if prev_team_token is None:
@@ -1033,7 +1257,7 @@ async def agent_background_task(
         _background_tasks.pop(thread_id, None)
         _message_queues.pop(thread_id, None)
         _response_queues.pop(thread_id, None)
-        if session.client:
+        if session is not None and getattr(session, "client", None):
             await session.cleanup()
         logger.info(f"[BG] Background task ended for thread {thread_id}")
 
@@ -1106,12 +1330,18 @@ async def create_investigation_stream(
     images: Optional[List[dict]] = None,
     file_downloads: Optional[List[dict]] = None,
     resume_session_id: Optional[str] = None,
+    original_prompt: Optional[str] = None,
 ):
     """
     Create SSE stream by communicating with background agent task.
+
+    ``prompt`` may include a pending-confirm priming prefix. ``original_prompt``
+    is the user text stored on AgentRun for audit — never mutate that copy.
     """
     import datetime
     import json
+
+    audit_prompt = original_prompt if original_prompt is not None else prompt
 
     try:
         # Create background task if needed
@@ -1127,7 +1357,7 @@ async def create_investigation_stream(
 
         logger.info(f"Sending message to background task for thread {thread_id}")
         await message_queue.put(
-            {"prompt": prompt, "original_prompt": prompt, "images": images}
+            {"prompt": prompt, "original_prompt": audit_prompt, "images": images}
         )
 
         # Stream responses
@@ -1219,6 +1449,48 @@ async def investigate(investigate_request: InvestigateRequest, http_request: Req
     else:
         _trigger_actor_by_thread.pop(thread_id, None)
 
+    # Create-or-touch investigation_followups + optional pending-confirm priming.
+    # One Episode read drives both still_open (upsert) and priming (Task 7).
+    episode = None
+    try:
+        episode = _episode_store_for_followup().get_by_correlation(thread_id)
+    except Exception as e:
+        logger.warning("[FOLLOWUP] episode load failed for corr=%s: %s", thread_id, e)
+
+    still_open = episode is None or episode.resolution_status == "open"
+    org_id, team_node_id = _thread_tenancy(thread_id)
+    trigger_source = _trigger_source_by_thread.get(thread_id, "web_ui")
+    teams_id = _normalize_trigger_actor(investigate_request.trigger_actor_teams_id)
+    from ticket_followup import extract_explicit_ticket_key
+
+    ticket_key = extract_explicit_ticket_key(investigate_request.prompt or "")
+    followup = _upsert_investigation_followup(
+        correlation_id=thread_id,
+        org_id=org_id,
+        team_node_id=team_node_id,
+        entry_channel=_entry_channel_from_trigger_source(trigger_source),
+        still_open=still_open,
+        trigger_actor_name=actor,
+        trigger_actor_teams_id=teams_id,
+        conversation_ref=investigate_request.conversation_ref,
+        ticket_key=ticket_key,
+    )
+    if ticket_key and followup and not followup.get("ticket_key"):
+        _attach_ticket_to_followup(thread_id, ticket_key)
+    if ticket_key:
+        logger.info(
+            "[FOLLOWUP] explicit ticket attached corr=%s key=%s",
+            thread_id,
+            ticket_key,
+        )
+    nudge_count = int((followup or {}).get("nudge_count") or 0)
+    original_prompt = investigate_request.prompt
+    prompt = _prime_prompt_if_pending_confirm(
+        original_prompt,
+        resolution_status=None if episode is None else episode.resolution_status,
+        nudge_count=nudge_count,
+    )
+
     print(f"🔍 Investigation: thread={thread_id}, new={is_new}")
 
     if is_new:
@@ -1266,11 +1538,12 @@ async def investigate(investigate_request: InvestigateRequest, http_request: Req
 
     stream = create_investigation_stream(
         thread_id,
-        investigate_request.prompt,
+        prompt,
         is_new,
         images,
         file_downloads,
         resume_session_id=investigate_request.resume_session_id,
+        original_prompt=original_prompt,
     )
 
     return StreamingResponse(
@@ -1395,6 +1668,8 @@ def _episode_row(r: dict) -> dict:
         "effectiveness_score": e.get("effectiveness_score"),
         "skills_used": e.get("skills_used", []),
         "extraction_status": e.get("extraction_status") or "ok",
+        "recommended_actions": list(e.get("recommended_actions") or []),
+        "resolution_status": e.get("resolution_status") or "open",
         "created_at": e.get("created_at"),
         "updated_at": e.get("updated_at"),
     }
@@ -1420,6 +1695,8 @@ def _episode_from_model(ep) -> dict:
                 "effectiveness_score": ep.effectiveness_score,
                 "skills_used": ep.skills_used,
                 "extraction_status": ep.extraction_status,
+                "recommended_actions": list(ep.recommended_actions or []),
+                "resolution_status": ep.resolution_status,
                 "created_at": ep.created_at,
                 "updated_at": ep.updated_at,
             },

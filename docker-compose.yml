@@ -395,6 +395,42 @@ services:
       - app_network
       - default
 
+  # Investigation follow-up nudge/abandon timer (always on — Teams + Web)
+  opensre-scheduler:
+    build:
+      context: ./opensre-scheduler
+      dockerfile: Dockerfile
+    container_name: opensre-scheduler
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      - CONFIG_SERVICE_URL=http://config-service:8080
+      - SRE_AGENT_URL=http://sre-agent:8000
+      - TEAMS_BOT_URL=http://teams-bot:3978
+      - POLL_INTERVAL_SECONDS=${POLL_INTERVAL_SECONDS:-30}
+      - PORT=8090
+    depends_on:
+      - config-service
+      - sre-agent
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=50m
+    mem_limit: 256m
+    cpus: 0.5
+    pids_limit: 50
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - app_network
+      - default
+
 networks:
   app_network:
     driver: bridge

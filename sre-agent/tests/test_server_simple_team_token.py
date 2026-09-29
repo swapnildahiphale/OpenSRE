@@ -426,3 +426,196 @@ def test_investigate_empty_actor_clears_thread(monkeypatch):
         )
     assert resp.status_code == 200
     assert "thread-clear-actor" not in server_simple._trigger_actor_by_thread
+
+
+# ---------------------------------------------------------------------------
+# Task 7: investigation_followups upsert + pending-confirm priming
+# ---------------------------------------------------------------------------
+
+
+def _investigate_harness(monkeypatch, thread_id="thread-followup"):
+    """Common stubs for /investigate followup tests."""
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-test")
+    import server_simple
+
+    async def fake_bg(tid, resume_session_id=None):
+        pass
+
+    monkeypatch.setattr(server_simple, "agent_background_task", fake_bg)
+    monkeypatch.setattr(server_simple, "_background_tasks", {})
+    monkeypatch.setattr(server_simple, "_message_queues", {})
+    monkeypatch.setattr(server_simple, "_response_queues", {})
+    monkeypatch.setattr(server_simple, "_team_identity_by_thread", {})
+    monkeypatch.setattr(server_simple, "_trigger_actor_by_thread", {})
+    monkeypatch.setattr(
+        server_simple,
+        "_resolve_team_identity",
+        lambda _t: ("pilot", "SRE"),
+    )
+    return server_simple, thread_id
+
+
+def test_investigate_upserts_followup_when_no_row(monkeypatch):
+    server_simple, thread_id = _investigate_harness(monkeypatch)
+
+    upsert_bodies = []
+
+    class FakeEpStore:
+        def get_by_correlation(self, cid):
+            return None
+
+    monkeypatch.setattr(server_simple, "_episode_store_for_followup", lambda: FakeEpStore())
+
+    def fake_upsert(**kwargs):
+        upsert_bodies.append(kwargs)
+        return {"correlation_id": kwargs["correlation_id"], "nudge_count": 0}
+
+    monkeypatch.setattr(server_simple, "_upsert_investigation_followup", fake_upsert)
+
+    captured = {}
+
+    def fake_stream(tid, prompt, is_new, images=None, file_downloads=None,
+                    resume_session_id=None, original_prompt=None):
+        captured["prompt"] = prompt
+        captured["original_prompt"] = original_prompt
+        return iter([])
+
+    client = TestClient(server_simple.app)
+    with patch.object(server_simple, "create_investigation_stream", side_effect=fake_stream):
+        resp = client.post(
+            "/investigate",
+            json={
+                "prompt": "check checkout latency",
+                "thread_id": thread_id,
+                "trigger_source": "teams",
+                "trigger_actor": "Jane Doe",
+            },
+            headers={"Authorization": "Bearer team-token"},
+        )
+    assert resp.status_code == 200
+    assert len(upsert_bodies) == 1
+    body = upsert_bodies[0]
+    assert body["correlation_id"] == thread_id
+    assert body["org_id"] == "pilot"
+    assert body["team_node_id"] == "SRE"
+    assert body["entry_channel"] == "teams"
+    assert body["trigger_actor_name"] == "Jane Doe"
+    assert body["still_open"] is True
+    assert captured["prompt"] == "check checkout latency"
+    assert captured["original_prompt"] == "check checkout latency"
+
+
+def test_investigate_does_not_prime_when_nudge_count_zero(monkeypatch):
+    server_simple, thread_id = _investigate_harness(monkeypatch, "thread-no-prime")
+
+    ep = MagicMock()
+    ep.resolution_status = "open"
+
+    class FakeEpStore:
+        def get_by_correlation(self, cid):
+            return ep
+
+    monkeypatch.setattr(server_simple, "_episode_store_for_followup", lambda: FakeEpStore())
+    monkeypatch.setattr(
+        server_simple,
+        "_upsert_investigation_followup",
+        lambda **kwargs: {"correlation_id": thread_id, "nudge_count": 0},
+    )
+
+    captured = {}
+
+    def fake_stream(tid, prompt, is_new, images=None, file_downloads=None,
+                    resume_session_id=None, original_prompt=None):
+        captured["prompt"] = prompt
+        captured["original_prompt"] = original_prompt
+        return iter([])
+
+    client = TestClient(server_simple.app)
+    with patch.object(server_simple, "create_investigation_stream", side_effect=fake_stream):
+        resp = client.post(
+            "/investigate",
+            json={"prompt": "any update?", "thread_id": thread_id},
+            headers={"Authorization": "Bearer team-token"},
+        )
+    assert resp.status_code == 200
+    assert captured["prompt"] == "any update?"
+    assert captured["original_prompt"] == "any update?"
+
+
+def test_investigate_primes_prompt_not_original_when_nudged(monkeypatch):
+    server_simple, thread_id = _investigate_harness(monkeypatch, "thread-prime")
+
+    ep = MagicMock()
+    ep.resolution_status = "open"
+
+    class FakeEpStore:
+        def get_by_correlation(self, cid):
+            return ep
+
+    monkeypatch.setattr(server_simple, "_episode_store_for_followup", lambda: FakeEpStore())
+    monkeypatch.setattr(
+        server_simple,
+        "_upsert_investigation_followup",
+        lambda **kwargs: {"correlation_id": thread_id, "nudge_count": 1},
+    )
+
+    captured = {}
+
+    def fake_stream(tid, prompt, is_new, images=None, file_downloads=None,
+                    resume_session_id=None, original_prompt=None):
+        captured["prompt"] = prompt
+        captured["original_prompt"] = original_prompt
+        return iter([])
+
+    client = TestClient(server_simple.app)
+    with patch.object(server_simple, "create_investigation_stream", side_effect=fake_stream):
+        resp = client.post(
+            "/investigate",
+            json={"prompt": "we restarted the pod", "thread_id": thread_id},
+            headers={"Authorization": "Bearer team-token"},
+        )
+    assert resp.status_code == 200
+    assert captured["original_prompt"] == "we restarted the pod"
+    assert captured["prompt"].startswith(
+        "[This thread has a pending fix-confirmation"
+    )
+    assert captured["prompt"].endswith("we restarted the pod")
+
+
+def test_investigate_skips_prime_when_resolution_not_open(monkeypatch):
+    server_simple, thread_id = _investigate_harness(monkeypatch, "thread-confirmed")
+
+    ep = MagicMock()
+    ep.resolution_status = "confirmed"
+
+    class FakeEpStore:
+        def get_by_correlation(self, cid):
+            return ep
+
+    monkeypatch.setattr(server_simple, "_episode_store_for_followup", lambda: FakeEpStore())
+    upsert_calls = []
+
+    def fake_upsert(**kwargs):
+        upsert_calls.append(kwargs)
+        return {"correlation_id": thread_id, "nudge_count": 2}
+
+    monkeypatch.setattr(server_simple, "_upsert_investigation_followup", fake_upsert)
+
+    captured = {}
+
+    def fake_stream(tid, prompt, is_new, images=None, file_downloads=None,
+                    resume_session_id=None, original_prompt=None):
+        captured["prompt"] = prompt
+        captured["original_prompt"] = original_prompt
+        return iter([])
+
+    client = TestClient(server_simple.app)
+    with patch.object(server_simple, "create_investigation_stream", side_effect=fake_stream):
+        resp = client.post(
+            "/investigate",
+            json={"prompt": "thanks", "thread_id": thread_id},
+            headers={"Authorization": "Bearer team-token"},
+        )
+    assert resp.status_code == 200
+    assert upsert_calls[0]["still_open"] is False
+    assert captured["prompt"] == "thanks"

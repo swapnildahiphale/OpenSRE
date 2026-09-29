@@ -173,6 +173,57 @@ async def test_run_investigation_includes_trigger_actor():
 
 
 @pytest.mark.asyncio
+async def test_run_investigation_includes_teams_id_and_conversation_ref():
+    send_card = AsyncMock()
+    sse_lines = ['data: {"type": "result", "data": {"text": "done"}}']
+    sse_bytes = ("\n".join(sse_lines) + "\n").encode()
+
+    async def _iter_any():
+        yield sse_bytes
+
+    mock_resp = MagicMock()
+    mock_resp.raise_for_status = MagicMock()
+    mock_resp.content.iter_any = _iter_any
+    mock_post_ctx = AsyncMock()
+    mock_post_ctx.__aenter__ = AsyncMock(return_value=mock_resp)
+    mock_post_ctx.__aexit__ = AsyncMock(return_value=None)
+    mock_session = MagicMock()
+    mock_session.post = MagicMock(return_value=mock_post_ctx)
+    mock_session_ctx = AsyncMock()
+    mock_session_ctx.__aenter__.return_value = mock_session
+    mock_session_ctx.__aexit__.return_value = None
+
+    ref = {
+        "conversation_id": "19:abc@thread.tacv2",
+        "service_url": "https://smba.example/",
+        "channel_id": "msteams",
+        "tenant_id": "tenant-1",
+    }
+    with patch(
+        "investigation_runner.aiohttp.ClientSession", return_value=mock_session_ctx
+    ):
+        with patch("investigation_runner.Config") as mock_cfg:
+            mock_cfg.return_value.SRE_AGENT_URL = "http://agent:8001"
+            mock_cfg.return_value.INVESTIGATE_AUTH_TOKEN = ""
+            mock_cfg.return_value.WEB_UI_PUBLIC_BASE_URL = ""
+            await run_investigation(
+                thread_id="teams-test",
+                prompt="investigate latency",
+                stream_update=AsyncMock(),
+                stream_close=AsyncMock(),
+                send_card=send_card,
+                send_text=AsyncMock(),
+                update_card=AsyncMock(),
+                trigger_actor="Jane Doe",
+                trigger_actor_teams_id="29:jane",
+                conversation_ref=ref,
+            )
+    payload = mock_session.post.call_args.kwargs["json"]
+    assert payload["trigger_actor_teams_id"] == "29:jane"
+    assert payload["conversation_ref"] == ref
+
+
+@pytest.mark.asyncio
 async def test_queued_message_continuation_delivers_final_answer():
     """Backend emits result then continues for a queued message.
     Only one final card is sent (at stream close), with the LAST result text."""

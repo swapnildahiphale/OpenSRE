@@ -24,6 +24,7 @@ EXTRACTION_JSON_SCHEMA = {
         "root_cause",
         "resolved",
         "summary",
+        "recommended_actions",
     ],
     "properties": {
         "issue_type": {"type": "string"},
@@ -44,6 +45,10 @@ EXTRACTION_JSON_SCHEMA = {
         "root_cause": {"type": ["string", "null"]},
         "resolved": {"type": "boolean"},
         "summary": {"type": "string"},
+        "recommended_actions": {
+            "type": "array",
+            "items": {"type": "string"},
+        },
     },
 }
 
@@ -215,6 +220,7 @@ class Extraction:
     root_cause: Optional[str] = None
     resolved: bool = False
     summary: str = ""
+    recommended_actions: List[str] = field(default_factory=list)
     status: str = "ok"
 
 
@@ -237,6 +243,7 @@ Return ONLY minified JSON with these keys:
 - root_cause: the CURRENT best root cause (string), or null if not identified.
 - resolved: boolean — true when a root cause has been identified with enough supporting evidence in the latest turn; false otherwise. This reflects diagnostic completeness, not whether the production issue was fixed or remediated.
 - summary: 1-2 sentence summary of the whole investigation so far.
+- recommended_actions: short bullets of what you told the human to try. Empty array if this turn was diagnosis-only, not prescriptive.
 
 If a prior record is shown, CONSOLIDATE: the latest result supersedes earlier conclusions
 (e.g. a corrected root cause replaces the previous one). Do not blend contradictory root causes.
@@ -254,7 +261,8 @@ def extract_investigation(
         prior_block = (
             "Prior record for THIS conversation (may be corrected by the latest turn):\n"
             f'{{"issue_type": "{prior.issue_type}", "root_cause": {json.dumps(prior.root_cause)}, '
-            f'"resolved": {str(prior.resolved).lower()}, "summary": {json.dumps(prior.summary)}}}\n\n'
+            f'"resolved": {str(prior.resolved).lower()}, "summary": {json.dumps(prior.summary)}, '
+            f'"recommended_actions": {json.dumps(prior.recommended_actions or [])}}}\n\n'
         )
     prompt_text = _EXTRACT_PROMPT.format(
         prior_block=prior_block, prompt=prompt[:2000], result=result_text[:4000]
@@ -282,6 +290,9 @@ def extract_investigation(
             root_cause=None,
             resolved=False,
             summary=result_text[:200] if result_text else "",
+            recommended_actions=list((prior.recommended_actions or [])[:8])
+            if prior
+            else [],
             status="failed",
         )
     comps = [
@@ -289,6 +300,18 @@ def extract_investigation(
         for c in data.get("components", [])
         if isinstance(c, dict) and c.get("name")
     ]
+    latest_actions = [
+        a.strip()
+        for a in (data.get("recommended_actions") or [])
+        if isinstance(a, str) and a.strip()
+    ][:8]
+    # Latest non-empty list replaces; empty keeps prior. Cap at 8.
+    if latest_actions:
+        recommended_actions = latest_actions
+    elif prior is not None:
+        recommended_actions = list((prior.recommended_actions or [])[:8])
+    else:
+        recommended_actions = []
     return Extraction(
         issue_type=data.get("issue_type") or "unknown",
         issue_description=data.get("issue_description") or prompt[:200],
@@ -297,6 +320,7 @@ def extract_investigation(
         root_cause=data.get("root_cause"),
         resolved=bool(data.get("resolved", False)),
         summary=data.get("summary") or (result_text[:200] if result_text else ""),
+        recommended_actions=recommended_actions,
         status="ok",
     )
 
