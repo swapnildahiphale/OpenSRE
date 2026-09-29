@@ -82,6 +82,52 @@ def test_finalize_consolidates_via_prior(monkeypatch):
     assert captured["ep"].extraction_status == "ok"
 
 
+def test_finalize_keeps_prior_when_extraction_fails(monkeypatch):
+    import investigation_lifecycle as il
+    from memory.extraction import Extraction
+    from memory.models import Episode
+
+    captured = {}
+
+    class FakeStore:
+        def get_by_correlation(self, cid):
+            return Episode(
+                episode_id="e1",
+                correlation_id=cid,
+                org_id="acme",
+                issue_type="db",
+                issue_description="d",
+                root_cause="redis",
+                resolved=False,
+                summary="s",
+                effectiveness_score=0.1,
+                extraction_status="ok",
+                created_at="t",
+                updated_at="t",
+            )
+
+        def upsert_episode(self, ep):
+            captured["ep"] = ep
+
+    monkeypatch.setattr(il, "_store", FakeStore())
+    monkeypatch.setattr(
+        il,
+        "extract_investigation",
+        lambda *a, **k: Extraction(status="failed", summary="stub " * 20),
+    )
+    monkeypatch.setattr(il, "_embed_episode_text", lambda ep: [0.0] * 384)
+    il.finalize_investigation(
+        "c1",
+        "run2",
+        "follow up",
+        "still investigating the checkout path " * 4,
+        [],
+        org_id="acme",
+        team_node_id="t1",
+    )
+    assert "ep" not in captured
+
+
 def test_finalize_persists_failed_status(monkeypatch):
     import investigation_lifecycle as il
     from memory.extraction import Extraction
