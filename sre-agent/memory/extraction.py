@@ -273,7 +273,11 @@ def extract_investigation(
         except Exception:
             raw = ""
     data = _safe_json(raw)
-    if not data and (not raw.strip() or not _raw_looks_like_json_object(raw)):
+    # Brace-delimited but invalid JSON (truncated output, Python True/False)
+    # parses to {}. Treating that as success stores an empty episode and
+    # retrieval will use it. An unrelated object such as {"error": "..."} is
+    # the same failure.
+    if not _usable_extraction(data):
         return Extraction(
             issue_type="unknown",
             issue_description=prompt[:200],
@@ -284,9 +288,12 @@ def extract_investigation(
             summary=result_text[:200] if result_text else "",
             status="failed",
         )
+    raw_components = data.get("components") or []
+    if not isinstance(raw_components, list):
+        raw_components = []
     comps = [
         Component(type=c.get("type", "unknown"), name=c.get("name", ""))
-        for c in data.get("components", [])
+        for c in raw_components
         if isinstance(c, dict) and c.get("name")
     ]
     return Extraction(
@@ -301,13 +308,20 @@ def extract_investigation(
     )
 
 
-def _raw_looks_like_json_object(raw: str) -> bool:
-    s = raw.strip()
-    if s.startswith("```"):
-        s = s.split("```")[1] if "```" in s[3:] else s.strip("`")
-        s = s[4:] if s.startswith("json") else s
-    start, end = s.find("{"), s.rfind("}")
-    return start >= 0 and end > start
+_EXTRACTION_KEYS = (
+    "issue_type",
+    "issue_description",
+    "summary",
+    "root_cause",
+    "resolved",
+    "components",
+    "severity",
+)
+
+
+def _usable_extraction(data: object) -> bool:
+    """True only for a parsed object that carries extraction fields."""
+    return isinstance(data, dict) and any(key in data for key in _EXTRACTION_KEYS)
 
 
 def _safe_json(raw: str) -> dict:
