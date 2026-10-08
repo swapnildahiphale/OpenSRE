@@ -9,12 +9,12 @@ Deploy OpenSRE in **simple mode** (`server_simple.py`) using the umbrella Helm c
 - Optional: Ingress controller (nginx, Apisix, or ALB)
 - Container registry with pull access for your chosen image references (public Docker Hub defaults work out of the box)
 
-Simple-mode image defaults (tag **v1.2.6**):
+Simple-mode image defaults (tag **v1.2.8**):
 
-- `swapnildahiphale/opensre-sre-agent:v1.2.6`
-- `swapnildahiphale/opensre-config-service:v1.2.6`
-- `swapnildahiphale/opensre-web-ui:v1.2.6`
-- `swapnildahiphale/opensre-teams-bot:v1.2.6` (chart service off unless you enable `teamsBot`)
+- `swapnildahiphale/opensre-sre-agent:v1.2.8`
+- `swapnildahiphale/opensre-config-service:v1.2.8`
+- `swapnildahiphale/opensre-web-ui:v1.2.8`
+- `swapnildahiphale/opensre-teams-bot:v1.2.8` (chart service off unless you enable `teamsBot`)
 
 Override only in a local `my-site.yaml` if you use a private registry.
 

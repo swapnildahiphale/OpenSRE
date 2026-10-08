@@ -150,7 +150,7 @@ helm upgrade --install opensre charts/opensre \
 
 ### Self-hosted profile (recommended)
 
-See `charts/opensre/values.self-hosted-simple.yaml` for the supported public self-hosted profile (simple mode with embedded Postgres/Neo4j; Docker Hub image pins for v1.2.6). Full walkthrough: `docs/SELF_HOSTED_SIMPLE_INSTALL.md`.
+See `charts/opensre/values.self-hosted-simple.yaml` for the supported public self-hosted profile (simple mode with embedded Postgres/Neo4j; Docker Hub image pins for v1.2.8). Full walkthrough: `docs/SELF_HOSTED_SIMPLE_INSTALL.md`.
 
 ### Site overlay (hosts, TLS, private registry)
 
