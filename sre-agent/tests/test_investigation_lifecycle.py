@@ -107,7 +107,13 @@ def test_finalize_persists_failed_status(monkeypatch):
         "run1",
         "prompt",
         "result text long enough to store " * 5,
-        [{"tool_name": "Skill", "tool_input": {"skill": "memory-search"}, "tool_output": "ok"}],
+        [
+            {
+                "tool_name": "Skill",
+                "tool_input": {"skill": "memory-search"},
+                "tool_output": "ok",
+            }
+        ],
         org_id="acme",
         team_node_id="t1",
     )

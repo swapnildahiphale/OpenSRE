@@ -1,8 +1,7 @@
 """Timeout message formatting and session_id capture helpers."""
 
-from claude_agent_sdk import SystemMessage
-
 from agent import capture_session_id_from_result, format_investigation_timeout_message
+from claude_agent_sdk import SystemMessage
 
 
 class _FakeResultMessage:

@@ -41,7 +41,7 @@ def strip_structured_report_block(text: str) -> str:
     m = _FENCE.search(text)
     if not m:
         return text
-    stripped = text[: m.start()] + text[m.end():]
+    stripped = text[: m.start()] + text[m.end() :]
     stripped = re.sub(r"\n{3,}", "\n\n", stripped)
     return stripped.rstrip()
 

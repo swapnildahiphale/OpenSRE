@@ -80,7 +80,9 @@ def _extract_message_text(msg) -> str:
     ).strip()
 
 
-def _anthropic_messages_create(client, prompt: str, max_tokens: int, json_schema: dict | None):
+def _anthropic_messages_create(
+    client, prompt: str, max_tokens: int, json_schema: dict | None
+):
     """Create an Anthropic message, optionally with structured output config."""
     global _structured_cap
     kwargs = {
@@ -112,14 +114,16 @@ def _anthropic_messages_create(client, prompt: str, max_tokens: int, json_schema
     return client.messages.create(**kwargs)
 
 
-def _openai_compat_completion(prompt: str, max_tokens: int, json_schema: dict | None) -> str:
+def _openai_compat_completion(
+    prompt: str, max_tokens: int, json_schema: dict | None
+) -> str:
     """OpenAI-compatible chat completions via httpx (no OpenAI SDK)."""
     global _structured_cap
     import httpx
 
-    base = (os.getenv("OPENAI_BASE_URL") or os.getenv("ANTHROPIC_BASE_URL") or "").rstrip(
-        "/"
-    )
+    base = (
+        os.getenv("OPENAI_BASE_URL") or os.getenv("ANTHROPIC_BASE_URL") or ""
+    ).rstrip("/")
     api_key = os.getenv("OPENAI_API_KEY") or os.getenv("ANTHROPIC_API_KEY") or ""
     payload: dict = {
         "model": _MODEL,
@@ -148,7 +152,12 @@ def _openai_compat_completion(prompt: str, max_tokens: int, json_schema: dict | 
                 )
         resp.raise_for_status()
         data = resp.json()
-        return (data.get("choices") or [{}])[0].get("message", {}).get("content", "").strip()
+        return (
+            (data.get("choices") or [{}])[0]
+            .get("message", {})
+            .get("content", "")
+            .strip()
+        )
     except Exception as e:
         logger.error("[MEMORY] openai_compat completion failed: %s", e)
         return ""

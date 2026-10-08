@@ -1,11 +1,11 @@
 """Internal PUT sdk-session and GET latest-sdk-session."""
+
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
-
 from src.api.routes.internal import router as internal_router
 from src.db import repository
 from src.db.models import AgentRun

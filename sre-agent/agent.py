@@ -375,6 +375,11 @@ _langfuse_session_metadata: dict = {}
 # still-running tool spans.
 _langfuse_tool_spans: dict = {}
 
+# Cumulative SDK usage must be converted to per-turn deltas before it is sent
+# as separate Langfuse generations. Keep one watermark per thread, SDK session,
+# and model so concurrent investigations cannot affect one another.
+_langfuse_generation_watermarks: dict = {}
+
 
 def _detect_observability_backend() -> str:
     """Detect which observability backend to use."""
@@ -594,6 +599,13 @@ def observability_end_session(thread_id: str) -> None:
     observability_close_open_tool_spans(thread_id)
 
 
+def observability_reset_generation_watermark(thread_id: str) -> None:
+    """Forget usage watermarks when starting a new SDK session."""
+    for key in list(_langfuse_generation_watermarks):
+        if key[0] == thread_id:
+            _langfuse_generation_watermarks.pop(key, None)
+
+
 def _langfuse_usage_details(usage: dict | None) -> dict[str, int]:
     """Map Claude Agent SDK usage onto Langfuse exclusive token buckets.
 
@@ -637,6 +649,58 @@ def _langfuse_cost_details(cost_usd) -> dict[str, float] | None:
         return None
 
 
+def _langfuse_delta(current, previous):
+    """Return a non-negative delta, treating a counter reset as a new base."""
+    if current is None:
+        return None
+    try:
+        current_value = float(current)
+    except (TypeError, ValueError):
+        return None
+    if previous is None:
+        return current_value
+    try:
+        previous_value = float(previous)
+    except (TypeError, ValueError):
+        return current_value
+    return (
+        current_value - previous_value
+        if current_value >= previous_value
+        else current_value
+    )
+
+
+def _langfuse_usage_delta(
+    current: dict[str, int], previous: dict[str, int] | None
+) -> dict[str, int]:
+    """Convert cumulative token counters to the current turn's token delta."""
+    previous = previous or {}
+    delta: dict[str, int] = {}
+    for key, value in current.items():
+        value_delta = _langfuse_delta(value, previous.get(key))
+        if value_delta is not None and value_delta > 0:
+            delta[key] = int(value_delta)
+    return delta
+
+
+def _langfuse_session_scope(message, thread_id: str | None) -> tuple[str, str]:
+    """Return the stable scope used for cumulative usage watermarks."""
+    thread_key = (
+        thread_id or getattr(message, "thread_id", None) or "__unknown_thread__"
+    )
+    session_key = getattr(message, "session_id", None) or "__unknown_session__"
+    return str(thread_key), str(session_key)
+
+
+def _langfuse_prepare_session_scope(thread_key: str, session_key: str) -> None:
+    """Discard stale SDK-session scopes after a thread reconnects."""
+    if session_key == "__unknown_session__":
+        return
+    for key in list(_langfuse_generation_watermarks):
+        if key[0] == thread_key and key[1] != session_key:
+            _langfuse_generation_watermarks.pop(key, None)
+
+
 def _emit_langfuse_generation(
     *,
     model: str | None,
@@ -660,7 +724,11 @@ def _emit_langfuse_generation(
     generation.end()
 
 
-def observability_record_generation(message, fallback_model: str | None = None) -> None:
+def observability_record_generation(
+    message,
+    fallback_model: str | None = None,
+    thread_id: str | None = None,
+) -> None:
     """Record LLM usage and cost from a Claude Agent SDK ResultMessage.
 
     Langfuse only computes cost on observations of type ``generation`` that
@@ -673,7 +741,8 @@ def observability_record_generation(message, fallback_model: str | None = None) 
     by model. Fall back to aggregated ``usage`` + ``total_cost_usd`` when
     the SDK omitted the per-model map. Call this once per ``execute()``
     with the last ResultMessage — in streaming input mode those cost
-    fields are running totals, so summing every result would double-count.
+    fields are running totals, so this helper emits only the delta from the
+    previous turn for the same thread, SDK session, and model.
     """
     if _observability_backend != "langfuse" or _langfuse_client is None:
         return
@@ -681,28 +750,60 @@ def observability_record_generation(message, fallback_model: str | None = None) 
         return
 
     try:
+        thread_key, session_key = _langfuse_session_scope(message, thread_id)
+        _langfuse_prepare_session_scope(thread_key, session_key)
+
         model_usage = getattr(message, "model_usage", None) or {}
         if isinstance(model_usage, dict) and model_usage:
             for model_name, usage in model_usage.items():
                 usage_dict = usage if isinstance(usage, dict) else {}
+                model_key = model_name or fallback_model or "__unknown_model__"
+                watermark_key = (thread_key, session_key, model_key)
+                previous = _langfuse_generation_watermarks.get(watermark_key, {})
+                usage_details = _langfuse_usage_details(usage_dict)
+                cost_usd = usage_dict.get("costUSD", usage_dict.get("cost_usd"))
+                cost_delta = _langfuse_delta(cost_usd, previous.get("cost_usd"))
+                _langfuse_generation_watermarks[watermark_key] = {
+                    "usage": usage_details,
+                    "cost_usd": (
+                        cost_usd if cost_usd is not None else previous.get("cost_usd")
+                    ),
+                }
                 _emit_langfuse_generation(
                     model=model_name or fallback_model,
-                    usage_details=_langfuse_usage_details(usage_dict),
-                    cost_details=_langfuse_cost_details(
-                        usage_dict.get("costUSD", usage_dict.get("cost_usd"))
+                    usage_details=_langfuse_usage_delta(
+                        usage_details, previous.get("usage")
+                    ),
+                    cost_details=(
+                        _langfuse_cost_details(cost_delta)
+                        if cost_delta and cost_delta > 0
+                        else None
                     ),
                 )
             return
 
         usage = getattr(message, "usage", None)
-        usage_details = (
+        current_usage_details = (
             _langfuse_usage_details(usage) if isinstance(usage, dict) else {}
         )
+        model = fallback_model or os.getenv("ANTHROPIC_MODEL") or "__aggregate__"
+        watermark_key = (thread_key, session_key, model)
+        previous = _langfuse_generation_watermarks.get(watermark_key, {})
+        cost_usd = getattr(message, "total_cost_usd", None)
+        cost_delta = _langfuse_delta(cost_usd, previous.get("cost_usd"))
+        _langfuse_generation_watermarks[watermark_key] = {
+            "usage": current_usage_details,
+            "cost_usd": cost_usd if cost_usd is not None else previous.get("cost_usd"),
+        }
         _emit_langfuse_generation(
             model=fallback_model or os.getenv("ANTHROPIC_MODEL"),
-            usage_details=usage_details,
-            cost_details=_langfuse_cost_details(
-                getattr(message, "total_cost_usd", None)
+            usage_details=_langfuse_usage_delta(
+                current_usage_details, previous.get("usage")
+            ),
+            cost_details=(
+                _langfuse_cost_details(cost_delta)
+                if cost_delta and cost_delta > 0
+                else None
             ),
         )
     except Exception as e:  # never let telemetry break an investigation
@@ -1494,6 +1595,8 @@ class InteractiveAgentSession:
     async def start(self):
         """Initialize the Claude client session for streaming input mode."""
         if self.client is None:
+            if not self.resume:
+                observability_reset_generation_watermark(self.thread_id)
             # Don't use async with here - we need to keep the client alive
             # across multiple execute() calls. We'll manage lifecycle manually.
             self.client = ClaudeSDKClient(options=self.options)
@@ -1983,7 +2086,9 @@ class InteractiveAgentSession:
             # One generation per execute(), nested under the turn span. Must
             # run before the wrapper closes that span.
             observability_record_generation(
-                last_result_message, fallback_model=last_llm_model
+                last_result_message,
+                fallback_model=last_llm_model,
+                thread_id=self.thread_id,
             )
             # Push the generation before the next turn; otherwise cost sits in
             # the OTEL batch until the processor's interval and the dashboard
@@ -2091,7 +2196,10 @@ class InteractiveAgentSession:
 
     async def provide_answer(self, answers: dict) -> None:
         """Provide answer to pending AskUserQuestion."""
-        if not hasattr(self, "_pending_answer_event") or self._pending_answer_event is None:
+        if (
+            not hasattr(self, "_pending_answer_event")
+            or self._pending_answer_event is None
+        ):
             raise NoPendingQuestionError("No pending question")
 
         self._pending_answer = answers

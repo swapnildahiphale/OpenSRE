@@ -53,7 +53,9 @@ def test_final_card_converts_markdown_report_into_multiple_blocks():
 
 def test_final_card_error_path_is_a_single_text_block():
     card = build_final_card(result_text=None, error="Agent timed out")
-    assert card["body"] == [{"type": "TextBlock", "text": "Agent timed out", "wrap": True}]
+    assert card["body"] == [
+        {"type": "TextBlock", "text": "Agent timed out", "wrap": True}
+    ]
 
 
 def test_final_card_appends_run_link_footer():

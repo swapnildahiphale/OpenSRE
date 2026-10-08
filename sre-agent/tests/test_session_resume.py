@@ -1,8 +1,7 @@
 """InteractiveAgentSession accepts a resume id and captures session_id."""
 
-from claude_agent_sdk import SystemMessage
-
 from agent import InteractiveAgentSession, session_id_event_if_changed
+from claude_agent_sdk import SystemMessage
 
 
 def test_resume_id_is_stored_on_init():

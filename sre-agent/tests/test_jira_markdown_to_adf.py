@@ -24,7 +24,11 @@ def test_bold_paragraph_and_bullet_list():
             {
                 "type": "paragraph",
                 "content": [
-                    {"type": "text", "text": "Root cause", "marks": [{"type": "strong"}]}
+                    {
+                        "type": "text",
+                        "text": "Root cause",
+                        "marks": [{"type": "strong"}],
+                    }
                 ],
             },
             {
@@ -33,13 +37,19 @@ def test_bold_paragraph_and_bullet_list():
                     {
                         "type": "listItem",
                         "content": [
-                            {"type": "paragraph", "content": [{"type": "text", "text": "one"}]}
+                            {
+                                "type": "paragraph",
+                                "content": [{"type": "text", "text": "one"}],
+                            }
                         ],
                     },
                     {
                         "type": "listItem",
                         "content": [
-                            {"type": "paragraph", "content": [{"type": "text", "text": "two"}]}
+                            {
+                                "type": "paragraph",
+                                "content": [{"type": "text", "text": "two"}],
+                            }
                         ],
                     },
                 ],
@@ -83,7 +93,11 @@ def test_inline_marks_codespan_link_emphasis_strong():
 
 def test_empty_input_returns_empty_paragraph_not_empty_doc():
     doc = markdown_to_adf("")
-    assert doc == {"type": "doc", "version": 1, "content": [{"type": "paragraph", "content": []}]}
+    assert doc == {
+        "type": "doc",
+        "version": 1,
+        "content": [{"type": "paragraph", "content": []}],
+    }
 
 
 def test_plain_text_round_trips():
@@ -91,7 +105,9 @@ def test_plain_text_round_trips():
     assert doc == {
         "type": "doc",
         "version": 1,
-        "content": [{"type": "paragraph", "content": [{"type": "text", "text": "just text"}]}],
+        "content": [
+            {"type": "paragraph", "content": [{"type": "text", "text": "just text"}]}
+        ],
     }
 
 
@@ -107,7 +123,9 @@ def test_never_raises_on_malformed_input(monkeypatch):
     assert doc == {
         "type": "doc",
         "version": 1,
-        "content": [{"type": "paragraph", "content": [{"type": "text", "text": "**anything**"}]}],
+        "content": [
+            {"type": "paragraph", "content": [{"type": "text", "text": "**anything**"}]}
+        ],
     }
 
 
@@ -120,7 +138,12 @@ def test_make_text_body_uses_adf_converter_for_cloud(monkeypatch):
         "type": "doc",
         "version": 1,
         "content": [
-            {"type": "paragraph", "content": [{"type": "text", "text": "bold", "marks": [{"type": "strong"}]}]}
+            {
+                "type": "paragraph",
+                "content": [
+                    {"type": "text", "text": "bold", "marks": [{"type": "strong"}]}
+                ],
+            }
         ],
     }
 

@@ -37,7 +37,13 @@ def _render_inline(token, marks):
         return [node]
 
     if ttype == "codespan":
-        return [{"type": "text", "text": token.get("raw", ""), "marks": [*marks, {"type": "code"}]}]
+        return [
+            {
+                "type": "text",
+                "text": token.get("raw", ""),
+                "marks": [*marks, {"type": "code"}],
+            }
+        ]
 
     if ttype in ("strong", "emphasis"):
         mark = {"type": _INLINE_MARK_TYPES[ttype]}
@@ -144,7 +150,9 @@ def _render_block(token):
         blocks = []
         for child in token.get("children", []):
             blocks.extend(_render_block(child))
-        return [{"type": "blockquote", "content": blocks or [_paragraph_from_inline([])]}]
+        return [
+            {"type": "blockquote", "content": blocks or [_paragraph_from_inline([])]}
+        ]
 
     if ttype == "thematic_break":
         return [{"type": "rule"}]
@@ -177,7 +185,11 @@ def markdown_to_adf(text: str) -> dict:
     caller and never produces an empty document.
     """
     if not text:
-        return {"type": "doc", "version": 1, "content": [{"type": "paragraph", "content": []}]}
+        return {
+            "type": "doc",
+            "version": 1,
+            "content": [{"type": "paragraph", "content": []}],
+        }
 
     try:
         tokens = _md_ast(text)
@@ -185,11 +197,15 @@ def markdown_to_adf(text: str) -> dict:
         for token in tokens:
             content.extend(_render_block(token))
         if not content:
-            content = [{"type": "paragraph", "content": [{"type": "text", "text": text}]}]
+            content = [
+                {"type": "paragraph", "content": [{"type": "text", "text": text}]}
+            ]
         return {"type": "doc", "version": 1, "content": content}
     except Exception:
         return {
             "type": "doc",
             "version": 1,
-            "content": [{"type": "paragraph", "content": [{"type": "text", "text": text}]}],
+            "content": [
+                {"type": "paragraph", "content": [{"type": "text", "text": text}]}
+            ],
         }

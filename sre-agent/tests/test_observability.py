@@ -37,6 +37,7 @@ def _reset_observability():
     agent._langfuse_propagate_attributes = None
     agent._langfuse_session_metadata.clear()
     agent._langfuse_tool_spans.clear()
+    agent._langfuse_generation_watermarks.clear()
 
 
 # ---------------------------------------------------------------------------
@@ -734,6 +735,68 @@ class TestLangfuseGenerationCost:
         ]
         assert models == ["claude-opus-4-6", "claude-sonnet-4-6"]
 
+    def test_cumulative_model_usage_emits_only_the_turn_delta(self):
+        agent, mock_client, mock_gen = self._enable()
+        first = self._result(
+            model_usage={
+                "claude-sonnet-4-6": {
+                    "inputTokens": 100,
+                    "outputTokens": 20,
+                    "costUSD": 0.10,
+                }
+            }
+        )
+        second = self._result(
+            model_usage={
+                "claude-sonnet-4-6": {
+                    "inputTokens": 160,
+                    "outputTokens": 35,
+                    "costUSD": 0.16,
+                }
+            }
+        )
+
+        agent.observability_record_generation(first, thread_id="thread-a")
+        agent.observability_record_generation(second, thread_id="thread-a")
+
+        assert mock_client.start_observation.call_count == 2
+        assert mock_gen.update.call_args_list[1].kwargs == {
+            "usage_details": {"input": 60, "output": 15},
+            "cost_details": {"total": 0.06},
+        }
+
+    def test_new_sdk_session_gets_a_fresh_watermark(self):
+        agent, mock_client, mock_gen = self._enable()
+        first = self._result(
+            session_id="sdk-session-1",
+            model_usage={
+                "claude-sonnet-4-6": {
+                    "inputTokens": 100,
+                    "outputTokens": 20,
+                    "costUSD": 0.10,
+                }
+            },
+        )
+        reconnected = self._result(
+            session_id="sdk-session-2",
+            model_usage={
+                "claude-sonnet-4-6": {
+                    "inputTokens": 12,
+                    "outputTokens": 3,
+                    "costUSD": 0.02,
+                }
+            },
+        )
+
+        agent.observability_record_generation(first, thread_id="thread-a")
+        agent.observability_record_generation(reconnected, thread_id="thread-a")
+
+        assert mock_client.start_observation.call_count == 2
+        assert mock_gen.update.call_args_list[1].kwargs == {
+            "usage_details": {"input": 12, "output": 3},
+            "cost_details": {"total": 0.02},
+        }
+
     def test_falls_back_to_usage_and_total_cost_when_model_usage_missing(self):
         agent, mock_client, mock_gen = self._enable()
         message = self._result(
@@ -767,6 +830,30 @@ class TestLangfuseGenerationCost:
         assert "server_tool_use" not in update_kwargs["usage_details"]
         assert "service_tier" not in update_kwargs["usage_details"]
         assert update_kwargs["cost_details"] == {"total": 0.18}
+
+    def test_cumulative_fallback_usage_emits_only_the_turn_delta(self):
+        agent, mock_client, mock_gen = self._enable()
+        first = self._result(
+            usage={"input_tokens": 100, "output_tokens": 20},
+            total_cost_usd=0.10,
+        )
+        second = self._result(
+            usage={"input_tokens": 160, "output_tokens": 35},
+            total_cost_usd=0.16,
+        )
+
+        agent.observability_record_generation(
+            first, fallback_model="claude-sonnet-4-6", thread_id="thread-a"
+        )
+        agent.observability_record_generation(
+            second, fallback_model="claude-sonnet-4-6", thread_id="thread-a"
+        )
+
+        assert mock_client.start_observation.call_count == 2
+        assert mock_gen.update.call_args_list[1].kwargs == {
+            "usage_details": {"input": 60, "output": 15},
+            "cost_details": {"total": 0.06},
+        }
 
     def test_skips_when_there_is_no_usage_and_no_cost(self):
         agent, mock_client, _ = self._enable()
