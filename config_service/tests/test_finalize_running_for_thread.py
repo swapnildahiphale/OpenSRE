@@ -10,7 +10,6 @@ from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
-
 from src.api.routes.internal import router as internal_router
 from src.db import repository
 from src.db.models import AgentRun
@@ -32,16 +31,31 @@ def db_session():
 
 def test_finalize_marks_all_running_on_thread(db_session):
     repository.create_agent_run(
-        db_session, run_id="a", org_id="local", team_node_id="default",
-        correlation_id="t1", trigger_source="web_ui", agent_name="planner",
+        db_session,
+        run_id="a",
+        org_id="local",
+        team_node_id="default",
+        correlation_id="t1",
+        trigger_source="web_ui",
+        agent_name="planner",
     )
     repository.create_agent_run(
-        db_session, run_id="b", org_id="local", team_node_id="default",
-        correlation_id="t1", trigger_source="web_ui", agent_name="planner",
+        db_session,
+        run_id="b",
+        org_id="local",
+        team_node_id="default",
+        correlation_id="t1",
+        trigger_source="web_ui",
+        agent_name="planner",
     )
     repository.create_agent_run(
-        db_session, run_id="c", org_id="local", team_node_id="default",
-        correlation_id="t2", trigger_source="web_ui", agent_name="planner",
+        db_session,
+        run_id="c",
+        org_id="local",
+        team_node_id="default",
+        correlation_id="t2",
+        trigger_source="web_ui",
+        agent_name="planner",
     )
     n = repository.finalize_running_runs_for_thread(
         db_session, correlation_id="t1", org_id="local", team_node_id="default"
@@ -64,8 +78,13 @@ def test_finalize_zero_rows(db_session):
 
 def test_finalize_ignores_other_tenant(db_session):
     repository.create_agent_run(
-        db_session, run_id="x", org_id="other", team_node_id="team",
-        correlation_id="t1", trigger_source="web_ui", agent_name="planner",
+        db_session,
+        run_id="x",
+        org_id="other",
+        team_node_id="team",
+        correlation_id="t1",
+        trigger_source="web_ui",
+        agent_name="planner",
     )
     n = repository.finalize_running_runs_for_thread(
         db_session, correlation_id="t1", org_id="local", team_node_id="default"
@@ -77,8 +96,13 @@ def test_finalize_ignores_other_tenant(db_session):
 def test_mark_stale_runs_as_timeout_positive_cutoff(db_session):
     """Cron path: old running → timeout. Does not use max_age_seconds=0."""
     run = repository.create_agent_run(
-        db_session, run_id="old", org_id="local", team_node_id="default",
-        correlation_id="t-old", trigger_source="web_ui", agent_name="planner",
+        db_session,
+        run_id="old",
+        org_id="local",
+        team_node_id="default",
+        correlation_id="t-old",
+        trigger_source="web_ui",
+        agent_name="planner",
     )
     run.started_at = datetime.now(timezone.utc) - timedelta(seconds=120)
     db_session.flush()

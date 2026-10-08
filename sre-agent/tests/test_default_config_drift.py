@@ -253,6 +253,8 @@ def test_planner_prompt_emits_structured_report_scoped_to_final_message():
     assert "```json" in prompt
     # Scoped to the final report, not every reply - a future edit that drops
     # this qualifier would make every follow-up turn emit the block too.
-    assert "only on the final-report message" in prompt.lower() or \
-        "not on follow-up" in prompt.lower() or \
-        "not on ordinary follow-up" in prompt.lower()
+    assert (
+        "only on the final-report message" in prompt.lower()
+        or "not on follow-up" in prompt.lower()
+        or "not on ordinary follow-up" in prompt.lower()
+    )

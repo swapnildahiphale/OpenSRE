@@ -1288,7 +1288,9 @@ def finalize_running_runs_for_thread(
                 AgentRun.team_node_id == team_node_id,
                 AgentRun.status == "running",
             )
-        ).scalars().all()
+        )
+        .scalars()
+        .all()
     )
     for run in runs:
         complete_agent_run(

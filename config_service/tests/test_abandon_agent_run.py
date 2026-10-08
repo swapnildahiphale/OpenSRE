@@ -7,7 +7,6 @@ from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
-
 from src.api.main import create_app
 from src.core.security import hash_token
 from src.db import repository
@@ -62,9 +61,12 @@ def test_abandon_wrong_tenant_returns_none(db_session):
 
 
 def test_abandon_missing_returns_none(db_session):
-    assert repository.abandon_agent_run(
-        db_session, run_id="nope", org_id="local", team_node_id="default"
-    ) is None
+    assert (
+        repository.abandon_agent_run(
+            db_session, run_id="nope", org_id="local", team_node_id="default"
+        )
+        is None
+    )
 
 
 def test_abandon_not_running_leaves_status(db_session):

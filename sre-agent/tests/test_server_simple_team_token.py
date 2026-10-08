@@ -210,7 +210,9 @@ def test_resolve_team_identity_falls_back_on_failure(monkeypatch):
     assert team_node_id == "default"
 
 
-def test_finalize_investigation_strips_fence_and_attaches_structured_report(monkeypatch):
+def test_finalize_investigation_strips_fence_and_attaches_structured_report(
+    monkeypatch,
+):
     monkeypatch.setenv("OPENSRE_TENANT_ID", "local")
     monkeypatch.setenv("OPENSRE_TEAM_ID", "default")
     import server_simple
@@ -253,7 +255,10 @@ def test_normalize_trigger_actor():
 def test_actor_from_auth_me_prefers_name():
     import server_simple
 
-    assert server_simple._actor_from_auth_me({"name": "Jane", "email": "j@x.com"}) == "Jane"
+    assert (
+        server_simple._actor_from_auth_me({"name": "Jane", "email": "j@x.com"})
+        == "Jane"
+    )
     assert server_simple._actor_from_auth_me({"email": "j@x.com"}) == "j@x.com"
     assert server_simple._actor_from_auth_me({}) is None
     assert server_simple._actor_from_auth_me({"name": "  "}) is None

@@ -16,15 +16,31 @@ def test_final_report_shape_renders_bold_labels_and_bullets():
         {"type": "TextBlock", "text": "**Root cause headline**", "wrap": True},
         {"type": "TextBlock", "text": "**Scope:** affected thing", "wrap": True},
         {"type": "TextBlock", "text": "**Timeline:**", "wrap": True},
-        {"type": "TextBlock", "text": "• 10:00 UTC - event one", "wrap": True, "spacing": "None"},
-        {"type": "TextBlock", "text": "• 10:05 UTC - event two", "wrap": True, "spacing": "None"},
+        {
+            "type": "TextBlock",
+            "text": "• 10:00 UTC - event one",
+            "wrap": True,
+            "spacing": "None",
+        },
+        {
+            "type": "TextBlock",
+            "text": "• 10:05 UTC - event two",
+            "wrap": True,
+            "spacing": "None",
+        },
     ]
 
 
 def test_heading_becomes_bold_text_block():
     blocks = markdown_to_adaptive_blocks("## Section\n")
     assert blocks == [
-        {"type": "TextBlock", "text": "Section", "wrap": True, "weight": "Bolder", "size": "Medium"}
+        {
+            "type": "TextBlock",
+            "text": "Section",
+            "wrap": True,
+            "weight": "Bolder",
+            "size": "Medium",
+        }
     ]
 
 
@@ -39,7 +55,12 @@ def test_table_flattens_to_pipe_separated_rows():
 def test_code_fence_becomes_monospace_block_without_trailing_newline():
     blocks = markdown_to_adaptive_blocks("```\nraw output\n```\n")
     assert blocks == [
-        {"type": "TextBlock", "text": "raw output", "wrap": True, "fontType": "Monospace"}
+        {
+            "type": "TextBlock",
+            "text": "raw output",
+            "wrap": True,
+            "fontType": "Monospace",
+        }
     ]
 
 

@@ -116,7 +116,9 @@ def test_reextract_calls_finalize_with_run_data(monkeypatch):
                 return ep
             return updated_ep
 
-    monkeypatch.setattr(server_simple, "_tenancy_from_request", lambda _r: ("local", "default"))
+    monkeypatch.setattr(
+        server_simple, "_tenancy_from_request", lambda _r: ("local", "default")
+    )
     monkeypatch.setattr(server_simple, "EpisodeStore", FakeStore)
     monkeypatch.setattr(server_simple._il, "finalize_investigation", fake_finalize)
     monkeypatch.setattr(server_simple.httpx, "get", fake_get)
@@ -147,7 +149,9 @@ def test_reextract_episode_not_found(monkeypatch):
         def get_by_episode_id(self, episode_id, org_id, team_node_id):
             return None
 
-    monkeypatch.setattr(server_simple, "_tenancy_from_request", lambda _r: ("local", "default"))
+    monkeypatch.setattr(
+        server_simple, "_tenancy_from_request", lambda _r: ("local", "default")
+    )
     monkeypatch.setattr(server_simple, "EpisodeStore", FakeStore)
 
     client = TestClient(server_simple.app)
@@ -176,7 +180,9 @@ def test_reextract_no_agent_run_id(monkeypatch):
         def get_by_episode_id(self, episode_id, org_id, team_node_id):
             return ep
 
-    monkeypatch.setattr(server_simple, "_tenancy_from_request", lambda _r: ("local", "default"))
+    monkeypatch.setattr(
+        server_simple, "_tenancy_from_request", lambda _r: ("local", "default")
+    )
     monkeypatch.setattr(server_simple, "EpisodeStore", FakeStore)
 
     client = TestClient(server_simple.app)

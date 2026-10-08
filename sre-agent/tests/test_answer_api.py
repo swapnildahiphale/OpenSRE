@@ -36,9 +36,7 @@ def test_answer_returns_404_for_missing_thread(client):
 def test_answer_returns_409_for_idle_session(client):
     server_simple._active_sessions["idle"] = _session("idle")
 
-    response = client.post(
-        "/answer", json={"thread_id": "idle", "answers": {"q": "a"}}
-    )
+    response = client.post("/answer", json={"thread_id": "idle", "answers": {"q": "a"}})
 
     assert response.status_code == 409
 
@@ -63,9 +61,7 @@ def test_answer_does_not_translate_unrelated_runtime_error(client):
     server_simple._active_sessions["failing"] = FailingSession()
 
     with pytest.raises(RuntimeError, match="storage failure"):
-        client.post(
-            "/answer", json={"thread_id": "failing", "answers": {"q": "a"}}
-        )
+        client.post("/answer", json={"thread_id": "failing", "answers": {"q": "a"}})
 
 
 def test_answer_delivers_to_running_session_with_pending_question(client):

@@ -482,7 +482,9 @@ def _lookup_latest_sdk_session_id(thread_id: str) -> Optional[str]:
         return None
 
 
-async def _start_interactive_session(thread_id: str, team_config, resume: Optional[str]):
+async def _start_interactive_session(
+    thread_id: str, team_config, resume: Optional[str]
+):
     """Start a session; if resume fails (missing JSONL), start without resume."""
     from agent import InteractiveAgentSession
 
@@ -1160,7 +1162,11 @@ async def create_investigation_stream(
             if event_type == "result" and isinstance(data, dict):
                 display_text, structured = clean_and_extract(data.get("text", ""))
                 if structured is not None:
-                    data = {**data, "text": display_text, "structured_report": structured}
+                    data = {
+                        **data,
+                        "text": display_text,
+                        "structured_report": structured,
+                    }
 
             # Emit SSE event in same format as sandbox mode
             # Format: data: {"type": "...", "data": {...}, "thread_id": "...", "timestamp": "..."}
