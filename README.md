@@ -185,7 +185,7 @@ OpenSRE is built on top of proven open-source technologies:
     <picture>
       <source media="(prefers-color-scheme: dark)" srcset=".github/assets/star-history-dark.svg" />
       <source media="(prefers-color-scheme: light)" srcset=".github/assets/star-history-light.svg" />
-      <img alt="OpenSRE GitHub star history — 158 stars as of 12 Oct 2026" src=".github/assets/star-history-light.svg" width="800" />
+      <img alt="OpenSRE GitHub star history — 162 stars as of 14 Oct 2026" src=".github/assets/star-history-light.svg" width="800" />
     </picture>
   </a>
 </p>
