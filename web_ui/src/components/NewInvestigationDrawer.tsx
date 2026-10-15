@@ -11,10 +11,12 @@
 //
 // API chain is unchanged from the original inline implementation:
 //   useAgentStream -> POST /api/team/agent/stream -> sre-agent /investigate (SSE).
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Bot, Sparkles, X } from 'lucide-react';
 import { useAgentStream } from '@/lib/useAgentStream';
-import { timelineToTurns } from '@/lib/agentTimeline';
+import { timelineToTurns, type Turn } from '@/lib/agentTimeline';
+import { apiFetch } from '@/lib/apiClient';
 import ConversationTranscript from './ConversationTranscript';
 import ConversationComposer from './ConversationComposer';
 
@@ -26,22 +28,95 @@ type Props = {
   onComplete?: () => void;
 };
 
+type FollowupStatus = {
+  lastNudgeText: string | null;
+  stoppedAt: string | null;
+  ticketKey: string | null;
+};
+
+function turnsWithWebNudge(turns: Turn[], followup: FollowupStatus | null): Turn[] {
+  const text = followup?.lastNudgeText?.trim();
+  if (!text || followup?.stoppedAt || followup?.ticketKey) return turns;
+  if (turns.some((t) => t.result?.text?.trim() === text)) return turns;
+  return [
+    ...turns,
+    {
+      runId: `web-nudge:${text.slice(0, 24)}`,
+      query: '',
+      items: [],
+      result: {
+        kind: 'result',
+        seq: Number.MAX_SAFE_INTEGER,
+        text,
+        structuredReport: null,
+        success: true,
+      },
+      status: 'completed',
+    },
+  ];
+}
+
 export function NewInvestigationDrawer({ open, onClose, onComplete }: Props) {
   const router = useRouter();
-  const { timeline, runId, isStreaming, backgroundWaiting, sendMessage, queueMessage, queuedMessages, stop, reset } = useAgentStream({
+  const {
+    timeline, runId, threadId, isStreaming, backgroundWaiting,
+    sendMessage, queueMessage, queuedMessages, stop, reset,
+  } = useAgentStream({
     // useAgentStream passes the final output text; callers here only need a
     // signal that the run completed, so we drop the argument.
     onComplete: () => onComplete?.(),
   });
+  const [followup, setFollowup] = useState<FollowupStatus | null>(null);
+
+  // Poll followup so a due Web nudge can appear as a chat bubble in this drawer.
+  useEffect(() => {
+    if (!open || !threadId) {
+      setFollowup(null);
+      return;
+    }
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const res = await apiFetch(
+          `/api/team/investigation-followups/${encodeURIComponent(threadId)}`,
+        );
+        if (!res.ok || cancelled) return;
+        const fu = await res.json() as {
+          last_nudge_text?: string | null;
+          stopped_at?: string | null;
+          ticket_key?: string | null;
+        };
+        if (cancelled) return;
+        setFollowup({
+          lastNudgeText: fu.last_nudge_text ?? null,
+          stoppedAt: fu.stopped_at ?? null,
+          ticketKey: fu.ticket_key ?? null,
+        });
+      } catch {
+        // Non-fatal
+      }
+    };
+    void load();
+    const id = window.setInterval(load, 10_000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+    };
+  }, [open, threadId]);
 
   // Close + reset stream state so reopening starts a fresh conversation
   // (no carried-over thread_id from the previous investigation).
   const closeChat = () => {
     onClose();
     reset();
+    setFollowup(null);
   };
 
   if (!open) return null;
+
+  const showTicketNote =
+    Boolean(followup?.ticketKey) && !followup?.stoppedAt;
+  const turns = turnsWithWebNudge(timelineToTurns(timeline), followup);
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end">
@@ -75,7 +150,14 @@ export function NewInvestigationDrawer({ open, onClose, onComplete }: Props) {
           </div>
         </div>
         <div className="flex-1 overflow-y-auto p-6">
-          {timeline.length === 0 && !isStreaming ? (
+          {showTicketNote && (
+            <div className="mb-4 rounded-md bg-slate-50 border border-slate-200 px-4 py-3 text-sm text-slate-700">
+              Follow-ups go to Jira{' '}
+              <span className="font-mono">{followup!.ticketKey}</span>
+              (not this drawer).
+            </div>
+          )}
+          {turns.length === 0 && !isStreaming ? (
             <div className="py-12 text-center">
               <Bot className="mx-auto mb-4 h-12 w-12 text-slate-300" />
               <p className="mb-2 text-slate-600">Start an investigation</p>
@@ -84,7 +166,7 @@ export function NewInvestigationDrawer({ open, onClose, onComplete }: Props) {
               </p>
             </div>
           ) : (
-            <ConversationTranscript turns={timelineToTurns(timeline)} isRunning={isStreaming} backgroundWaiting={backgroundWaiting} />
+            <ConversationTranscript turns={turns} isRunning={isStreaming} backgroundWaiting={backgroundWaiting} />
           )}
         </div>
         <div className="border-t border-slate-200/70 px-4 pb-4 [&>div]:mt-4">

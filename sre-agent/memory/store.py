@@ -63,6 +63,12 @@ class EpisodeStore:
             "effectiveness_score": ep.effectiveness_score,
             "duration_seconds": ep.duration_seconds,
             "extraction_status": ep.extraction_status or "ok",
+            "recommended_actions": ep.recommended_actions,
+            "resolution_status": ep.resolution_status,
+            "resolution_note_raw": ep.resolution_note_raw,
+            "fix_summary": ep.fix_summary,
+            "matched_suggestion": ep.matched_suggestion,
+            "resolution_history_json": json.dumps(ep.resolution_history),
             "created_at": ep.created_at,
             "updated_at": ep.updated_at,
             "embedding": ep.embedding,
@@ -125,6 +131,13 @@ class EpisodeStore:
     def _node_to_episode(n: dict, correlation_id: str) -> Episode:
         comps = [Component(**c) for c in json.loads(n.get("components_json", "[]"))]
         finds = [KeyFinding(**k) for k in json.loads(n.get("key_findings_json", "[]"))]
+        history_raw = n.get("resolution_history_json") or "[]"
+        try:
+            history = json.loads(history_raw) if isinstance(history_raw, str) else list(
+                history_raw or []
+            )
+        except Exception:
+            history = []
         return Episode(
             episode_id=n.get("episode_id", ""),
             correlation_id=correlation_id,
@@ -142,6 +155,12 @@ class EpisodeStore:
             summary=n.get("summary", ""),
             effectiveness_score=float(n.get("effectiveness_score", 0.1)),
             extraction_status=n.get("extraction_status") or "ok",
+            recommended_actions=list(n.get("recommended_actions") or []),
+            resolution_status=n.get("resolution_status") or "open",
+            resolution_note_raw=n.get("resolution_note_raw"),
+            fix_summary=n.get("fix_summary"),
+            matched_suggestion=n.get("matched_suggestion"),
+            resolution_history=history,
             duration_seconds=n.get("duration_seconds"),
             created_at=n.get("created_at", ""),
             updated_at=n.get("updated_at", ""),

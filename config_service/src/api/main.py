@@ -15,6 +15,12 @@ from src.api.routes.k8s_clusters import internal_router as k8s_internal_router
 from src.api.routes.k8s_clusters import router as k8s_clusters_router
 from src.api.routes.metrics import router as metrics_router
 from src.api.routes.remediation import router as remediation_router
+from src.api.routes.investigation_followups import (
+    internal_router as investigation_followups_internal_router,
+)
+from src.api.routes.investigation_followups import (
+    team_router as investigation_followups_team_router,
+)
 from src.api.routes.scheduled_jobs import (
     internal_router as scheduled_jobs_internal_router,
 )
@@ -109,6 +115,8 @@ def create_app() -> FastAPI:
     app.include_router(github_router)
     app.include_router(scheduled_jobs_router)
     app.include_router(scheduled_jobs_internal_router)
+    app.include_router(investigation_followups_team_router)
+    app.include_router(investigation_followups_internal_router)
 
     @app.middleware("http")
     async def add_request_id(request: Request, call_next):

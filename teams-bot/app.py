@@ -24,9 +24,11 @@ async def main() -> None:
         sys.exit(0)
 
     from microsoft_teams.apps import App
+    from nudge_handler import register_nudge_route
 
     app = App()
     register_handlers(app)
+    register_nudge_route(app)
     logger.info("Starting OpenSRE teams-bot on port %s", cfg.PORT)
     # App.start reads PORT / CLIENT_* from environment
     await app.start()

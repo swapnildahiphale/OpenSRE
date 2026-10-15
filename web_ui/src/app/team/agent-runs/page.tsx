@@ -16,6 +16,7 @@ import {
 import { formatRelativeTime } from '@/lib/formatRelativeTime';
 import {
   EpisodeResolutionBadge,
+  ResolutionStatusBadge,
   RunStatusBadge,
 } from '@/components/RunStatusBadge';
 import {
@@ -495,6 +496,12 @@ export default function TeamAgentRunsPage() {
                                   resolved={ep.resolved ?? false}
                                   size="sm"
                                   showIcon={false}
+                                />
+                              )}
+                              {ep?.resolution_status && (
+                                <ResolutionStatusBadge
+                                  status={ep.resolution_status}
+                                  size="sm"
                                 />
                               )}
                               <span className="text-xs text-slate-400 font-mono tabular-nums ml-auto">

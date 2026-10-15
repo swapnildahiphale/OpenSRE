@@ -1,0 +1,81 @@
+{{- /*
+opensre-scheduler — investigation follow-up nudge/abandon poll loop.
+
+Replicas fixed at 1 (no HPA). No Service/Ingress — nothing calls in;
+the container only polls config-service and pushes to teams-bot / sre-agent.
+*/ -}}
+
+{{- if .Values.services.opensreScheduler.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: opensre-scheduler
+  namespace: {{ .Values.namespace }}
+  labels:
+    app: opensre-scheduler
+    component: scheduler
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: opensre-scheduler
+  template:
+    metadata:
+      labels:
+        app: opensre-scheduler
+        component: scheduler
+    spec:
+      {{- if .Values.global.imagePullSecrets }}
+      imagePullSecrets:
+{{ toYaml .Values.global.imagePullSecrets | indent 8 }}
+      {{- end }}
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+      containers:
+        - name: opensre-scheduler
+          image: {{ required "services.opensreScheduler.image is required" .Values.services.opensreScheduler.image }}
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          ports:
+            - name: http
+              containerPort: 8090
+              protocol: TCP
+          resources:
+{{ toYaml .Values.services.opensreScheduler.resources | indent 12 }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          env:
+            - name: PYTHONUNBUFFERED
+              value: "1"
+            - name: PORT
+              value: "8090"
+            - name: CONFIG_SERVICE_URL
+              value: {{ printf "http://opensre-config-service.%s.svc.cluster.local:%d" .Values.namespace (int .Values.services.configService.servicePort) | quote }}
+            - name: SRE_AGENT_URL
+              value: {{ printf "http://opensre-agent.%s.svc.cluster.local:8000" .Values.namespace | quote }}
+            - name: POLL_INTERVAL_SECONDS
+              value: {{ .Values.services.opensreScheduler.pollIntervalSeconds | quote }}
+            {{- if .Values.services.teamsBot.enabled }}
+            - name: TEAMS_BOT_URL
+              value: {{ printf "http://opensre-teams-bot.%s.svc.cluster.local:%d" .Values.namespace (int .Values.services.teamsBot.servicePort) | quote }}
+            {{- end }}
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: {{ .Values.services.opensreScheduler.livenessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.services.opensreScheduler.livenessProbe.periodSeconds }}
+            timeoutSeconds: 3
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: {{ .Values.services.opensreScheduler.readinessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.services.opensreScheduler.readinessProbe.periodSeconds }}
+{{- end }}
