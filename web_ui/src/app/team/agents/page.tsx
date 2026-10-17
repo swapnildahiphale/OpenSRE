@@ -1,8 +1,9 @@
 'use client';
 
-import { useEffect, useState, useCallback, useMemo } from 'react';
+import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useIdentity } from '@/lib/useIdentity';
+import { testA2AConnection } from '@/lib/a2aClient';
 import {
   Bot,
   Save,
@@ -111,6 +112,43 @@ export default function AgentSettingsPage() {
   });
   const [testingConnection, setTestingConnection] = useState(false);
   const [connectionTestResult, setConnectionTestResult] = useState<{ success: boolean; message: string } | null>(null);
+
+  // Clear stale test feedback when URL, auth, or timeout changes
+  const prevTestConfigRef = useRef({
+    newUrl: newRemoteAgent.url,
+    newTimeout: newRemoteAgent.timeout,
+    newAuth: JSON.stringify(newRemoteAgent.auth),
+    editUrl: editingRemoteAgent?.url,
+    editTimeout: editingRemoteAgent?.timeout,
+    editAuth: JSON.stringify(editingRemoteAgent?.auth),
+  });
+
+  useEffect(() => {
+    const prev = prevTestConfigRef.current;
+    const currentNewAuth = JSON.stringify(newRemoteAgent.auth);
+    const currentEditAuth = JSON.stringify(editingRemoteAgent?.auth);
+
+    if (
+      prev.newUrl !== newRemoteAgent.url ||
+      prev.newTimeout !== newRemoteAgent.timeout ||
+      prev.newAuth !== currentNewAuth ||
+      prev.editUrl !== editingRemoteAgent?.url ||
+      prev.editTimeout !== editingRemoteAgent?.timeout ||
+      prev.editAuth !== currentEditAuth
+    ) {
+      if (connectionTestResult) {
+        setConnectionTestResult(null);
+      }
+      prevTestConfigRef.current = {
+        newUrl: newRemoteAgent.url,
+        newTimeout: newRemoteAgent.timeout,
+        newAuth: currentNewAuth,
+        editUrl: editingRemoteAgent?.url,
+        editTimeout: editingRemoteAgent?.timeout,
+        editAuth: currentEditAuth,
+      };
+    }
+  }, [newRemoteAgent, editingRemoteAgent, connectionTestResult]);
   const [zoom, setZoom] = useState(1);
   const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
@@ -1271,25 +1309,15 @@ export default function AgentSettingsPage() {
 
                   <button
                     onClick={async () => {
+                      if (!editingRemoteAgent) return;
                       setTestingConnection(true);
                       setConnectionTestResult(null);
 
                       try {
-                        const res = await fetch('/api/a2a/test', {
-                          method: 'POST',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify(editingRemoteAgent),
-                        });
-
-                        const data = await res.json();
+                        const result = await testA2AConnection(editingRemoteAgent);
                         setConnectionTestResult({
-                          success: res.ok,
-                          message: data.message || (res.ok ? 'Connection successful!' : 'Connection failed'),
-                        });
-                      } catch (e) {
-                        setConnectionTestResult({
-                          success: false,
-                          message: `Error: ${(e as Error).message}`,
+                          success: result.success,
+                          message: result.message,
                         });
                       } finally {
                         setTestingConnection(false);
@@ -1746,16 +1774,11 @@ export default function AgentSettingsPage() {
                     setTestingConnection(true);
                     setConnectionTestResult(null);
                     try {
-                      // TODO: Implement test connection API endpoint
-                      // For now, just validate URL format
-                      if (!newRemoteAgent.url) {
-                        throw new Error('URL is required');
-                      }
-                      new URL(newRemoteAgent.url);
-                      await new Promise(resolve => setTimeout(resolve, 1000));
-                      setConnectionTestResult({ success: true, message: 'Connection test successful!' });
-                    } catch (e: any) {
-                      setConnectionTestResult({ success: false, message: e.message || 'Connection failed' });
+                      const result = await testA2AConnection(newRemoteAgent);
+                      setConnectionTestResult({
+                        success: result.success,
+                        message: result.message,
+                      });
                     } finally {
                       setTestingConnection(false);
                     }
