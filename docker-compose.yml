@@ -186,7 +186,7 @@ services:
       # the team-level Skills toggles take effect.
       - ENABLED_SKILLS=${ENABLED_SKILLS:-}
       # Investigation timeout (seconds; default 600 = 10 minutes)
-      - AGENT_TIMEOUT_SECONDS=600
+      - AGENT_TIMEOUT_SECONDS=${AGENT_TIMEOUT_SECONDS:-600}
       # Durable session store for SDK conversation resume (persistent volume).
       - CLAUDE_CONFIG_DIR=/data/agent-sessions
       # LLM models — direct Anthropic vars from .env

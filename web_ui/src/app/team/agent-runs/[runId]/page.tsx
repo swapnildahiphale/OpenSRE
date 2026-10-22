@@ -7,6 +7,7 @@ import { useAgentStream } from '@/lib/useAgentStream';
 import { timelineToTurns, mergeTurns } from '@/lib/agentTimeline';
 import ConversationTranscript from '@/components/ConversationTranscript';
 import ConversationComposer from '@/components/ConversationComposer';
+import InvestigationHaltBanner, { SUMMARIZE_FOLLOW_UP } from '@/components/InvestigationHaltBanner';
 import { isOrphanedRun } from '@/lib/orphanRun';
 import { abandonRun, interruptThread } from '@/lib/streamRequest';
 import {
@@ -137,12 +138,24 @@ export default function AgentRunDetailPage() {
   );
 
   const turnLabel = `${turns.length} turn${turns.length === 1 ? '' : 's'}`;
+  const canSendFollowUp = !isLiveTurn && (continuable || isOrphaned) && !!threadId;
 
   return (
     <TeamPageShell
       variant="conversation"
       footer={
         <div className="py-4">
+          {showHaltBanner && (
+            <InvestigationHaltBanner
+              className="mb-4"
+              message={haltMessage}
+              onFollowUp={
+                canSendFollowUp
+                  ? () => onSend(SUMMARIZE_FOLLOW_UP)
+                  : undefined
+              }
+            />
+          )}
           {/* Full column width — same edges as run title / transcript */}
           <ConversationComposer
             embedded
@@ -196,9 +209,7 @@ export default function AgentRunDetailPage() {
         </header>
 
         {showHaltBanner && (
-          <div className="mb-4 rounded-xl border border-yellow-200 dark:border-yellow-800/50 bg-yellow-50 dark:bg-yellow-900/20 px-4 py-3 text-sm text-yellow-900 dark:text-yellow-100">
-            {haltMessage}
-          </div>
+          <InvestigationHaltBanner className="mb-4" message={haltMessage} />
         )}
 
         <label className="flex items-center gap-2 text-xs text-slate-500 mb-4 cursor-pointer select-none">

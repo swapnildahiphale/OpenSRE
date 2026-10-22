@@ -38,14 +38,14 @@ export function pickThreadSummary(
   const rootCause = rootCauseFromJson(latestRun.outputJson);
   if (rootCause) return truncate(rootCause);
 
+  if (firstRun.triggerMessage?.trim()) return truncate(firstRun.triggerMessage);
+
   if (
     (latestRun.status === 'failed' || latestRun.status === 'timeout') &&
     latestRun.errorMessage?.trim()
   ) {
     return truncate(latestRun.errorMessage);
   }
-
-  if (firstRun.triggerMessage?.trim()) return truncate(firstRun.triggerMessage);
 
   if (latestRun.status === 'running') return 'Investigation in progress…';
 
