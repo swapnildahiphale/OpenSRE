@@ -2,7 +2,7 @@
 
 import type { ReactNode } from 'react';
 import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { clsx } from 'clsx';
 import { useIdentity } from '@/lib/useIdentity';
 import { useOnboarding } from '@/lib/useOnboarding';
@@ -19,6 +19,10 @@ import {
   RunStatusBadge,
 } from '@/components/RunStatusBadge';
 import {
+  InvestigationsPager,
+  INVESTIGATIONS_PAGE_SIZE,
+} from '@/components/InvestigationsPager';
+import {
   PageHeader,
   Chip,
   EmptyState,
@@ -28,6 +32,7 @@ import {
   listRowHoverClass,
   TeamPageShell,
 } from '@/components/ui-flow';
+import { parseInvestigationsPageParam } from '@/lib/investigationsPager';
 import {
   MessageSquare,
   Monitor,
@@ -60,6 +65,14 @@ interface Conversation {
   firstRun: AgentRun;
   latestRun: AgentRun;
   turnCount: number;
+}
+
+interface InvestigationsListResponse {
+  items: Conversation[];
+  total: number;
+  page: number;
+  pageSize: number;
+  runningInvestigationCount: number;
 }
 
 const STATUS_OPTIONS = [
@@ -127,13 +140,17 @@ function StatusFilterItem({
 
 export default function TeamAgentRunsPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const page = parseInvestigationsPageParam(searchParams.get('page'));
   const { identity } = useIdentity();
   const {
     state: onboardingState,
     markFirstAgentRunCompleted,
     setQuickStartStep,
   } = useOnboarding();
-  const [runs, setRuns] = useState<AgentRun[]>([]);
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [investigationTotal, setInvestigationTotal] = useState(0);
+  const [runningInvestigationCount, setRunningInvestigationCount] = useState(0);
   const [episodes, setEpisodes] = useState<ThreadEpisode[]>([]);
   const [loading, setLoading] = useState(true);
   const [filterStatus, setFilterStatus] = useState('all');
@@ -146,17 +163,21 @@ export default function TeamAgentRunsPage() {
   const teamId = identity?.team_node_id;
   const initialLoadDone = useRef(false);
 
-  const loadRuns = useCallback(async () => {
+  const loadRuns = useCallback(async (silent = false) => {
     if (!teamId) return;
-    if (!initialLoadDone.current) setLoading(true);
+    if (!silent) setLoading(true);
     try {
-      const [runsRes, episodesRes] = await Promise.all([
-        apiFetch('/api/team/agent-runs'),
+      const [invRes, episodesRes] = await Promise.all([
+        apiFetch(
+          `/api/team/investigations?page=${page}&page_size=${INVESTIGATIONS_PAGE_SIZE}`,
+        ),
         fetch('/api/memory/episodes'),
       ]);
-      if (runsRes.ok) {
-        const data = await runsRes.json();
-        if (Array.isArray(data)) setRuns(data);
+      if (invRes.ok) {
+        const data = (await invRes.json()) as InvestigationsListResponse;
+        setConversations(data.items ?? []);
+        setInvestigationTotal(data.total ?? 0);
+        setRunningInvestigationCount(data.runningInvestigationCount ?? 0);
       }
       if (episodesRes.ok) {
         const epData = await episodesRes.json();
@@ -166,7 +187,7 @@ export default function TeamAgentRunsPage() {
       setLoading(false);
       initialLoadDone.current = true;
     }
-  }, [teamId]);
+  }, [teamId, page]);
 
   useEffect(() => {
     loadRuns();
@@ -190,10 +211,25 @@ export default function TeamAgentRunsPage() {
   }, [registerOnComplete, handleInvestigationComplete]);
 
   useEffect(() => {
-    if (!runs.some((r) => r.status === 'running')) return;
-    const id = setInterval(loadRuns, 5000);
+    if (page !== 1) return;
+    const hasRunningOnPage = conversations.some((c) => c.latestRun.status === 'running');
+    if (!hasRunningOnPage && runningInvestigationCount === 0) return;
+    const id = setInterval(() => {
+      void loadRuns(true);
+    }, 5000);
     return () => clearInterval(id);
-  }, [runs, loadRuns]);
+  }, [page, conversations, runningInvestigationCount, loadRuns]);
+
+  const goToPage = (nextPage: number) => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (nextPage <= 1) {
+      params.delete('page');
+    } else {
+      params.set('page', String(nextPage));
+    }
+    const qs = params.toString();
+    router.push(qs ? `/team/agent-runs?${qs}` : '/team/agent-runs');
+  };
 
   const handleRefresh = () => {
     setRefreshing(true);
@@ -202,27 +238,6 @@ export default function TeamAgentRunsPage() {
   };
 
   const episodeMap = useMemo(() => buildEpisodeMap(episodes), [episodes]);
-
-  const conversations: Conversation[] = useMemo(() => {
-    const groups = new Map<string, AgentRun[]>();
-    for (const r of runs) {
-      const key = r.correlationId || r.id;
-      const arr = groups.get(key) ?? [];
-      arr.push(r);
-      groups.set(key, arr);
-    }
-    const out: Conversation[] = [];
-    for (const [correlationId, arr] of groups) {
-      const sorted = [...arr].sort((a, b) => a.startedAt.localeCompare(b.startedAt));
-      out.push({
-        correlationId,
-        firstRun: sorted[0],
-        latestRun: sorted[sorted.length - 1],
-        turnCount: sorted.length,
-      });
-    }
-    return out.sort((a, b) => b.latestRun.startedAt.localeCompare(a.latestRun.startedAt));
-  }, [runs]);
 
   const issueTypeFreqs = useMemo(() => {
     const counts = new Map<string, number>();
@@ -285,13 +300,13 @@ export default function TeamAgentRunsPage() {
   });
 
   const channelOptions = useMemo(() => {
-    const sources = new Set(runs.map((r) => r.triggerSource));
+    const sources = new Set(conversations.map((c) => c.latestRun.triggerSource));
     return ['web_ui', 'teams', 'slack', 'api', 'manual', 'scheduled'].filter((s) =>
       sources.has(s as AgentRun['triggerSource']),
     );
-  }, [runs]);
+  }, [conversations]);
 
-  const runningCount = conversations.filter((c) => c.latestRun.status === 'running').length;
+  const runningCount = runningInvestigationCount;
   const fmtDuration = (s?: number) =>
     !s ? null : s < 60 ? `${s}s` : `${Math.floor(s / 60)}m ${s % 60}s`;
 
@@ -311,7 +326,7 @@ export default function TeamAgentRunsPage() {
             title="Runs"
             subtitle="Episode and thread summaries"
           />
-          {!loading && conversations.length > 0 && (
+          {!loading && investigationTotal > 0 && (
             <div className="flex items-center gap-3 shrink-0">
               {runningCount > 0 && (
                 <span className="inline-flex items-center gap-2 h-9 px-3.5 rounded-full text-[13px] font-medium bg-slate-100 text-slate-600">
@@ -341,7 +356,7 @@ export default function TeamAgentRunsPage() {
             <Skeleton key={i} className="h-28 w-full rounded-xl" />
           ))}
         </div>
-      ) : conversations.length === 0 ? (
+      ) : investigationTotal === 0 ? (
         <EmptyState
           title="No investigations yet"
           action={
@@ -553,6 +568,12 @@ export default function TeamAgentRunsPage() {
                 })}
               </Panel>
             )}
+
+            <InvestigationsPager
+              page={page}
+              total={investigationTotal}
+              onPageChange={goToPage}
+            />
           </div>
         </div>
       )}

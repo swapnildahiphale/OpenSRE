@@ -7,7 +7,8 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import structlog
 from fastapi import APIRouter, Depends, File, Header, HTTPException, UploadFile
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+from sqlalchemy import and_, func
 from sqlalchemy.orm import Session
 
 from ...core.config_cache import get_config_cache
@@ -682,6 +683,25 @@ class AgentRunResponse(BaseModel):
     sdkSessionId: Optional[str] = None
 
 
+def _investigation_thread_key_expr():
+    """SQL expression: correlation id when set, else run id (matches web UI grouping)."""
+    return func.coalesce(func.nullif(AgentRun.correlation_id, ""), AgentRun.id)
+
+
+def _thread_key_for_run(run: AgentRun) -> str:
+    cid = run.correlation_id
+    if cid:
+        return cid
+    return str(run.id)
+
+
+def _team_agent_run_scope(team: TeamPrincipal):
+    return (
+        AgentRun.org_id == team.org_id,
+        AgentRun.team_node_id == team.team_node_id,
+    )
+
+
 def _agent_run_to_response(run: AgentRun) -> AgentRunResponse:
     duration = None
     if run.completed_at and run.started_at:
@@ -727,6 +747,123 @@ async def list_agent_runs(
     )
 
     return [_agent_run_to_response(run) for run in runs]
+
+
+class InvestigationItem(BaseModel):
+    """One investigation thread (grouped by correlation id)."""
+
+    correlationId: str
+    turnCount: int
+    firstRun: AgentRunResponse
+    latestRun: AgentRunResponse
+
+
+class InvestigationsListResponse(BaseModel):
+    items: List[InvestigationItem]
+    total: int
+    page: int
+    pageSize: int
+    runningInvestigationCount: int = Field(
+        description="Threads whose latest run is still running (team-wide).",
+    )
+
+
+def _investigation_threads_subquery(db: Session, team: TeamPrincipal):
+    thread_key = _investigation_thread_key_expr()
+    return (
+        db.query(
+            thread_key.label("thread_key"),
+            func.max(AgentRun.started_at).label("latest_started_at"),
+        )
+        .filter(*_team_agent_run_scope(team))
+        .group_by(thread_key)
+        .subquery()
+    )
+
+
+def _count_running_investigations(
+    db: Session, team: TeamPrincipal, thread_agg
+) -> int:
+    thread_key = _investigation_thread_key_expr()
+    return (
+        db.query(func.count())
+        .select_from(AgentRun)
+        .join(
+            thread_agg,
+            and_(
+                thread_key == thread_agg.c.thread_key,
+                AgentRun.started_at == thread_agg.c.latest_started_at,
+            ),
+        )
+        .filter(*_team_agent_run_scope(team), AgentRun.status == "running")
+        .scalar()
+        or 0
+    )
+
+
+@router.get("/investigations", response_model=InvestigationsListResponse)
+async def list_investigations(
+    page: int = 1,
+    page_size: int = 20,
+    db: Session = Depends(get_db),
+    team: TeamPrincipal = Depends(require_team_auth),
+):
+    """List investigation threads, newest activity first, with pagination."""
+    page = max(1, page)
+    page_size = min(max(1, page_size), 100)
+    offset = (page - 1) * page_size
+
+    thread_agg = _investigation_threads_subquery(db, team)
+    total = db.query(func.count()).select_from(thread_agg).scalar() or 0
+
+    thread_rows = (
+        db.query(thread_agg.c.thread_key, thread_agg.c.latest_started_at)
+        .order_by(thread_agg.c.latest_started_at.desc())
+        .offset(offset)
+        .limit(page_size)
+        .all()
+    )
+    ordered_keys = [row.thread_key for row in thread_rows]
+
+    items: List[InvestigationItem] = []
+    if ordered_keys:
+        thread_key = _investigation_thread_key_expr()
+        runs = (
+            db.query(AgentRun)
+            .filter(*_team_agent_run_scope(team))
+            .filter(thread_key.in_(ordered_keys))
+            .order_by(AgentRun.started_at.asc())
+            .all()
+        )
+        by_key: Dict[str, List[AgentRun]] = {k: [] for k in ordered_keys}
+        for run in runs:
+            by_key.setdefault(_thread_key_for_run(run), []).append(run)
+
+        for key in ordered_keys:
+            arr = by_key.get(key) or []
+            if not arr:
+                continue
+            sorted_runs = sorted(arr, key=lambda r: r.started_at)
+            first = sorted_runs[0]
+            latest = sorted_runs[-1]
+            items.append(
+                InvestigationItem(
+                    correlationId=key,
+                    turnCount=len(sorted_runs),
+                    firstRun=_agent_run_to_response(first),
+                    latestRun=_agent_run_to_response(latest),
+                )
+            )
+
+    running_count = _count_running_investigations(db, team, thread_agg)
+
+    return InvestigationsListResponse(
+        items=items,
+        total=total,
+        page=page,
+        pageSize=page_size,
+        runningInvestigationCount=running_count,
+    )
 
 
 @router.get("/agent-runs/{run_id}", response_model=AgentRunResponse)
