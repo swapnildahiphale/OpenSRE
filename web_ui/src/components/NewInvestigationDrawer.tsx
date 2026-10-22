@@ -60,7 +60,11 @@ export function NewInvestigationDrawer({ open, onClose, onComplete }: Props) {
           <div className="flex items-center gap-2">
             {runId && !isStreaming && (
               <button
-                onClick={() => router.push(`/team/agent-runs/${runId}`)}
+                onClick={() => {
+                  const id = runId;
+                  closeChat();
+                  router.push(`/team/agent-runs/${id}`);
+                }}
                 className="rounded-full bg-emerald-100/50 px-3 py-1 text-xs font-medium text-emerald-700 hover:bg-emerald-100/80"
               >
                 View saved run
