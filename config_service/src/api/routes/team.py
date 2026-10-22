@@ -1129,6 +1129,7 @@ class TeamStatsResponse(BaseModel):
     """Response model for team dashboard statistics."""
 
     totalRuns: int
+    totalInvestigations: int
     successRate: float
     avgMttdSeconds: Optional[float]  # Average Mean Time To Detect (run duration)
     runsThisWeek: int
@@ -1218,10 +1219,11 @@ async def get_team_stats(
     Get team dashboard statistics.
 
     Returns:
-    - Total runs (all time)
-    - Success rate
-    - Average MTTD (run duration in seconds)
-    - Weekly trend
+    - Total investigations (distinct threads by correlation id, else run id)
+    - Total runs (all time, backward compatible)
+    - Success rate (per run)
+    - Average MTTD (per completed run duration in seconds, last 30 days)
+    - Weekly run volume trend
     """
     import structlog
 
@@ -1263,6 +1265,19 @@ async def get_team_stats(
     )
 
     logger.info("total_runs (with team_node_id)", count=total_runs)
+
+    thread_key = func.coalesce(AgentRun.correlation_id, AgentRun.id)
+    total_investigations = (
+        db.query(func.count(func.distinct(thread_key)))
+        .filter(
+            AgentRun.org_id == team.org_id,
+            AgentRun.team_node_id == team.team_node_id,
+        )
+        .scalar()
+        or 0
+    )
+
+    logger.info("total_investigations", count=total_investigations)
 
     # Success rate (all time)
     successful_runs = (
@@ -1339,6 +1354,7 @@ async def get_team_stats(
 
     return TeamStatsResponse(
         totalRuns=total_runs,
+        totalInvestigations=total_investigations,
         successRate=success_rate,
         avgMttdSeconds=avg_mttd_seconds,
         runsThisWeek=runs_this_week,

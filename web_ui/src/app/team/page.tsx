@@ -28,6 +28,7 @@ import type { ComponentProps } from 'react';
 
 interface TeamStats {
   totalRuns: number;
+  totalInvestigations: number;
   successRate: number;
   avgMttdSeconds: number | null;
   runsThisWeek: number;
@@ -285,7 +286,7 @@ export default function TeamDashboardPage() {
                   </span>
                   {(stats?.runsThisWeek ?? 0) > 0 && (
                     <span className="text-emerald-600 font-mono text-sm font-medium">
-                      / {stats?.runsThisWeek} this week
+                      / {stats?.runsThisWeek} runs this week
                     </span>
                   )}
                 </div>
@@ -319,19 +320,25 @@ export default function TeamDashboardPage() {
           </div>
           <div className="col-span-12 md:col-span-7 grid grid-cols-3 gap-x-10 px-2">
             <div className="border-t border-slate-200 pt-6">
-              <div className="text-[11px] uppercase tracking-[0.22em] text-slate-500">Total runs</div>
+              <div className="text-[11px] uppercase tracking-[0.22em] text-slate-500">
+                Total investigations
+              </div>
               <div className="mt-4 text-4xl font-medium tracking-tight font-mono tabular-nums text-slate-900">
-                {stats?.totalRuns ?? 0}
+                {stats?.totalInvestigations ?? stats?.totalRuns ?? 0}
               </div>
             </div>
             <div className="border-t border-slate-200 pt-6">
-              <div className="text-[11px] uppercase tracking-[0.22em] text-slate-500">Success</div>
+              <div className="text-[11px] uppercase tracking-[0.22em] text-slate-500">
+                Run success
+              </div>
               <div className="mt-4 text-4xl font-medium tracking-tight font-mono tabular-nums text-slate-900">
                 {stats?.successRate ?? 0}%
               </div>
             </div>
             <div className="border-t border-slate-200 pt-6">
-              <div className="text-[11px] uppercase tracking-[0.22em] text-slate-500">MTTD</div>
+              <div className="text-[11px] uppercase tracking-[0.22em] text-slate-500">
+                Avg run MTTD
+              </div>
               <div className="mt-4 text-4xl font-medium tracking-tight font-mono tabular-nums text-slate-900">
                 {formatMttd(stats?.avgMttdSeconds)}
               </div>
