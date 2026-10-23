@@ -286,6 +286,8 @@ export interface RunWithTrace {
   outputSummary?: string | null;
   outputJson?: InvestigationReportData | null;
   items: TimelineItem[];   // thoughts + tools from the run's trace (no result)
+  /** Optional — used to hide web followup_nudge turns when ticket-linked. */
+  triggerSource?: string;
 }
 
 /** Append a user message marker to the live timeline and mark the run running. */

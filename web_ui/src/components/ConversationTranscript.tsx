@@ -301,7 +301,8 @@ function TurnBlock({
   const todos = deriveTodoSnapshot(todoTools);
   return (
     <div className="space-y-4">
-      {/* User message — right-aligned with avatar */}
+      {/* User message — right-aligned with avatar (omit for system nudges). */}
+      {Boolean(turn.query?.trim()) && (
       <div className="flex items-start justify-end gap-2.5">
         <div className="max-w-[min(100%,42rem)] rounded-2xl rounded-tr-md bg-slate-100/90 dark:bg-stone-700/80 px-3.5 py-2.5">
           <p className="text-sm font-medium text-slate-900 dark:text-white whitespace-pre-wrap leading-relaxed">
@@ -316,6 +317,7 @@ function TurnBlock({
           <User className="w-4 h-4 text-slate-600 dark:text-stone-300" />
         </div>
       </div>
+      )}
 
       {/* OpenSRE reply — left-aligned with spinner logo */}
       <div className="flex items-start gap-2.5">

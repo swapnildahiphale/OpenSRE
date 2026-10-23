@@ -195,3 +195,50 @@ def test_extract_does_not_retry_on_broken_json(monkeypatch):
     out = ex.extract_investigation("p", "result " * 20, [])
     assert n["c"] == 1
     assert out.status == "failed"
+
+
+def test_extract_recommended_actions_parsed_and_capped(monkeypatch):
+    import memory.extraction as ex
+
+    actions = [f"step-{i}" for i in range(12)]
+    payload = {
+        "issue_type": "crashloop-backoff",
+        "issue_description": "pods down",
+        "severity": "warning",
+        "components": [],
+        "root_cause": "oom",
+        "resolved": True,
+        "summary": "oom",
+        "recommended_actions": actions,
+    }
+    monkeypatch.setattr(ex, "llm_text_completion", lambda *a, **k: __import__("json").dumps(payload))
+    out = ex.extract_investigation("pods crashing", "OOMKilled " * 10, [])
+    assert out.status == "ok"
+    assert len(out.recommended_actions) == 8
+    assert out.recommended_actions[0] == "step-0"
+    assert out.recommended_actions[-1] == "step-7"
+
+
+def test_extract_empty_recommended_actions_keeps_prior(monkeypatch):
+    import memory.extraction as ex
+    from memory.models import Episode
+
+    prior = Episode(
+        episode_id="e1",
+        correlation_id="c1",
+        recommended_actions=["restart pod", "check logs"],
+    )
+    monkeypatch.setattr(
+        ex,
+        "llm_text_completion",
+        lambda *a, **k: '{"issue_type":"x","issue_description":"d","severity":null,"components":[],"root_cause":null,"resolved":false,"summary":"s","recommended_actions":[]}',
+    )
+    out = ex.extract_investigation("follow-up", "still looking " * 10, [], prior=prior)
+    assert out.recommended_actions == ["restart pod", "check logs"]
+
+
+def test_schema_requires_recommended_actions():
+    from memory.extraction import EXTRACTION_JSON_SCHEMA
+
+    assert "recommended_actions" in EXTRACTION_JSON_SCHEMA["required"]
+    assert EXTRACTION_JSON_SCHEMA["properties"]["recommended_actions"]["type"] == "array"

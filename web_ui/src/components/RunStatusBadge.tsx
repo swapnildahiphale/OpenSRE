@@ -116,3 +116,37 @@ export function EpisodeResolutionBadge({
     </span>
   );
 }
+
+const FOLLOWUP_COLORS = {
+  open: 'text-amber-600 bg-amber-100',
+  confirmed: 'text-green-600 bg-green-100',
+  abandoned: 'text-slate-500 bg-slate-100',
+} as const;
+
+/** Production fix-confirmation status (distinct from diagnosis resolved/unresolved). */
+export function ResolutionStatusBadge({
+  status,
+  size = 'md',
+}: {
+  status: 'open' | 'confirmed' | 'abandoned' | 'ignored';
+  size?: BadgeSize;
+}) {
+  if (status === 'ignored') return null;
+  const label =
+    status === 'open'
+      ? 'Fix unconfirmed'
+      : status === 'confirmed'
+        ? 'Fix confirmed'
+        : 'Abandoned';
+  const color = FOLLOWUP_COLORS[status];
+  const textClass = size === 'sm' ? 'text-xs' : 'text-xs';
+
+  return (
+    <span
+      className={`inline-flex items-center gap-1 rounded-full shrink-0 px-2 py-0.5 font-medium ${textClass} ${color}`}
+      title={label}
+    >
+      {label}
+    </span>
+  );
+}

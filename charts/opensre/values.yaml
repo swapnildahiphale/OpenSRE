@@ -554,6 +554,25 @@ services:
         secretName: ""
       annotations: {}
 
+  # Investigation follow-up nudge/abandon scheduler (always on when enabled)
+  opensreScheduler:
+    enabled: true
+    image: "opensre/scheduler:v1.0.0"
+    pollIntervalSeconds: 30
+    resources:
+      requests:
+        cpu: "50m"
+        memory: "128Mi"
+      limits:
+        cpu: "200m"
+        memory: "256Mi"
+    readinessProbe:
+      initialDelaySeconds: 5
+      periodSeconds: 10
+    livenessProbe:
+      initialDelaySeconds: 10
+      periodSeconds: 30
+
   aiPipelineApi:
     enabled: false  # Deprecated - use knowledgeBase instead
     image: "opensre/knowledge-base:v1.0.0"
