@@ -20,7 +20,9 @@ RUN pip install --no-cache-dir -r /app/requirements.runtime.txt \
     "urllib3>=2.6.3" \
     "pyasn1>=0.6.2" \
     "jaraco.context>=6.1.0" \
-    "starlette>=0.49.1"
+    "starlette>=1.3.1" \
+    "anyio>=4.14.2" \
+    "PyJWT>=2.15.0"
 
 # Install uv package manager (required for Python MCP servers like AWS EKS MCP)
 RUN pip install --no-cache-dir uv

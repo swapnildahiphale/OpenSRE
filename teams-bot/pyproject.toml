@@ -5,9 +5,15 @@ requires-python = ">=3.11"
 dependencies = [
   "microsoft-teams-apps>=2.0.14",
   "microsoft-teams-cards>=2.0.14",
-  "aiohttp>=3.9.0",
+  "aiohttp>=3.14.4",
   "python-dotenv>=1.0.0",
   "mistune>=3.0.0",
+]
+
+[tool.uv]
+override-dependencies = [
+    "anyio>=4.14.2",
+    "pyjwt>=2.15.0",
 ]
 
 [dependency-groups]
