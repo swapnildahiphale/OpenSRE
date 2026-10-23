@@ -8,7 +8,7 @@ dependencies = [
     "claude-agent-sdk==0.2.110",  # ClaudeSDKClient with interrupt support
     "anthropic>=0.40.0",
     "python-dotenv==1.2.1",
-    "fastapi==0.128.0",
+    "fastapi==0.161.1",
     "uvicorn==0.40.0",
 
     # Infrastructure integrations
@@ -40,6 +40,13 @@ build-backend = "hatchling.build"
 [tool.hatch.build.targets.wheel]
 packages = ["."]
 only-include = ["agent.py", "events.py", "sandbox_server.py", "server.py", "sandbox_manager.py", "server_simple.py"]
+
+[tool.uv]
+override-dependencies = [
+    "anyio>=4.14.2",
+    "pyjwt>=2.15.0",
+    "starlette>=1.3.1",
+]
 
 [dependency-groups]
 dev = [
