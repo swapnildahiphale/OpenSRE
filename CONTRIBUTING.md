@@ -182,6 +182,17 @@ git push origin feature/your-feature-name
 - For large changes, expect multiple review rounds
 - We aim to review PRs within 2-3 business days
 
+### Dependency updates
+
+[Dependabot](https://docs.github.com/en/code-security/dependabot) opens weekly, grouped pull requests for the ecosystems listed in [`.github/dependabot.yml`](.github/dependabot.yml) (npm, pip, Docker, GitHub Actions).
+
+| Update kind | Maintainer action |
+|-------------|-------------------|
+| **Patch/minor** (grouped PRs) | Safe to merge once CI is green; skim the release notes if the dependency is security-sensitive. |
+| **Major** (ungrouped PRs) | Requires manual review: read the changelog, run the local stack (`make dev`), and exercise affected surfaces before merge. |
+
+We do not use auto-merge for dependency PRs; a maintainer always clicks merge after checks pass.
+
 ## Style Guidelines
 
 ### Python
