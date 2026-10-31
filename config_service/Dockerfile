@@ -17,7 +17,9 @@ RUN apt-get update && apt-get upgrade -y && \
 COPY requirements.runtime.txt /app/requirements.runtime.txt
 RUN pip install --no-cache-dir -r /app/requirements.runtime.txt \
     && pip install --no-cache-dir --upgrade \
-    "urllib3>=2.6.3" \
+    "certifi>=2026.10.19" \
+    "idna>=3.15" \
+    "urllib3>=2.8.0" \
     "pyasn1>=0.6.2" \
     "jaraco.context>=6.1.0" \
     "starlette>=1.3.1" \

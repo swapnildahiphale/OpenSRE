@@ -34,11 +34,21 @@
     "glob": "^10.5.0",
     "jsdom": "^26.1.0",
     "tailwindcss": "^4",
-    "tar": "^7.5.7",
+    "tar": "^7.5.21",
     "typescript": "5.9.3",
-    "vitest": "^2.1.9"
+    "vitest": "^3.2.6"
   },
   "overrides": {
-    "tar": "^7.5.7"
+    "tar": "^7.5.21",
+    "minimatch": "^9.0.7",
+    "picomatch": "^4.0.4",
+    "source-map-js": "^1.2.2",
+    "brace-expansion": "^2.0.2",
+    "js-yaml": "^4.3.2",
+    "flatted": "^3.4.2",
+    "ajv": "^6.14.0",
+    "@humanfs/node": "^0.16.8",
+    "esbuild": "^0.25.0",
+    "tinypool": "^2.1.2"
   }
 }
