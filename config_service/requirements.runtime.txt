@@ -37,6 +37,10 @@ croniter>=2.0.0
 redis>=5.0.0
 
 # MCP (for MCP preview functionality)
-mcp==1.24.0
+mcp>=1.30.0,<2
+
+# Transitive security pins (httpx / MCP stack)
+certifi>=2026.10.19
+idna>=3.15
 
 
