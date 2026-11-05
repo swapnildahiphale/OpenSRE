@@ -125,6 +125,13 @@ class AdminPrincipal:
     org_id: Optional[str] = None  # Set for org-scoped admins
 
 
+def resolve_admin_audit_actor(principal: AdminPrincipal) -> str:
+    """Derive audit actor from authenticated principal (not spoofable headers)."""
+    if principal.email:
+        return principal.email
+    return principal.subject
+
+
 def authenticate_admin_request(
     authorization: str = Header(default=""),
     x_admin_token: str = Header(default="", alias="X-Admin-Token"),
@@ -142,12 +149,10 @@ def authenticate_admin_request(
 
     # 0) Internal service header for agent service
     internal_secret = os.getenv("INTERNAL_SERVICE_SECRET", "")
-    if x_internal_service and (
-        x_internal_service == "agent"
-        or (
-            internal_secret
-            and secrets.compare_digest(x_internal_service, internal_secret)
-        )
+    if (
+        x_internal_service
+        and internal_secret
+        and secrets.compare_digest(x_internal_service, internal_secret)
     ):
         return AdminPrincipal(
             auth_kind="internal_service",
