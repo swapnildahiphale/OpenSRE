@@ -66,6 +66,51 @@ def activity_sender_name(activity: Any) -> Optional[str]:
     return stripped[:128]
 
 
+def activity_sender_id(activity: Any) -> Optional[str]:
+    """Teams-scoped conversation member id (Bot Framework Account.id) — NOT aad_object_id."""
+    sender = getattr(activity, "from_", None)
+    if sender is None:
+        sender = getattr(activity, "from_property", None)
+    if sender is None:
+        sender = getattr(activity, "from", None)
+    member_id = getattr(sender, "id", None) if sender is not None else None
+    if isinstance(sender, dict):
+        member_id = sender.get("id")
+    if not isinstance(member_id, str):
+        return None
+    stripped = member_id.strip()
+    if not stripped:
+        return None
+    return stripped[:128]
+
+
+def conversation_ref_from_activity(activity: Any) -> dict[str, Optional[str]]:
+    """Build a ConversationReference-shaped dict for outbound Teams nudges."""
+    conversation = getattr(activity, "conversation", None)
+    conversation_id = getattr(conversation, "id", None) if conversation is not None else None
+    if isinstance(conversation, dict):
+        conversation_id = conversation.get("id")
+        tenant_id = conversation.get("tenant_id") or conversation.get("tenantId")
+    else:
+        tenant_id = None
+        if conversation is not None:
+            tenant_id = getattr(conversation, "tenant_id", None) or getattr(
+                conversation, "tenantId", None
+            )
+    service_url = getattr(activity, "service_url", None) or getattr(
+        activity, "serviceUrl", None
+    )
+    channel_id = getattr(activity, "channel_id", None) or getattr(
+        activity, "channelId", None
+    )
+    return {
+        "conversation_id": conversation_id,
+        "service_url": service_url,
+        "channel_id": channel_id,
+        "tenant_id": tenant_id,
+    }
+
+
 def strip_bot_mention(text: str, bot_name: str = "OpenSRE") -> str:
     cleaned = re.sub(r"<at>[^<]*</at>", "", text or "", flags=re.IGNORECASE)
     cleaned = re.sub(re.escape(bot_name), "", cleaned, flags=re.IGNORECASE)
@@ -210,6 +255,8 @@ def register_handlers(app) -> None:
             update_card=update_card,
             plain_text_final=not use_stream,
             trigger_actor=activity_sender_name(activity),
+            trigger_actor_teams_id=activity_sender_id(activity),
+            conversation_ref=conversation_ref_from_activity(activity),
         )
 
     @app.on_card_action_execute(SUBMIT_VERB)

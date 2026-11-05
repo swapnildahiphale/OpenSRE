@@ -12,6 +12,7 @@ import { isOrphanedRun } from '@/lib/orphanRun';
 import { abandonRun, interruptThread } from '@/lib/streamRequest';
 import {
   EpisodeResolutionBadge,
+  ResolutionStatusBadge,
   RunStatusBadge,
 } from '@/components/RunStatusBadge';
 import { Skeleton, TeamPageShell } from '@/components/ui-flow';
@@ -30,7 +31,7 @@ export default function AgentRunDetailPage() {
     turns: historicalTurns, title, status,
     sessionId, threadId, sessionAlive, continuable, errorMessage, loading, error, reload,
     activeKnown, consecutiveInactivePolls,
-    episode, triggerSource, triggerActor,
+    episode, triggerSource, triggerActor, followupStatus,
   } = useConversation(runId);
 
   const stream = useAgentStream({
@@ -202,6 +203,12 @@ export default function AgentRunDetailPage() {
                 showIcon={false}
               />
             )}
+            {episode?.resolution_status && (
+              <ResolutionStatusBadge
+                status={episode.resolution_status}
+                size="sm"
+              />
+            )}
             <span className="text-xs text-slate-400 font-mono tabular-nums">
               · {turnLabel} · {formatTriggerMeta(triggerSource, triggerActor)}
             </span>
@@ -210,6 +217,14 @@ export default function AgentRunDetailPage() {
 
         {showHaltBanner && (
           <InvestigationHaltBanner className="mb-4" message={haltMessage} />
+        )}
+
+        {followupStatus?.ticketKey && !followupStatus.stoppedAt && (
+          <div className="mb-4 rounded-md bg-slate-50 border border-slate-200 px-4 py-3 text-sm text-slate-700">
+            Follow-ups for this investigation go to Jira{' '}
+            <span className="font-mono">{followupStatus.ticketKey}</span>
+            (not this page).
+          </div>
         )}
 
         <label className="flex items-center gap-2 text-xs text-slate-500 mb-4 cursor-pointer select-none">

@@ -5,6 +5,7 @@ export interface ThreadEpisode {
   issue_type?: string | null;
   services?: string[];
   resolved?: boolean;
+  resolution_status?: 'open' | 'confirmed' | 'abandoned' | 'ignored';
 }
 
 export interface ThreadRunSlice {

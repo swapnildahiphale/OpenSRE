@@ -23,12 +23,23 @@ class StrategyGenerator:
     ) -> str:
         lines = []
         for i, ep in enumerate(episodes, 1):
-            status = "RESOLVED" if ep.resolved else "UNRESOLVED"
+            if ep.resolution_status == "confirmed":
+                status = "CONFIRMED_FIX"
+            elif ep.resolution_status == "abandoned":
+                status = "UNRESOLVED"
+            elif ep.resolved:
+                status = "DIAGNOSIS_RESOLVED"
+            else:
+                status = "UNRESOLVED"
             skills = ", ".join(ep.skills_used[:5]) or "none recorded"
+            actions = "; ".join(ep.recommended_actions[:5]) or "none recorded"
+            fix = ep.fix_summary or "n/a"
             lines.append(
                 f"Episode {i} [{status}] (effectiveness {ep.effectiveness_score:.1f}):\n"
                 f"  Root cause: {ep.root_cause or 'not identified'}\n"
                 f"  Skills used: {skills}\n"
+                f"  Recommended actions: {actions}\n"
+                f"  Fix summary: {fix}\n"
                 f"  Summary: {ep.summary}"
             )
         body = "\n\n".join(lines)
@@ -38,8 +49,11 @@ class StrategyGenerator:
             "Return a markdown playbook with these sections:\n"
             "1. **Common Root Causes** — patterns across episodes\n"
             "2. **Recommended Investigation Steps** — ordered by effectiveness\n"
-            "3. **Key Skills / Commands** — what worked\n"
-            "4. **Anti-patterns** — approaches that did NOT help (draw from UNRESOLVED / low-effectiveness episodes)\n\n"
+            "3. **Key Skills / Commands** — what worked "
+            "(prefer CONFIRMED_FIX episodes; treat those as proven remediations)\n"
+            "4. **Anti-patterns** — approaches that did NOT help "
+            "(draw from UNRESOLVED / abandoned / low-effectiveness episodes — "
+            "never treat abandoned as a successful remediation)\n\n"
             "Be specific and actionable. Under 300 words.\nStrategy:"
         )
 

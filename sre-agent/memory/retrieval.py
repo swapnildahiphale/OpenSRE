@@ -34,10 +34,26 @@ RETURN e.correlation_id AS correlation_id, e.episode_id AS episode_id,
        e.skills_used AS skills_used, e.key_findings_json AS key_findings_json,
        e.resolved AS resolved, e.root_cause AS root_cause, e.summary AS summary,
        e.effectiveness_score AS effectiveness_score, e.duration_seconds AS duration_seconds,
+       e.recommended_actions AS recommended_actions,
+       e.resolution_status AS resolution_status,
+       e.fix_summary AS fix_summary,
        e.created_at AS created_at, e.updated_at AS updated_at,
        collect(s.name) AS services, score AS vscore
 ORDER BY vscore DESC
 """
+
+
+def recall_tie_break_rank(episode: Episode) -> int:
+    """Higher = preferred when vector scores tie.
+
+    confirmed fix > diagnosis-only resolved > everything else.
+    Unconfirmed episodes are never dropped — only reordered.
+    """
+    if episode.resolution_status == "confirmed":
+        return 2
+    if episode.resolved:
+        return 1
+    return 0
 
 
 class ScoredEpisode:
@@ -92,9 +108,13 @@ class EpisodeRetriever:
         for item in res.items:
             # result_formatter guarantees item.content is a dict.
             out.append(_to_scored(dict(item.content)))
-            if len(out) >= k:
-                break
-        return out
+
+        # Stable display sort: vector score desc, then confirmed > diagnosis-resolved.
+        out.sort(
+            key=lambda se: (se.score, recall_tie_break_rank(se.episode)),
+            reverse=True,
+        )
+        return out[:k]
 
 
 def _to_scored(rec: dict) -> ScoredEpisode:
@@ -116,6 +136,9 @@ def _to_scored(rec: dict) -> ScoredEpisode:
         root_cause=rec.get("root_cause"),
         summary=rec.get("summary", ""),
         effectiveness_score=float(rec.get("effectiveness_score", 0.1)),
+        recommended_actions=list(rec.get("recommended_actions") or []),
+        resolution_status=rec.get("resolution_status") or "open",
+        fix_summary=rec.get("fix_summary"),
         duration_seconds=rec.get("duration_seconds"),
         created_at=rec.get("created_at", ""),
         updated_at=rec.get("updated_at", ""),

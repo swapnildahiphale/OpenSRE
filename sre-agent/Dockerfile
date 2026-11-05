@@ -64,7 +64,8 @@ RUN uv pip install --system --no-cache-dir .
 # Copy all application source
 COPY agent.py server.py server_simple.py config.py events.py auth.py \
      report.py sandbox_manager.py sandbox_server.py message_queue.py \
-     investigation_lifecycle.py team_context.py tool_output_sanitize.py ./
+     investigation_lifecycle.py team_context.py tool_output_sanitize.py \
+     resolution_tool.py ticket_followup.py ./
 COPY memory/ memory/
 COPY tools/ tools/
 COPY .claude/ .claude/

@@ -2,7 +2,9 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from bot_handlers import (
+    activity_sender_id,
     activity_sender_name,
+    conversation_ref_from_activity,
     is_azure_webchat,
     is_direct_bot_chat,
     is_personal_chat,
@@ -53,6 +55,73 @@ def test_activity_sender_name_strips_and_caps():
     got = activity_sender_name(activity)
     assert got is not None
     assert len(got) == 128
+
+
+def test_activity_sender_id_from_property():
+    sender = MagicMock()
+    sender.id = "29:abc-user-id"
+    activity = MagicMock(spec=["from_property", "from"])
+    activity.from_property = sender
+    assert activity_sender_id(activity) == "29:abc-user-id"
+
+
+def test_activity_sender_id_message_activity_from_alias():
+    from microsoft_teams.api import MessageActivity
+
+    activity = MessageActivity.model_validate(
+        {
+            "type": "message",
+            "id": "msg-1",
+            "timestamp": "2026-09-10T07:30:00Z",
+            "from": {"id": "29:user-1", "name": "Jane Doe"},
+            "recipient": {"id": "bot-1", "name": "OpenSRE"},
+            "conversation": {"id": "conv-1"},
+            "text": "hello",
+        }
+    )
+    assert activity_sender_id(activity) == "29:user-1"
+
+
+def test_activity_sender_id_missing():
+    activity = MagicMock(spec=["text"])
+    assert activity_sender_id(activity) is None
+
+
+def test_activity_sender_id_strips_and_caps():
+    activity = MagicMock(spec=["from_"])
+    activity.from_ = MagicMock()
+    activity.from_.id = "  " + ("y" * 200)
+    got = activity_sender_id(activity)
+    assert got is not None
+    assert len(got) == 128
+
+
+def test_conversation_ref_from_activity_has_four_keys():
+    from microsoft_teams.api import MessageActivity
+
+    activity = MessageActivity.model_validate(
+        {
+            "type": "message",
+            "id": "msg-2",
+            "timestamp": "2026-09-10T07:30:00Z",
+            "from": {"id": "29:user-1", "name": "Jane Doe"},
+            "recipient": {"id": "bot-1", "name": "OpenSRE"},
+            "conversation": {
+                "id": "19:abc@thread.tacv2",
+                "tenantId": "tenant-xyz",
+            },
+            "serviceUrl": "https://smba.trafficmanager.net/in/",
+            "channelId": "msteams",
+            "text": "hello",
+        }
+    )
+    ref = conversation_ref_from_activity(activity)
+    assert ref == {
+        "conversation_id": "19:abc@thread.tacv2",
+        "service_url": "https://smba.trafficmanager.net/in/",
+        "channel_id": "msteams",
+        "tenant_id": "tenant-xyz",
+    }
 
 
 def test_strip_bot_mention():
@@ -113,18 +182,26 @@ async def test_channel_investigation_does_not_use_activity_stream():
             id="19:00000000000000000000000000000000@thread.tacv2",
             conversation_type="channel",
             conversationType=None,
+            tenant_id="tenant-test",
         ),
         channel_id="msteams",
         channelId="msteams",
+        service_url="https://smba.example/",
     )
     ctx.activity.from_ = MagicMock()
     ctx.activity.from_.name = "Jane Doe"
+    ctx.activity.from_.id = "29:jane"
     with patch("bot_handlers.run_investigation", new_callable=AsyncMock) as mock_run:
         await on_message_handler(ctx)
 
     mock_run.assert_awaited_once()
     kwargs = mock_run.await_args.kwargs
     assert kwargs["trigger_actor"] == "Jane Doe"
+    assert kwargs["trigger_actor_teams_id"] == "29:jane"
+    assert kwargs["conversation_ref"]["conversation_id"] == (
+        "19:00000000000000000000000000000000@thread.tacv2"
+    )
+    assert kwargs["conversation_ref"]["channel_id"] == "msteams"
     assert kwargs["plain_text_final"] is True
     ctx.stream.update.assert_not_called()
     # Ack is one send; progress edits reuse that activity id (PUT, not stream).

@@ -78,6 +78,7 @@ export function useAgentStream(options: UseAgentStreamOptions = {}) {
   const [state, setState] = useState<TimelineState>(initialTimelineState);
   const [isStreaming, setIsStreaming] = useState(false);
   const [queuedMessages, setQueuedMessages] = useState<string[]>([]);
+  const [liveThreadId, setLiveThreadId] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const stoppingRef = useRef(false);
   const stateRef = useRef<TimelineState>(initialTimelineState);
@@ -146,7 +147,11 @@ export function useAgentStream(options: UseAgentStreamOptions = {}) {
           if (line.startsWith('data: ')) {
             try {
               const parsed = JSON.parse(line.slice(6));
-              if (parsed.thread_id) threadIdRef.current = parsed.thread_id as string;
+              if (parsed.thread_id) {
+                const tid = parsed.thread_id as string;
+                threadIdRef.current = tid;
+                setLiveThreadId(tid);
+              }
               push(parsed);
             } catch { /* partial line */ }
           }
@@ -231,14 +236,19 @@ export function useAgentStream(options: UseAgentStreamOptions = {}) {
 
   const reset = useCallback(() => {
     threadIdRef.current = null;
+    setLiveThreadId(null);
     stateRef.current = initialTimelineState;
     setState(initialTimelineState);
+    setIsStreaming(false);
+    setQueuedMessages([]);
   }, []);
 
   return {
     timeline: state.items,
     runStatus: state.runStatus,
     runId: state.runId,
+    // Prefer prop (detail-page resume); else live thread captured from SSE.
+    threadId: threadId ?? liveThreadId,
     backgroundWaiting: visibleBackgroundWaiting(state.backgroundWaiting),
     error: state.error ?? null,
     isStreaming,
