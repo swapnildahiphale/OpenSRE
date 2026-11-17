@@ -1,0 +1,172 @@
+# Dependabot configuration for OpenSRE (https://docs.github.com/en/code-security/dependabot)
+#
+# Grouping: patch/minor updates are batched per ecosystem; major-version bumps stay
+# as separate PRs for manual review. See CONTRIBUTING.md § Dependency updates.
+
+version: 2
+updates:
+  # --- JavaScript (web console) ---
+  - package-ecosystem: npm
+    directory: /web_ui
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 10
+    groups:
+      npm-production-patch-minor:
+        dependency-type: production
+        patterns:
+          - "*"
+        update-types:
+          - patch
+          - minor
+      npm-development-patch-minor:
+        dependency-type: development
+        patterns:
+          - "*"
+        update-types:
+          - patch
+          - minor
+
+  # --- Python services ---
+  - package-ecosystem: pip
+    directory: /config_service
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 10
+    groups:
+      pip-production-patch-minor:
+        patterns:
+          - "*"
+        update-types:
+          - patch
+          - minor
+
+  - package-ecosystem: pip
+    directory: /sre-agent
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 10
+    groups:
+      pip-production-patch-minor:
+        patterns:
+          - "*"
+        update-types:
+          - patch
+          - minor
+
+  - package-ecosystem: pip
+    directory: /teams-bot
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 10
+    groups:
+      pip-production-patch-minor:
+        patterns:
+          - "*"
+        update-types:
+          - patch
+          - minor
+
+  - package-ecosystem: pip
+    directory: /sre-agent/sandbox-router
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 10
+    groups:
+      pip-production-patch-minor:
+        patterns:
+          - "*"
+        update-types:
+          - patch
+          - minor
+
+  # --- Container base images ---
+  - package-ecosystem: docker
+    directory: /config_service
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      docker-patch-minor:
+        patterns:
+          - "*"
+        update-types:
+          - patch
+          - minor
+
+  - package-ecosystem: docker
+    directory: /sre-agent
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      docker-patch-minor:
+        patterns:
+          - "*"
+        update-types:
+          - patch
+          - minor
+
+  - package-ecosystem: docker
+    directory: /sre-agent/sandbox-router
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      docker-patch-minor:
+        patterns:
+          - "*"
+        update-types:
+          - patch
+          - minor
+
+  - package-ecosystem: docker
+    directory: /teams-bot
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      docker-patch-minor:
+        patterns:
+          - "*"
+        update-types:
+          - patch
+          - minor
+
+  - package-ecosystem: docker
+    directory: /web_ui
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      docker-patch-minor:
+        patterns:
+          - "*"
+        update-types:
+          - patch
+          - minor
+
+  # --- GitHub Actions ---
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      actions-patch-minor:
+        patterns:
+          - "*"
+        update-types:
+          - patch
+          - minor
