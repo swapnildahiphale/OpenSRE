@@ -59,6 +59,10 @@ Requires **Docker Desktop** (or equivalent) running. `make dev` creates the exte
 
 > **[Full setup guide](https://www.opensre.in/docs/quick-start)** · **[Entra SSO](https://www.opensre.in/docs/sso)** · **[Slack integration](https://www.opensre.in/docs/integrations)** · **[Configuration](https://www.opensre.in/docs/configuration)**
 
+## One-Click Deploy
+
+[![Deploy on RepoCloud](https://d16t0pc4846x52.cloudfront.net/deploylobe.svg)](https://repocloud.io/details/OpenSRE/)
+
 ## Architecture
 
 <p align="center">
