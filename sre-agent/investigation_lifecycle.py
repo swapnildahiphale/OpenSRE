@@ -111,6 +111,18 @@ def finalize_investigation(
             return
         prior = _store.get_by_correlation(correlation_id)
         ext = extract_investigation(prompt, result_text, tool_calls, prior=prior)
+        # Upsert overwrites root cause, and retrieval hides failed episodes.
+        # A failed follow-up must not destroy a prior usable record.
+        if (
+            ext.status == "failed"
+            and prior is not None
+            and (prior.extraction_status or "ok") != "failed"
+        ):
+            logger.info(
+                "[MEMORY-SKIP] extraction failed; keeping prior episode corr=%s",
+                correlation_id,
+            )
+            return
         now = datetime.now(timezone.utc).isoformat()
 
         skills = extract_skills_used(tool_calls)

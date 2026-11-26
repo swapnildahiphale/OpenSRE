@@ -182,6 +182,33 @@ def test_extract_retries_once_on_empty(monkeypatch):
     assert out.root_cause == "idx"
 
 
+def test_extract_marks_failed_when_braces_are_not_valid_json(monkeypatch):
+    """Truncation often leaves a closing brace from a nested component object."""
+    import memory.extraction as ex
+
+    monkeypatch.setattr(
+        ex,
+        "llm_text_completion",
+        lambda *a, **k: '{"issue_type":"oom","components":[{"type":"service","name":"api"}]',
+    )
+    out = ex.extract_investigation("pods crashing", "OOMKilled " * 10, [])
+    assert out.status == "failed"
+    assert out.root_cause is None
+
+
+def test_extract_marks_failed_for_unrelated_json_object(monkeypatch):
+    import memory.extraction as ex
+
+    monkeypatch.setattr(
+        ex,
+        "llm_text_completion",
+        lambda *a, **k: '{"error": "could not summarize"}',
+    )
+    out = ex.extract_investigation("pods crashing", "OOMKilled " * 10, [])
+    assert out.status == "failed"
+    assert out.issue_type == "unknown"
+
+
 def test_extract_does_not_retry_on_broken_json(monkeypatch):
     import memory.extraction as ex
 
