@@ -13,9 +13,10 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ enabled: false });
   }
 
+  const discoveryQuery = request.nextUrl.searchParams.get('discover') === '1' ? '?discover=true' : '';
   try {
     const res = await fetch(
-      `${CONFIG_SERVICE_URL}/api/v1/admin/orgs/${orgId}/sso-config/public`,
+      `${CONFIG_SERVICE_URL}/api/v1/admin/orgs/${orgId}/sso-config/public${discoveryQuery}`,
       { cache: 'no-store' }
     );
 
@@ -23,10 +24,12 @@ export async function GET(request: NextRequest) {
       const data = await res.json();
       return NextResponse.json(data);
     }
-
-    return NextResponse.json({ enabled: false, org_id: orgId });
-  } catch (e) {
-    // If config service is down, just disable SSO
-    return NextResponse.json({ enabled: false, org_id: orgId });
+  } catch {
+    // Report discovery failure on a login attempt, but keep token login available.
   }
+
+  if (discoveryQuery) {
+    return NextResponse.json({ error: 'Unable to discover OIDC configuration' }, { status: 502 });
+  }
+  return NextResponse.json({ enabled: false, org_id: orgId });
 }

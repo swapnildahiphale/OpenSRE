@@ -6,12 +6,14 @@ import os
 import secrets
 from datetime import datetime, timedelta
 from typing import Any, Optional
+from urllib.parse import quote_plus
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
+from ...core.oidc_discovery import OIDCDiscoveryError, discover_oidc
 from ...core.security import get_token_pepper, hash_token
 from ...db.models import SSOConfig, TeamToken
 from ...db.session import get_db
@@ -190,7 +192,8 @@ async def exchange_auth_code(
             detail="SSO client secret not configured (set SSO_CLIENT_SECRET on config-service)",
         )
 
-    # Build token endpoint URL
+    token_auth = None
+    # Google and Entra keep their provider-specific settings.
     if config.provider_type == "google":
         token_url = "https://oauth2.googleapis.com/token"
         userinfo_url = "https://openidconnect.googleapis.com/v1/userinfo"
@@ -199,24 +202,30 @@ async def exchange_auth_code(
         token_url = f"https://login.microsoftonline.com/{tenant}/oauth2/v2.0/token"
         userinfo_url = "https://graph.microsoft.com/oidc/userinfo"
     else:
-        issuer = config.issuer.rstrip("/") if config.issuer else ""
-        token_url = f"{issuer}/token"
-        userinfo_url = f"{issuer}/userinfo"
+        try:
+            metadata = await discover_oidc(config.issuer)
+        except OIDCDiscoveryError as exc:
+            raise HTTPException(
+                status_code=502, detail="Unable to resolve OIDC provider endpoints"
+            ) from exc
+        token_url = metadata.token_endpoint
+        userinfo_url = metadata.userinfo_endpoint
+        if metadata.token_endpoint_auth_method == "client_secret_basic":
+            token_auth = httpx.BasicAuth(
+                quote_plus(config.client_id), quote_plus(client_secret)
+            )
+
+    token_data = {
+        "grant_type": "authorization_code",
+        "code": body.code,
+        "redirect_uri": body.redirect_uri,
+    }
+    if token_auth is None:
+        token_data.update(client_id=config.client_id, client_secret=client_secret)
 
     try:
-        async with httpx.AsyncClient(timeout=30) as client:
-            # Exchange code for tokens
-            token_resp = await client.post(
-                token_url,
-                data={
-                    "grant_type": "authorization_code",
-                    "code": body.code,
-                    "redirect_uri": body.redirect_uri,
-                    "client_id": config.client_id,
-                    "client_secret": client_secret,
-                },
-                headers={"Content-Type": "application/x-www-form-urlencoded"},
-            )
+        async with httpx.AsyncClient(timeout=30, follow_redirects=False) as client:
+            token_resp = await client.post(token_url, data=token_data, auth=token_auth)
 
             if token_resp.status_code != 200:
                 error_detail = token_resp.text
