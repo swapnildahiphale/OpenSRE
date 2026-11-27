@@ -14,6 +14,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
+from ...core.oidc_discovery import OIDCDiscoveryError, discover_oidc
 from ...db.models import Integration, SecurityPolicy, TokenAudit, TokenPermission
 from ...db.session import get_db
 from .admin import check_org_access, require_admin
@@ -911,51 +912,29 @@ async def test_sso_config(
 ):
     """Test SSO configuration by fetching OIDC discovery document."""
     check_org_access(admin, org_id)
-    import httpx
-
     from ...db.models import SSOConfig
 
-    # Get current config
     config = db.query(SSOConfig).filter(SSOConfig.org_id == org_id).first()
-
-    # Use provided values or fall back to stored config
     issuer = body.issuer or (config.issuer if config else None)
-
     if not issuer:
         return SSOTestResponse(success=False, message="Issuer URL is required")
 
     try:
-        # Fetch OIDC discovery document
-        discovery_url = issuer.rstrip("/") + "/.well-known/openid-configuration"
+        metadata = await discover_oidc(issuer)
+    except OIDCDiscoveryError as exc:
+        return SSOTestResponse(success=False, message=str(exc))
 
-        async with httpx.AsyncClient(timeout=10) as client:
-            resp = await client.get(discovery_url)
-
-            if resp.status_code == 200:
-                data = resp.json()
-                return SSOTestResponse(
-                    success=True,
-                    message=f"Successfully connected to {data.get('issuer', issuer)}",
-                    metadata={
-                        "issuer": data.get("issuer"),
-                        "authorization_endpoint": data.get("authorization_endpoint"),
-                        "token_endpoint": data.get("token_endpoint"),
-                        "userinfo_endpoint": data.get("userinfo_endpoint"),
-                        "scopes_supported": data.get("scopes_supported", [])[:5],
-                    },
-                )
-            else:
-                return SSOTestResponse(
-                    success=False,
-                    message=f"Failed to fetch OIDC discovery: HTTP {resp.status_code}",
-                )
-
-    except httpx.TimeoutException:
-        return SSOTestResponse(success=False, message="Connection timed out")
-    except httpx.RequestError as e:
-        return SSOTestResponse(success=False, message=f"Connection error: {str(e)}")
-    except Exception as e:
-        return SSOTestResponse(success=False, message=f"Error: {str(e)}")
+    return SSOTestResponse(
+        success=True,
+        message=f"Successfully connected to {metadata.issuer}",
+        metadata={
+            "issuer": metadata.issuer,
+            "authorization_endpoint": metadata.authorization_endpoint,
+            "token_endpoint": metadata.token_endpoint,
+            "userinfo_endpoint": metadata.userinfo_endpoint,
+            "scopes_supported": list(metadata.scopes_supported[:5]),
+        },
+    )
 
 
 # Public endpoint for SSO discovery (no auth required)
@@ -966,6 +945,7 @@ async def test_sso_config(
 async def get_public_sso_config(
     org_id: str,
     db: Session = Depends(get_db),
+    discover: bool = False,
 ):
     """Get public SSO configuration for login page. No auth required."""
     from ...db.models import SSOConfig
@@ -979,7 +959,18 @@ async def get_public_sso_config(
     if not config:
         return {"enabled": False, "org_id": org_id}
 
+    authorization_endpoint = {}
+    if discover and config.provider_type not in {"google", "azure"}:
+        try:
+            metadata = await discover_oidc(config.issuer)
+        except OIDCDiscoveryError as exc:
+            raise HTTPException(
+                status_code=502, detail="Unable to resolve OIDC authorization endpoint"
+            ) from exc
+        authorization_endpoint["authorization_endpoint"] = metadata.authorization_endpoint
+
     return {
+        **authorization_endpoint,
         "enabled": True,
         "org_id": org_id,
         "provider_type": config.provider_type,

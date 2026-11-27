@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { usePathname } from 'next/navigation';
+import { buildCustomOidcAuthorizationUrl } from '@/lib/oidcAuthorization';
 import { useIdentity } from '@/lib/useIdentity';
 import { applyTheme, getTheme } from '@/lib/theme';
 import { Building2, Chrome, Lock, Shield } from 'lucide-react';
@@ -16,7 +17,7 @@ interface OrgSSOConfig {
   org_id: string;
   provider_type: string;
   provider_name: string;
-  issuer?: string;
+  authorization_endpoint?: string;
   client_id?: string;
   tenant_id?: string;
   scopes?: string;
@@ -30,6 +31,7 @@ export function SignInGate({ children }: { children: React.ReactNode }) {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [ssoConfig, setSsoConfig] = useState<OrgSSOConfig | null>(null);
   const [loadingSSO, setLoadingSSO] = useState(true);
+  const [discoveringSSO, setDiscoveringSSO] = useState(false);
 
   const isPublicPath = PUBLIC_PATHS.some((p) => pathname?.startsWith(p));
 
@@ -85,7 +87,7 @@ export function SignInGate({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const handleSSOLogin = () => {
+  const handleSSOLogin = async () => {
     if (!ssoConfig?.org_id) return;
 
     const redirectUri = `${window.location.origin}/api/auth/callback`;
@@ -114,14 +116,27 @@ export function SignInGate({ children }: { children: React.ReactNode }) {
         `&state=${encodeURIComponent(state)}` +
         `&response_mode=query`;
     } else {
-      const issuer = ssoConfig.issuer?.replace(/\/$/, '');
-      authUrl =
-        `${issuer}/authorize?` +
-        `client_id=${ssoConfig.client_id}` +
-        `&redirect_uri=${encodeURIComponent(redirectUri)}` +
-        `&response_type=code` +
-        `&scope=${encodeURIComponent(scopes)}` +
-        `&state=${encodeURIComponent(state)}`;
+      setSubmitError(null);
+      setDiscoveringSSO(true);
+      try {
+        const res = await fetch('/api/sso/config?discover=1');
+        if (!res.ok) throw new Error('OIDC discovery failed');
+        const discovered: OrgSSOConfig = await res.json();
+        if (!discovered.enabled || discovered.org_id !== ssoConfig.org_id || !discovered.client_id) {
+          throw new Error('OIDC configuration changed or is incomplete');
+        }
+        authUrl = buildCustomOidcAuthorizationUrl(discovered.authorization_endpoint, {
+          client_id: discovered.client_id,
+          redirect_uri: redirectUri,
+          response_type: 'code',
+          scope: discovered.scopes || 'openid email profile',
+          state,
+        });
+      } catch {
+        setSubmitError('Unable to start SSO. Try again or ask an administrator to check the OIDC issuer.');
+        setDiscoveringSSO(false);
+        return;
+      }
     }
 
     window.location.href = authUrl;
@@ -177,10 +192,11 @@ export function SignInGate({ children }: { children: React.ReactNode }) {
                   <button
                     type="button"
                     onClick={handleSSOLogin}
+                    disabled={discoveringSSO}
                     className="w-full h-10 px-4 rounded-full text-[13.5px] font-medium bg-slate-100/60 text-slate-800 hover:bg-slate-100 flex items-center justify-center gap-2 transition active:translate-y-px"
                   >
                     {getProviderIcon(ssoConfig.provider_type)}
-                    Continue with {ssoConfig.provider_name}
+                    {discoveringSSO ? 'Connecting…' : `Continue with ${ssoConfig.provider_name}`}
                   </button>
                 </div>
               ) : null}

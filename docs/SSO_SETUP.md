@@ -146,6 +146,16 @@ SSO sessions share the org’s working team (`default` unless you set `SSO_DEFAU
 
 ---
 
+## Custom OIDC (for example, Casdoor)
+
+Set the HTTPS issuer and client ID under **Admin → SSO**, and register the
+OpenSRE callback URL ending in `/api/auth/callback` with the provider. OpenSRE
+uses the authorization, token, and UserInfo URLs advertised by that issuer at
+`/.well-known/openid-configuration`. **Test Connection** checks the same
+metadata used for login, but does not test credentials or the callback.
+The provider must advertise a UserInfo endpoint and support client secret
+authentication. Set `SSO_CLIENT_SECRET` on config-service as for Entra.
+
 ## Troubleshooting
 
 | Symptom | Likely cause |
