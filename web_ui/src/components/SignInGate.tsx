@@ -1,5 +1,7 @@
 'use client';
 
+import { LanguageSelect } from '@/components/LanguageSelect';
+
 import { useEffect, useMemo, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { useIdentity } from '@/lib/useIdentity';
@@ -8,6 +10,7 @@ import { Building2, Chrome, Lock, Shield } from 'lucide-react';
 import { OnboardingWrapper } from './onboarding/OnboardingWrapper';
 import { LoginHero } from './auth/LoginHero';
 import { Button, Skeleton } from '@/components/ui-flow';
+import { useLocale } from '@/lib/i18n/LocaleProvider';
 
 const PUBLIC_PATHS = ['/integrations/github/setup'];
 
@@ -23,6 +26,7 @@ interface OrgSSOConfig {
 }
 
 export function SignInGate({ children }: { children: React.ReactNode }) {
+  const { t } = useLocale();
   const pathname = usePathname();
   const { identity, loading, error, refresh } = useIdentity();
   const [token, setToken] = useState('');
@@ -53,7 +57,7 @@ export function SignInGate({ children }: { children: React.ReactNode }) {
     if (submitError) return submitError;
     if (error) return error;
     return null;
-  }, [error, submitError]);
+  }, [error, submitError, t]);
 
   const login = async () => {
     setSubmitting(true);
@@ -76,7 +80,7 @@ export function SignInGate({ children }: { children: React.ReactNode }) {
       clearTimeout(timeoutId);
       const err = e as { name?: string; message?: string };
       if (err?.name === 'AbortError') {
-        setSubmitError('Login request timed out. Please check your network connection and try again.');
+        setSubmitError('timeout');
       } else {
         setSubmitError(err?.message || String(e));
       }
@@ -152,14 +156,17 @@ export function SignInGate({ children }: { children: React.ReactNode }) {
       <div className="flex items-center justify-center min-h-[50vh] lg:min-h-screen px-6 py-14 lg:px-12 xl:px-14 bg-[#f9fafb] border-l border-slate-200/60">
         <div className="w-full max-w-[440px]">
           <header className="mb-8">
+            <div className="mb-4 flex justify-end">
+              <LanguageSelect id="sign-in-language" />
+            </div>
             <div className="text-[11px] uppercase tracking-[0.22em] text-slate-400 mb-4">
-              Team console
+              {t("Team console")}
             </div>
             <h2 className="text-4xl md:text-[2.75rem] font-medium tracking-tight text-slate-900 leading-none">
-              Sign in<span className="text-emerald-700">.</span>
+              {t("Sign in")}<span className="text-emerald-700">.</span>
             </h2>
             <p className="mt-4 text-sm text-slate-500 max-w-sm leading-relaxed">
-              Use your org SSO, or paste an admin or team token.
+              {t("Use your org SSO, or paste an admin or team token.")}
             </p>
           </header>
 
@@ -172,7 +179,7 @@ export function SignInGate({ children }: { children: React.ReactNode }) {
               ) : hasSSO && ssoConfig ? (
                 <div className="space-y-2">
                   <label className="text-[11px] font-medium uppercase tracking-[0.18em] text-slate-400">
-                    Single sign-on
+                    {t("Single sign-on")}
                   </label>
                   <button
                     type="button"
@@ -180,7 +187,7 @@ export function SignInGate({ children }: { children: React.ReactNode }) {
                     className="w-full h-10 px-4 rounded-full text-[13.5px] font-medium bg-slate-100/60 text-slate-800 hover:bg-slate-100 flex items-center justify-center gap-2 transition active:translate-y-px"
                   >
                     {getProviderIcon(ssoConfig.provider_type)}
-                    Continue with {ssoConfig.provider_name}
+                    {t('Continue with {provider}', { provider: ssoConfig.provider_name })}
                   </button>
                 </div>
               ) : null}
@@ -190,14 +197,14 @@ export function SignInGate({ children }: { children: React.ReactNode }) {
                   htmlFor="login-token"
                   className="text-[11px] font-medium uppercase tracking-[0.18em] text-slate-400"
                 >
-                  Token
+                  {t("Token")}
                 </label>
                 <textarea
                   id="login-token"
                   value={token}
                   onChange={(e) => setToken(e.target.value)}
                   rows={3}
-                  placeholder="tokid.toksecret or JWT"
+                  placeholder={t("tokid.toksecret or JWT")}
                   className="w-full p-3.5 font-mono text-xs rounded-xl border border-slate-200/70 bg-slate-50/50 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-300 resize-none dark:bg-slate-900 dark:border-slate-600"
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && token.trim() && !submitting) {
@@ -223,13 +230,13 @@ export function SignInGate({ children }: { children: React.ReactNode }) {
                 onClick={login}
                 disabled={submitting || !token.trim()}
               >
-                {submitting ? 'Signing in…' : 'Continue'}
+                {t(submitting ? 'Signing in…' : 'Continue')}
               </Button>
             </div>
           </div>
 
           <p className="text-center text-[11px] text-slate-400 mt-5">
-            Tokens are stored in a secure session cookie.
+            {t("Tokens are stored in a secure session cookie.")}
           </p>
         </div>
       </div>

@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { usePathname } from 'next/navigation';
 import { useOnboarding, type Step4NextAction, type Step4Progress } from '@/lib/useOnboarding';
 import { ArrowRight, X } from 'lucide-react';
+import { useLocale } from '@/lib/i18n/LocaleProvider';
 
 interface ContinueOnboardingButtonProps {
   onContinue: (step: number, step4Action?: Step4NextAction) => void;
@@ -26,6 +27,7 @@ const DEFAULT_STEP4_PROGRESS: Step4Progress = {
 };
 
 export function ContinueOnboardingButton({ onContinue, localStorageOnly = false }: ContinueOnboardingButtonProps) {
+  const { t } = useLocale();
   const pathname = usePathname();
   const { clearQuickStartStep } = useOnboarding({ localStorageOnly });
   const [dismissed, setDismissed] = useState(false);
@@ -177,19 +179,19 @@ export function ContinueOnboardingButton({ onContinue, localStorageOnly = false 
     <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 animate-in slide-in-from-top-2 duration-300">
       <div className="flex items-center gap-3 px-4 py-3 bg-forest text-white rounded-xl shadow-lg">
         <span className="text-sm font-medium">
-          Continue setup: {stepName}
+          {t("Continue setup:")}{' '}{stepName}
         </span>
         <button
           onClick={handleContinue}
           className="flex items-center gap-1 px-3 py-1.5 bg-white/20 hover:bg-white/30 rounded-lg text-sm font-medium transition-colors"
         >
-          Continue
+          {t("Continue")}
           <ArrowRight className="w-4 h-4" />
         </button>
         <button
           onClick={handleDismiss}
           className="p-1 hover:bg-white/20 rounded transition-colors"
-          aria-label="Dismiss"
+          aria-label={t("Dismiss")}
         >
           <X className="w-4 h-4" />
         </button>

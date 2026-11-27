@@ -6,8 +6,10 @@ import { applyTheme, getTheme, setTheme, type ThemeMode } from '@/lib/theme';
 import { ChevronUp, LogOut, Settings, Moon, Sun, KeyRound } from 'lucide-react';
 import Link from 'next/link';
 import { clearAuthToken } from '@/lib/authToken';
+import { useLocale } from '@/lib/i18n/LocaleProvider';
 
 export function AccountMenu() {
+  const { t } = useLocale();
   const { identity, refresh } = useIdentity();
   const [open, setOpen] = useState(false);
   const [theme, setThemeState] = useState<ThemeMode>('light');
@@ -64,17 +66,17 @@ export function AccountMenu() {
                   <div className="text-xs text-stone-500 truncate mt-0.5">{identity.email}</div>
                 )}
                 <div className="flex items-center gap-1.5 mt-2">
-                  <span className="text-[10px] uppercase tracking-wider text-stone-500 font-medium">Org</span>
+                  <span className="text-[10px] uppercase tracking-wider text-stone-500 font-medium">{t("Org")}</span>
                   <span className="text-sm font-semibold text-stone-900 dark:text-white truncate">
                     {identity?.org_id ?? '—'}
                   </span>
                 </div>
                 <div className="flex items-center gap-1.5 mt-0.5">
                   <span className="text-[10px] uppercase tracking-wider text-stone-500 font-medium">
-                    {identity?.role === 'admin' ? 'Role' : 'Team'}
+                    {identity?.role === 'admin' ? t('Role') : t('Team')}
                   </span>
                   <span className="text-xs text-forest-light font-medium truncate">
-                    {identity?.role === 'admin' ? 'Admin' : identity?.team_node_id ?? '—'}
+                    {identity?.role === 'admin' ? t('Admin') : identity?.team_node_id ?? '—'}
                   </span>
                 </div>
               </div>
@@ -83,17 +85,17 @@ export function AccountMenu() {
             {!hasPersona && (
               <div className="px-3 pt-3 pb-2 border-b border-stone-200 dark:border-stone-700">
                 <div className="flex items-center gap-1.5">
-                  <span className="text-[10px] uppercase tracking-wider text-stone-500 font-medium">Org</span>
+                  <span className="text-[10px] uppercase tracking-wider text-stone-500 font-medium">{t("Org")}</span>
                   <span className="text-sm font-semibold text-stone-900 dark:text-white truncate">
                     {identity?.org_id ?? '—'}
                   </span>
                 </div>
                 <div className="flex items-center gap-1.5 mt-0.5">
                   <span className="text-[10px] uppercase tracking-wider text-stone-500 font-medium">
-                    {identity?.role === 'admin' ? 'Role' : 'Team'}
+                    {identity?.role === 'admin' ? t('Role') : t('Team')}
                   </span>
                   <span className="text-xs text-forest-light font-medium truncate">
-                    {identity?.role === 'admin' ? 'Admin' : identity?.team_node_id ?? '—'}
+                    {identity?.role === 'admin' ? t('Admin') : identity?.team_node_id ?? '—'}
                   </span>
                 </div>
               </div>
@@ -109,7 +111,7 @@ export function AccountMenu() {
                 className="w-full flex items-center gap-2 px-3 py-2 text-sm rounded-lg hover:bg-stone-50 dark:hover:bg-stone-700"
               >
                 {theme === 'dark' ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
-                Theme: {theme === 'dark' ? 'Dark' : 'Light'}
+                {t("Theme:")}{' '}{theme === 'dark' ? t('Dark') : t('Light')}
               </button>
 
               <Link
@@ -118,7 +120,7 @@ export function AccountMenu() {
                 className="w-full flex items-center gap-2 px-3 py-2 text-sm rounded-lg hover:bg-stone-50 dark:hover:bg-stone-700"
               >
                 <Settings className="w-4 h-4" />
-                Settings
+                {t("Settings")}
               </Link>
 
               <button
@@ -126,14 +128,14 @@ export function AccountMenu() {
                 className="w-full flex items-center gap-2 px-3 py-2 text-sm rounded-lg hover:bg-clay-light/10 dark:hover:bg-clay/20 text-clay"
               >
                 <LogOut className="w-4 h-4" />
-                Log out
+                {t("Log out")}
               </button>
             </div>
 
             <div className="border-t border-stone-200 dark:border-stone-700 p-2 bg-stone-50 dark:bg-stone-900/30">
               <div className="text-[11px] text-stone-500 flex items-center gap-2 px-2">
                 <KeyRound className="w-3 h-3" />
-                Switch token via logout → sign in
+                {t("Switch token via logout → sign in")}
               </div>
             </div>
           </div>

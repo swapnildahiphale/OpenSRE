@@ -11,8 +11,10 @@ import {
   AlertTriangle,
   RefreshCcw
 } from 'lucide-react';
+import { useLocale } from '@/lib/i18n/LocaleProvider';
 
 export default function SecurityPoliciesPage() {
+  const { t } = useLocale();
   const { identity, loading: identityLoading } = useIdentity();
   const [policies, setPolicies] = useState<any>(null);
   const [policiesLoading, setPoliciesLoading] = useState(false);
@@ -70,7 +72,7 @@ export default function SecurityPoliciesPage() {
   if (identityLoading) {
     return (
       <div className="p-8 flex items-center justify-center">
-        <div className="animate-pulse text-stone-500">Loading...</div>
+        <div className="animate-pulse text-stone-500">{t("Loading...")}</div>
       </div>
     );
   }
@@ -79,7 +81,7 @@ export default function SecurityPoliciesPage() {
     return (
       <div className="p-8">
         <div className="bg-clay-light/10 dark:bg-clay/20 border border-red-200 dark:border-red-800 rounded-xl p-6 text-center">
-          <p className="text-clay dark:text-clay-light">Admin access required</p>
+          <p className="text-clay dark:text-clay-light">{t("Admin access required")}</p>
         </div>
       </div>
     );
@@ -89,15 +91,15 @@ export default function SecurityPoliciesPage() {
     <div className="p-8 max-w-5xl mx-auto">
       <div className="mb-8 flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-stone-900 dark:text-white">Security Policies</h1>
+          <h1 className="text-2xl font-semibold text-stone-900 dark:text-white">{t("Security Policies")}</h1>
           <p className="text-sm text-stone-500 mt-1">
-            Organization-wide security settings that cannot be overridden by teams.
+            {t("Organization-wide security settings that cannot be overridden by teams.")}
           </p>
         </div>
         <div className="flex items-center gap-3">
           {saveSuccess && (
             <span className="text-sm text-green-600 dark:text-green-400 flex items-center gap-1">
-              <Shield className="w-4 h-4" /> Saved
+              <Shield className="w-4 h-4" />{' '}{t("Saved")}
             </span>
           )}
           <button
@@ -120,32 +122,32 @@ export default function SecurityPoliciesPage() {
 
       {policiesLoading ? (
         <div className="bg-white dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded-xl p-12 text-center">
-          <div className="animate-pulse text-stone-500">Loading policies...</div>
+          <div className="animate-pulse text-stone-500">{t("Loading policies...")}</div>
         </div>
       ) : policies ? (
         <div className="space-y-6">
           {/* Token Policies */}
           <div className="bg-white dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded-xl p-6 shadow-sm">
             <h3 className="font-semibold text-stone-900 dark:text-white mb-4 flex items-center gap-2">
-              <Key className="w-5 h-5 text-stone-500" /> Token Policies
+              <Key className="w-5 h-5 text-stone-500" />{' '}{t("Token Policies")}
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
                 <label className="block text-sm text-stone-600 dark:text-stone-400 mb-1">
-                  Token Expiry (days)
+                  {t("Token Expiry (days)")}
                 </label>
                 <input
                   type="number"
                   value={policies.token_expiry_days || ''}
                   onChange={(e) => setPolicies({ ...policies, token_expiry_days: e.target.value ? parseInt(e.target.value) : null })}
-                  placeholder="Never"
+                  placeholder={t("Never")}
                   className="w-full px-3 py-2 rounded-lg border border-stone-200 dark:border-stone-600 bg-white dark:bg-stone-700 text-stone-900 dark:text-white"
                 />
-                <p className="text-xs text-stone-500 mt-1">Leave empty for no expiration</p>
+                <p className="text-xs text-stone-500 mt-1">{t("Leave empty for no expiration")}</p>
               </div>
               <div>
                 <label className="block text-sm text-stone-600 dark:text-stone-400 mb-1">
-                  Warn Before (days)
+                  {t("Warn Before (days)")}
                 </label>
                 <input
                   type="number"
@@ -154,20 +156,20 @@ export default function SecurityPoliciesPage() {
                   placeholder="7"
                   className="w-full px-3 py-2 rounded-lg border border-stone-200 dark:border-stone-600 bg-white dark:bg-stone-700 text-stone-900 dark:text-white"
                 />
-                <p className="text-xs text-stone-500 mt-1">Days before expiry to warn</p>
+                <p className="text-xs text-stone-500 mt-1">{t("Days before expiry to warn")}</p>
               </div>
               <div>
                 <label className="block text-sm text-stone-600 dark:text-stone-400 mb-1">
-                  Revoke Inactive (days)
+                  {t("Revoke Inactive (days)")}
                 </label>
                 <input
                   type="number"
                   value={policies.token_revoke_inactive_days || ''}
                   onChange={(e) => setPolicies({ ...policies, token_revoke_inactive_days: e.target.value ? parseInt(e.target.value) : null })}
-                  placeholder="Never"
+                  placeholder={t("Never")}
                   className="w-full px-3 py-2 rounded-lg border border-stone-200 dark:border-stone-600 bg-white dark:bg-stone-700 text-stone-900 dark:text-white"
                 />
-                <p className="text-xs text-stone-500 mt-1">Auto-revoke after inactivity</p>
+                <p className="text-xs text-stone-500 mt-1">{t("Auto-revoke after inactivity")}</p>
               </div>
             </div>
           </div>
@@ -175,12 +177,12 @@ export default function SecurityPoliciesPage() {
           {/* Guardrails */}
           <div className="bg-white dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded-xl p-6 shadow-sm">
             <h3 className="font-semibold text-stone-900 dark:text-white mb-4 flex items-center gap-2">
-              <Shield className="w-5 h-5 text-stone-500" /> Configuration Guardrails
+              <Shield className="w-5 h-5 text-stone-500" />{' '}{t("Configuration Guardrails")}
             </h3>
             <div className="space-y-4">
               <div>
                 <label className="block text-sm text-stone-600 dark:text-stone-400 mb-1">
-                  Locked Settings (teams cannot change)
+                  {t("Locked Settings (teams cannot change)")}
                 </label>
                 <textarea
                   value={JSON.stringify(policies.locked_settings || [], null, 2)}
@@ -193,11 +195,11 @@ export default function SecurityPoliciesPage() {
                   placeholder='["model", "enabled_tools.aws"]'
                   className="w-full px-3 py-2 rounded-lg border border-stone-200 dark:border-stone-600 bg-white dark:bg-stone-700 font-mono text-sm text-stone-900 dark:text-white"
                 />
-                <p className="text-xs text-stone-500 mt-1">JSON array of config paths that teams cannot override</p>
+                <p className="text-xs text-stone-500 mt-1">{t("JSON array of config paths that teams cannot override")}</p>
               </div>
               <div>
                 <label className="block text-sm text-stone-600 dark:text-stone-400 mb-1">
-                  Max Values (upper limits)
+                  {t("Max Values (upper limits)")}
                 </label>
                 <textarea
                   value={JSON.stringify(policies.max_values || {}, null, 2)}
@@ -210,7 +212,7 @@ export default function SecurityPoliciesPage() {
                   placeholder='{"max_turns": 200, "timeout_seconds": 300}'
                   className="w-full px-3 py-2 rounded-lg border border-stone-200 dark:border-stone-600 bg-white dark:bg-stone-700 font-mono text-sm text-stone-900 dark:text-white"
                 />
-                <p className="text-xs text-stone-500 mt-1">JSON object with maximum allowed values</p>
+                <p className="text-xs text-stone-500 mt-1">{t("JSON object with maximum allowed values")}</p>
               </div>
             </div>
           </div>
@@ -218,7 +220,7 @@ export default function SecurityPoliciesPage() {
           {/* Change Policies */}
           <div className="bg-white dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded-xl p-6 shadow-sm">
             <h3 className="font-semibold text-stone-900 dark:text-white mb-4 flex items-center gap-2">
-              <AlertTriangle className="w-5 h-5 text-stone-500" /> Change Policies
+              <AlertTriangle className="w-5 h-5 text-stone-500" />{' '}{t("Change Policies")}
             </h3>
             <div className="space-y-4">
               <label className="flex items-center gap-3 cursor-pointer p-3 rounded-lg hover:bg-stone-50 dark:hover:bg-stone-800 transition-colors">
@@ -229,8 +231,8 @@ export default function SecurityPoliciesPage() {
                   className="w-4 h-4 rounded border-stone-300 text-[#3D7B5F] focus:ring-forest"
                 />
                 <div>
-                  <span className="text-sm font-medium text-stone-900 dark:text-white">Require approval for prompt changes</span>
-                  <p className="text-xs text-stone-500">Custom agent prompts must be approved before taking effect</p>
+                  <span className="text-sm font-medium text-stone-900 dark:text-white">{t("Require approval for prompt changes")}</span>
+                  <p className="text-xs text-stone-500">{t("Custom agent prompts must be approved before taking effect")}</p>
                 </div>
               </label>
               <label className="flex items-center gap-3 cursor-pointer p-3 rounded-lg hover:bg-stone-50 dark:hover:bg-stone-800 transition-colors">
@@ -241,8 +243,8 @@ export default function SecurityPoliciesPage() {
                   className="w-4 h-4 rounded border-stone-300 text-[#3D7B5F] focus:ring-forest"
                 />
                 <div>
-                  <span className="text-sm font-medium text-stone-900 dark:text-white">Require approval for tool enablement</span>
-                  <p className="text-xs text-stone-500">New tool activations must be approved by an admin</p>
+                  <span className="text-sm font-medium text-stone-900 dark:text-white">{t("Require approval for tool enablement")}</span>
+                  <p className="text-xs text-stone-500">{t("New tool activations must be approved by an admin")}</p>
                 </div>
               </label>
               <label className="flex items-center gap-3 cursor-pointer p-3 rounded-lg hover:bg-stone-50 dark:hover:bg-stone-800 transition-colors">
@@ -253,8 +255,8 @@ export default function SecurityPoliciesPage() {
                   className="w-4 h-4 rounded border-stone-300 text-[#3D7B5F] focus:ring-forest"
                 />
                 <div>
-                  <span className="text-sm font-medium text-stone-900 dark:text-white">Log all configuration changes</span>
-                  <p className="text-xs text-stone-500">Record all changes to the unified audit log</p>
+                  <span className="text-sm font-medium text-stone-900 dark:text-white">{t("Log all configuration changes")}</span>
+                  <p className="text-xs text-stone-500">{t("Record all changes to the unified audit log")}</p>
                 </div>
               </label>
             </div>
@@ -262,12 +264,12 @@ export default function SecurityPoliciesPage() {
         </div>
       ) : (
         <div className="bg-white dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded-xl p-12 text-center">
-          <p className="text-stone-500">Failed to load policies. Please try again.</p>
+          <p className="text-stone-500">{t("Failed to load policies. Please try again.")}</p>
           <button
             onClick={loadPolicies}
             className="mt-4 px-4 py-2 bg-forest text-white rounded-lg hover:bg-forest-dark"
           >
-            Retry
+            {t("Retry")}
           </button>
         </div>
       )}

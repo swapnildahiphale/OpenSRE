@@ -22,6 +22,7 @@ import {
   Trash2,
   BookOpen,
 } from 'lucide-react';
+import { useLocale } from '@/lib/i18n/LocaleProvider';
 
 interface ConfigField {
   type: string;
@@ -86,6 +87,7 @@ interface IntegrationSchemaResponse {
 }
 
 export default function TeamToolsPage() {
+  const { t } = useLocale();
   const { identity } = useIdentity();
   const [items, setItems] = useState<ToolItem[]>([]);
   const [toolMetadata, setToolMetadata] = useState<ToolMetadata[]>([]);
@@ -853,7 +855,7 @@ export default function TeamToolsPage() {
               <h3 className="font-medium text-slate-900 dark:text-white">{item.name}</h3>
               {item.source === 'org' && (
                 <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-700 text-slate-500">
-                  Inherited
+                  {t("Inherited")}
                 </span>
               )}
             </div>
@@ -957,7 +959,7 @@ export default function TeamToolsPage() {
                   }
                 }}
                 className="p-1 rounded text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
-                title="Filter Tools"
+                title={t("Filter Tools")}
               >
                 <Settings className="w-4 h-4" />
               </button>
@@ -976,7 +978,7 @@ export default function TeamToolsPage() {
                     : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-400'
                 } hover:opacity-80`}
               >
-                Configure
+                {t("Configure")}
               </button>
             )}
 
@@ -986,7 +988,7 @@ export default function TeamToolsPage() {
                 onClick={() => deleteMCPServer(item)}
                 disabled={saving}
                 className="p-1 rounded text-rose-600 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-900/20 disabled:opacity-50 disabled:cursor-not-allowed"
-                title="Delete MCP Server"
+                title={t("Delete MCP Server")}
               >
                 <Trash2 className="w-4 h-4" />
               </button>
@@ -1004,13 +1006,13 @@ export default function TeamToolsPage() {
       header={
         <>
           <PageHeader
-            eyebrow="Team console"
-            title="Tools"
-            subtitle="Integrations, MCP servers, and skills available to your AI agents"
+            eyebrow={t("Team console")}
+            title={t("Tools")}
+            subtitle={t("Integrations, MCP servers, and skills available to your AI agents")}
             actions={
               <Button variant="primary" onClick={() => setShowAddCustomModal(true)}>
                 <Plus className="w-4 h-4" />
-                Add Custom
+                {t("Add Custom")}
               </Button>
             }
           />
@@ -1035,11 +1037,11 @@ export default function TeamToolsPage() {
         <div className="flex flex-wrap gap-3">
           <span className="inline-flex items-center gap-1.5 h-8 px-3 rounded-full text-xs font-medium bg-emerald-100/55 text-emerald-700">
             <Server className="w-3.5 h-3.5" />
-            {customServers.length} MCP Servers
+            {customServers.length}{' '}{t("MCP Servers")}
           </span>
           <span className="inline-flex items-center gap-1.5 h-8 px-3 rounded-full text-xs font-medium bg-white border border-slate-200/70 text-slate-600">
             <BookOpen className="w-3.5 h-3.5" />
-            {skillsCatalog.length} Skills
+            {skillsCatalog.length}{' '}{t("Skills")}
           </span>
         </div>
 
@@ -1047,7 +1049,7 @@ export default function TeamToolsPage() {
         <div className="mb-6">
           <input
             type="text"
-            placeholder="Search integrations, tools, and skills..."
+            placeholder={t("Search integrations, tools, and skills...")}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full px-4 py-2 bg-white border border-slate-200/70 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-500/50"
@@ -1073,11 +1075,11 @@ export default function TeamToolsPage() {
                 {expandedCategories.has('integration') ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
                 <Settings className="w-4 h-4 text-slate-500" />
                 <div className="flex-1 text-left">
-                  <span className="font-medium text-slate-900 dark:text-white">Integrations</span>
+                  <span className="font-medium text-slate-900 dark:text-white">{t("Integrations")}</span>
                   <span className="text-xs text-slate-500 ml-2">
                     {searchQuery ? `${filteredIntegrations.length} of ${integrations.length}` : `${integrations.length} connected`}
                   </span>
-                  <p className="text-xs text-slate-400 dark:text-slate-500">API connections to external services (Datadog, Grafana, PagerDuty, etc.)</p>
+                  <p className="text-xs text-slate-400 dark:text-slate-500">{t("API connections to external services (Datadog, Grafana, PagerDuty, etc.)")}</p>
                 </div>
               </button>
               {expandedCategories.has('integration') && (
@@ -1110,11 +1112,11 @@ export default function TeamToolsPage() {
                   {expandedCategories.has('mcp') ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
                   <Server className="w-4 h-4 text-emerald-600" />
                   <div className="flex-1 text-left">
-                    <span className="font-medium text-slate-900 dark:text-white">MCP Servers</span>
+                    <span className="font-medium text-slate-900 dark:text-white">{t("MCP Servers")}</span>
                     <span className="text-xs text-slate-500 ml-2">
                       {searchQuery ? `${filteredEnabled} enabled, ${filteredDisabled} disabled` : `${enabledServers.length} enabled, ${disabledServers.length} disabled`}
                     </span>
-                    <p className="text-xs text-slate-400 dark:text-slate-500">Custom tool providers via Model Context Protocol</p>
+                    <p className="text-xs text-slate-400 dark:text-slate-500">{t("Custom tool providers via Model Context Protocol")}</p>
                   </div>
                 </button>
                 {expandedCategories.has('mcp') && (
@@ -1156,14 +1158,14 @@ export default function TeamToolsPage() {
                 {expandedCategories.has('skills') ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
                 <BookOpen className="w-4 h-4 text-slate-500" />
                 <div className="flex-1 text-left">
-                  <span className="font-medium text-slate-900 dark:text-white">Skills</span>
+                  <span className="font-medium text-slate-900 dark:text-white">{t("Skills")}</span>
                   <span className="text-xs text-slate-500 ml-2">
                     {searchQuery
                       ? `${filteredCount} of ${skillsCatalog.length}`
                       : `${enabledSkillCount} enabled / ${skillsCatalog.length}`}
                   </span>
                   <p className="text-xs text-slate-400 dark:text-slate-500">
-                    Knowledge loaded into agent context on-demand (methodologies, runbooks, query syntax)
+                    {t("Knowledge loaded into agent context on-demand (methodologies, runbooks, query syntax)")}
                   </p>
                 </div>
               </button>
@@ -1277,7 +1279,7 @@ export default function TeamToolsPage() {
         {items.length === 0 && skillsCatalog.length === 0 && (
           <div className="text-center py-12">
             <Server className="w-12 h-12 text-slate-300 mx-auto mb-4" />
-            <p className="text-slate-500">No tools configured yet.</p>
+            <p className="text-slate-500">{t("No tools configured yet.")}</p>
           </div>
         )}
       </div>
@@ -1356,9 +1358,9 @@ export default function TeamToolsPage() {
                                 }
                               }}
                               className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-100/60 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-100/80 dark:hover:bg-emerald-500/40"
-                              title="Clear this value to inherit from organization settings"
+                              title={t("Clear this value to inherit from organization settings")}
                             >
-                              Clear (inherit)
+                              {t("Clear (inherit)")}
                             </button>
                           )}
                         </div>
@@ -1409,7 +1411,7 @@ export default function TeamToolsPage() {
                 onClick={() => setEditingItem(null)}
                 className="px-4 py-2 text-sm text-slate-600 hover:text-slate-900"
               >
-                Cancel
+                {t("Cancel")}
               </button>
               <button
                 onClick={saveConfig}
@@ -1431,7 +1433,7 @@ export default function TeamToolsPage() {
             <div className="flex items-center justify-between p-4 border-b border-slate-200 dark:border-slate-700">
               <div>
                 <h2 className="font-semibold text-slate-900 dark:text-white">Filter Tools - {filteringMcp.name}</h2>
-                <p className="text-xs text-slate-500">Select which tools from this MCP server should be available</p>
+                <p className="text-xs text-slate-500">{t("Select which tools from this MCP server should be available")}</p>
               </div>
               <button
                 onClick={() => setFilteringMcp(null)}
@@ -1461,7 +1463,7 @@ export default function TeamToolsPage() {
                     }}
                     className="text-xs px-2 py-1 rounded bg-emerald-100/60 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 hover:opacity-80"
                   >
-                    Select All
+                    {t("Select All")}
                   </button>
                   <button
                     onClick={() => {
@@ -1469,7 +1471,7 @@ export default function TeamToolsPage() {
                     }}
                     className="text-xs px-2 py-1 rounded bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:opacity-80"
                   >
-                    Deselect All
+                    {t("Deselect All")}
                   </button>
                 </div>
               </div>
@@ -1530,7 +1532,7 @@ export default function TeamToolsPage() {
                 onClick={() => setFilteringMcp(null)}
                 className="px-4 py-2 text-sm text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
               >
-                Cancel
+                {t("Cancel")}
               </button>
               <button
                 onClick={async () => {
@@ -1600,8 +1602,8 @@ export default function TeamToolsPage() {
           <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl w-full max-w-2xl">
             <div className="flex items-center justify-between p-4 border-b border-slate-200 dark:border-slate-700">
               <div>
-                <h2 className="font-semibold text-slate-900 dark:text-white">Add Custom MCP Server</h2>
-                <p className="text-xs text-slate-500">Add a custom Model Context Protocol server for your agents</p>
+                <h2 className="font-semibold text-slate-900 dark:text-white">{t("Add Custom MCP Server")}</h2>
+                <p className="text-xs text-slate-500">{t("Add a custom Model Context Protocol server for your agents")}</p>
               </div>
               <button
                 onClick={() => {
@@ -1625,7 +1627,7 @@ export default function TeamToolsPage() {
             <div className="p-4 space-y-4 max-h-[70vh] overflow-auto">
               <div>
                 <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                  Name <span className="text-rose-600">*</span>
+                  {t("Name")}{' '}<span className="text-rose-600">*</span>
                 </label>
                 <input
                   type="text"
@@ -1634,12 +1636,12 @@ export default function TeamToolsPage() {
                   placeholder="e.g., Slack MCP"
                   className="w-full bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-2 text-sm"
                 />
-                <p className="text-xs text-slate-500 mt-1">A friendly name for this MCP server</p>
+                <p className="text-xs text-slate-500 mt-1">{t("A friendly name for this MCP server")}</p>
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                  Description
+                  {t("Description")}
                 </label>
                 <input
                   type="text"
@@ -1648,12 +1650,12 @@ export default function TeamToolsPage() {
                   placeholder="e.g., Provides Slack channel and message management tools"
                   className="w-full bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-2 text-sm"
                 />
-                <p className="text-xs text-slate-500 mt-1">Brief description of what this MCP provides</p>
+                <p className="text-xs text-slate-500 mt-1">{t("Brief description of what this MCP provides")}</p>
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                  Command <span className="text-rose-600">*</span>
+                  {t("Command")}{' '}<span className="text-rose-600">*</span>
                 </label>
                 <input
                   type="text"
@@ -1662,12 +1664,12 @@ export default function TeamToolsPage() {
                   placeholder="e.g., npx or python or /path/to/executable"
                   className="w-full bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-2 text-sm font-mono"
                 />
-                <p className="text-xs text-slate-500 mt-1">The executable command to start the MCP server</p>
+                <p className="text-xs text-slate-500 mt-1">{t("The executable command to start the MCP server")}</p>
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                  Arguments
+                  {t("Arguments")}
                 </label>
                 <textarea
                   value={newServerForm.args}
@@ -1676,12 +1678,12 @@ export default function TeamToolsPage() {
                   rows={4}
                   className="w-full bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-2 text-sm font-mono"
                 />
-                <p className="text-xs text-slate-500 mt-1">Command arguments (one per line)</p>
+                <p className="text-xs text-slate-500 mt-1">{t("Command arguments (one per line)")}</p>
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                  Environment Variables
+                  {t("Environment Variables")}
                 </label>
                 <textarea
                   value={newServerForm.env}
@@ -1690,12 +1692,12 @@ export default function TeamToolsPage() {
                   rows={5}
                   className="w-full bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-2 text-sm font-mono"
                 />
-                <p className="text-xs text-slate-500 mt-1">Environment variables in KEY=VALUE format (one per line)</p>
+                <p className="text-xs text-slate-500 mt-1">{t("Environment variables in KEY=VALUE format (one per line)")}</p>
               </div>
 
               <div className="bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-600 rounded-lg p-3">
                 <p className="text-xs text-slate-700 dark:text-slate-300">
-                  <strong>Tip:</strong> MCP servers are executables that communicate via stdio. Common patterns:
+                  <strong>{t("Tip:")}</strong> MCP servers are executables that communicate via stdio. Common patterns:
                 </p>
                 <ul className="text-xs text-slate-600 dark:text-slate-400 mt-2 space-y-1 ml-4 list-disc">
                   <li><code className="bg-slate-100 dark:bg-slate-700 px-1 py-0.5 rounded">npx -y @modelcontextprotocol/server-name</code></li>
@@ -1736,7 +1738,7 @@ export default function TeamToolsPage() {
                   {/* Tools List */}
                   <div className="max-h-60 overflow-auto p-3 space-y-2">
                     {previewedTools.tools.length === 0 ? (
-                      <p className="text-xs text-slate-500 text-center py-4">No tools discovered</p>
+                      <p className="text-xs text-slate-500 text-center py-4">{t("No tools discovered")}</p>
                     ) : (
                       (() => {
                         // Group tools by category
@@ -1806,7 +1808,7 @@ export default function TeamToolsPage() {
                   }}
                   className="px-4 py-2 text-sm text-slate-600 hover:text-slate-900"
                 >
-                  Cancel
+                  {t("Cancel")}
                 </button>
                 <button
                   onClick={saveCustomServer}

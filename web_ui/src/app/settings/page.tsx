@@ -1,5 +1,9 @@
 'use client';
 
+import { type Message } from '@/lib/i18n/locale';
+
+import { LanguageSelect } from '@/components/LanguageSelect';
+
 import { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useIdentity } from '@/lib/useIdentity';
@@ -46,6 +50,7 @@ import {
   LogOut
 } from 'lucide-react';
 import { PageHeader } from '@/components/ui-flow';
+import { useLocale } from '@/lib/i18n/LocaleProvider';
 
 // Tab type
 type SettingsTab =
@@ -113,7 +118,7 @@ interface RoutingConfig {
 
 // Admin sub-pages (shown as links in sidebar for admins)
 interface AdminLink {
-  name: string;
+  name: Message;
   href: string;
   icon: any;
   description: string;
@@ -126,6 +131,7 @@ const adminLinks: AdminLink[] = [
 ];
 
 export default function SettingsPage() {
+  const { t } = useLocale();
   const router = useRouter();
   const searchParams = useSearchParams();
   const { identity, loading: identityLoading } = useIdentity();
@@ -164,7 +170,7 @@ export default function SettingsPage() {
 
   const [aboutVersion, setAboutVersion] = useState<string | null>(null);
   const [aboutGitSha, setAboutGitSha] = useState<string | null>(null);
-  const [aboutError, setAboutError] = useState<string | null>(null);
+  const [aboutError, setAboutError] = useState(false);
 
   useEffect(() => {
     if (activeTab !== 'about') return;
@@ -173,17 +179,17 @@ export default function SettingsPage() {
       try {
         const res = await apiFetch('/api/version');
         if (!res.ok) {
-          if (!cancelled) setAboutError('Could not load version');
+          if (!cancelled) setAboutError(true);
           return;
         }
         const data = await res.json();
         if (!cancelled) {
           setAboutVersion(data.version ?? 'dev');
           setAboutGitSha(data.gitSha ?? null);
-          setAboutError(null);
+          setAboutError(false);
         }
       } catch {
-        if (!cancelled) setAboutError('Could not load version');
+        if (!cancelled) setAboutError(true);
       }
     })();
     return () => {
@@ -306,7 +312,7 @@ export default function SettingsPage() {
       setTelemetryEnabled(newValue);
     } catch (e: any) {
       console.error('Failed to update telemetry', e);
-      alert('Failed to update telemetry preference');
+      alert(t("Failed to update telemetry preference"));
     } finally {
       setTelemetryLoading(false);
     }
@@ -338,10 +344,10 @@ export default function SettingsPage() {
       if (!res.ok) throw new Error('Failed to update');
       const data = await res.json();
       setOutputConfig(data);
-      alert('Output configuration saved successfully!');
+      alert(t("Output configuration saved successfully!"));
     } catch (e: any) {
       console.error('Failed to save output config', e);
-      alert('Failed to save output configuration');
+      alert(t("Failed to save output configuration"));
     } finally {
       setOutputConfigLoading(false);
     }
@@ -507,10 +513,10 @@ export default function SettingsPage() {
       });
 
       if (!res.ok) throw new Error('Failed to save');
-      alert('Feature configuration saved! Click "Apply Changes" to update scheduled jobs.');
+      alert(t("Feature configuration saved! Click \"Apply Changes\" to update scheduled jobs."));
     } catch (e: any) {
       console.error('Failed to save feature configs', e);
-      alert('Failed to save feature configuration');
+      alert(t("Failed to save feature configuration"));
     } finally {
       setFeaturesSaving(false);
     }
@@ -531,10 +537,10 @@ export default function SettingsPage() {
       });
 
       if (!res.ok) throw new Error('Failed to save');
-      alert('Routing configuration saved successfully!');
+      alert(t("Routing configuration saved successfully!"));
     } catch (e: any) {
       console.error('Failed to save routing config', e);
-      alert('Failed to save routing configuration');
+      alert(t("Failed to save routing configuration"));
     } finally {
       setRoutingSaving(false);
     }
@@ -545,7 +551,7 @@ export default function SettingsPage() {
     const trimmed = newRoutingValue.trim();
     if (!trimmed) return;
     if (routingConfig[field].includes(trimmed)) {
-      alert('This value already exists');
+      alert(t("This value already exists"));
       return;
     }
     setRoutingConfig({
@@ -576,19 +582,19 @@ export default function SettingsPage() {
 
       const data = await res.json();
       if (data.ok) {
-        alert('Scheduled jobs synced successfully!');
+        alert(t("Scheduled jobs synced successfully!"));
       } else {
-        alert(`Sync failed: ${data.message || 'Unknown error'}`);
+        alert(t('Sync failed: {message}', { message: data.message || t('Unknown error') }));
       }
     } catch (e: any) {
       console.error('Failed to sync cronjobs', e);
-      alert('Failed to sync scheduled jobs');
+      alert(t("Failed to sync scheduled jobs"));
     } finally {
       setSyncingCronJobs(false);
     }
   };
 
-  const tabs: { id: SettingsTab; name: string; icon: any; adminOnly?: boolean }[] = [
+  const tabs: { id: SettingsTab; name: Message; icon: any; adminOnly?: boolean }[] = [
     { id: 'general', name: 'General', icon: Settings },
     { id: 'routing', name: 'Webhook Routing', icon: Route },
     { id: 'notifications', name: 'Delivery & Notifications', icon: Bell },
@@ -601,20 +607,20 @@ export default function SettingsPage() {
   const filteredTabs = tabs.filter(t => !t.adminOnly || isAdmin);
 
   return (
-    <div className="p-8 max-w-6xl mx-auto">
+    <div className="p-4 sm:p-8 max-w-6xl mx-auto">
       <PageHeader
-        eyebrow="Team console"
-        title="Settings"
+        eyebrow={t("Team console")}
+        title={t("Settings")}
         subtitle={
           isAdmin
-            ? 'Manage preferences and run ad-hoc agents.'
-            : 'Manage your preferences.'
+            ? t('Manage preferences and run ad-hoc agents.')
+            : t('Manage your preferences.')
         }
       />
 
-      <div className="flex gap-8 mt-8">
+      <div className="flex flex-col gap-6 mt-8 lg:flex-row lg:gap-8">
         {/* Sidebar */}
-        <div className="w-64 flex-shrink-0">
+        <div className="w-full shrink-0 lg:w-64">
           <nav className="space-y-1">
             {filteredTabs.map((tab) => (
             <button
@@ -627,7 +633,7 @@ export default function SettingsPage() {
                 }`}
               >
                 <tab.icon className="w-4 h-4 shrink-0" />
-                <span className="flex-1 text-left whitespace-nowrap">{tab.name}</span>
+                <span className="flex-1 text-left whitespace-nowrap">{t(tab.name)}</span>
                 <ChevronRight className={`w-4 h-4 shrink-0 transition-transform ${activeTab === tab.id ? 'rotate-90' : ''}`} />
             </button>
           ))}
@@ -636,7 +642,7 @@ export default function SettingsPage() {
           {isAdmin && (
             <>
               <div className="pt-4 mt-4 border-t border-slate-200 dark:border-slate-700">
-                <p className="px-3 text-xs font-medium text-slate-400 uppercase tracking-wider mb-2">Admin</p>
+                <p className="px-3 text-xs font-medium text-slate-400 uppercase tracking-wider mb-2">{t("Admin")}</p>
               </div>
               {adminLinks.map((link) => (
                 <button
@@ -645,7 +651,7 @@ export default function SettingsPage() {
                   className="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg transition-colors text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
                 >
                   <link.icon className="w-4 h-4" />
-                  {link.name}
+                  {t(link.name)}
                   <ExternalLink className="w-3 h-3 ml-auto text-slate-400" />
                 </button>
               ))}
@@ -655,45 +661,55 @@ export default function SettingsPage() {
         </div>
 
         {/* Content */}
-        <div className="flex-1">
+        <div className="min-w-0 flex-1">
           {/* General Tab */}
           {activeTab === 'general' && (
             <div className="space-y-6">
               <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-6 shadow-sm">
-                <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">Settings</h2>
+                <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">{t("Settings")}</h2>
 
                 <div className="space-y-4">
+                  <div className="flex flex-wrap items-center justify-between gap-3 py-3">
+                    <div>
+                      <label htmlFor="settings-language" className="font-medium text-slate-900 dark:text-white">
+                        {t('Language')}
+                      </label>
+                      <div className="text-sm text-slate-500">{t('Choose the language used by this browser.')}</div>
+                    </div>
+                    <LanguageSelect id="settings-language" />
+                  </div>
+
                   <div className="flex items-center justify-between py-3">
                     <div>
-                      <div className="font-medium text-slate-900 dark:text-white">Theme</div>
-                      <div className="text-sm text-slate-500">Toggle dark/light mode</div>
+                      <div className="font-medium text-slate-900 dark:text-white">{t("Theme")}</div>
+                      <div className="text-sm text-slate-500">{t("Toggle dark/light mode")}</div>
                     </div>
                     <button
                       onClick={toggleTheme}
                       className="flex items-center gap-2 px-4 py-2 bg-slate-100 dark:bg-slate-700 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700"
                     >
                       {theme === 'dark' ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
-                      {theme === 'dark' ? 'Dark' : 'Light'}
+                      {t(theme === 'dark' ? 'Dark' : 'Light')}
                     </button>
                   </div>
                 </div>
               </div>
 
               <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-6 shadow-sm">
-                <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">Session</h2>
+                <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">{t("Session")}</h2>
                 
                 <div className="space-y-3 text-sm">
                   <div className="flex justify-between py-2">
-                    <span className="text-slate-500">Signed in as</span>
-                    <span className="font-mono text-slate-900 dark:text-white">{identity?.auth_kind || 'unknown'}</span>
+                    <span className="text-slate-500">{t("Signed in as")}</span>
+                    <span className="font-mono text-slate-900 dark:text-white">{identity?.auth_kind || t('unknown')}</span>
                   </div>
                   <div className="flex justify-between py-2">
-                    <span className="text-slate-500">Role</span>
-                    <span className="font-medium text-slate-900 dark:text-white">{identity?.role || 'unknown'}</span>
+                    <span className="text-slate-500">{t("Role")}</span>
+                    <span className="font-medium text-slate-900 dark:text-white">{t(identity?.role === 'admin' ? 'Admin' : identity?.role === 'team' ? 'Team' : 'unknown')}</span>
                   </div>
                   {identity?.org_id && (
                     <div className="flex justify-between py-2">
-                      <span className="text-slate-500">Organization</span>
+                      <span className="text-slate-500">{t("Organization")}</span>
                       <span className="font-mono text-slate-900 dark:text-white">{identity.org_id}</span>
                     </div>
                   )}
@@ -705,7 +721,7 @@ export default function SettingsPage() {
                     className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-rose-600 dark:text-slate-400 dark:hover:text-rose-600 transition-colors"
                   >
                     <LogOut className="w-3.5 h-3.5" />
-                    Sign out
+                    {t("Sign out")}
                   </button>
                 </div>
             </div>
@@ -713,17 +729,17 @@ export default function SettingsPage() {
               {/* Quick Start Guide */}
               <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-6 shadow-sm">
                 <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-2 flex items-center gap-2">
-                  <BookOpen className="w-5 h-5" /> Quick Start Guide
+                  <BookOpen className="w-5 h-5" />{' '}{t("Quick Start Guide")}
                 </h2>
                 <p className="text-sm text-slate-500 mb-4">
-                  Learn how OpenSRE works and get started with AI-powered investigations.
+                  {t("Learn how OpenSRE works and get started with AI-powered investigations.")}
                 </p>
                 <button
                   onClick={() => setShowQuickStart(true)}
                   className="flex items-center gap-2 px-4 py-2 bg-emerald-100/50 text-emerald-700 rounded-lg hover:bg-emerald-100/80 transition-colors"
                 >
                   <BookOpen className="w-4 h-4" />
-                  View Guide
+                  {t("View Guide")}
                 </button>
               </div>
           </div>
@@ -736,13 +752,13 @@ export default function SettingsPage() {
                 <div className="flex items-center justify-between mb-6">
                   <div>
                     <h2 className="text-lg font-semibold text-slate-900 dark:text-white flex items-center gap-1">
-                      Webhook Routing
+                      {t("Webhook Routing")}
                       <HelpTip id="webhook-routing" position="right">
-                        <strong>Webhook Routing</strong> determines which incoming webhooks are directed to your team. Configure identifiers from your integrations (Slack channels, GitHub repos, PagerDuty services, etc.) so that alerts and events from those sources are routed to your team's agent.
+                        <strong>{t("Webhook Routing")}</strong>{' '}{t("determines which incoming webhooks are directed to your team. Configure identifiers from your integrations (Slack channels, GitHub repos, PagerDuty services, etc.) so that alerts and events from those sources are routed to your team's agent.")}
                       </HelpTip>
                     </h2>
                     <p className="text-sm text-slate-500 mt-1">
-                      Configure which webhooks should route to your team
+                      {t("Configure which webhooks should route to your team")}
                     </p>
                   </div>
                 </div>
@@ -752,8 +768,8 @@ export default function SettingsPage() {
                   <div className="flex items-start gap-3">
                     <Info className="w-5 h-5 text-slate-500 dark:text-slate-400 flex-shrink-0 mt-0.5" />
                     <div className="text-sm text-slate-600 dark:text-slate-300">
-                      <p className="font-medium mb-1">How routing works:</p>
-                      <p>When a webhook arrives from Slack, GitHub, PagerDuty, or other integrations, the system checks these identifiers to determine which team should handle the event. Add all the IDs and names that belong to your team.</p>
+                      <p className="font-medium mb-1">{t("How routing works:")}</p>
+                      <p>{t("When a webhook arrives from Slack, GitHub, PagerDuty, or other integrations, the system checks these identifiers to determine which team should handle the event. Add all the IDs and names that belong to your team.")}</p>
                     </div>
                   </div>
                 </div>
@@ -761,7 +777,7 @@ export default function SettingsPage() {
                 {routingLoading ? (
                   <div className="flex items-center justify-center py-12">
                     <Loader2 className="w-6 h-6 animate-spin text-slate-400" />
-                    <span className="ml-2 text-slate-500">Loading routing configuration...</span>
+                    <span className="ml-2 text-slate-500">{t("Loading routing configuration...")}</span>
                   </div>
                 ) : (
                   <div className="space-y-4">
@@ -774,13 +790,13 @@ export default function SettingsPage() {
                             onChange={(e) => setEditingRoutingField(e.target.value as keyof RoutingConfig)}
                             className="px-3 py-2 text-sm rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white"
                           >
-                            <option value="slack_channel_ids">Slack Channel ID</option>
-                            <option value="github_repos">GitHub Repository</option>
-                            <option value="pagerduty_service_ids">PagerDuty Service ID</option>
-                            <option value="incidentio_team_ids">Incident.io Team ID</option>
-                            <option value="incidentio_alert_source_ids">Incident.io Alert Source ID</option>
-                            <option value="coralogix_team_names">Coralogix Team Name</option>
-                            <option value="services">Service Name</option>
+                            <option value="slack_channel_ids">{t("Slack Channel ID")}</option>
+                            <option value="github_repos">{t("GitHub Repository")}</option>
+                            <option value="pagerduty_service_ids">{t("PagerDuty Service ID")}</option>
+                            <option value="incidentio_team_ids">{t("Incident.io Team ID")}</option>
+                            <option value="incidentio_alert_source_ids">{t("Incident.io Alert Source ID")}</option>
+                            <option value="coralogix_team_names">{t("Coralogix Team Name")}</option>
+                            <option value="services">{t("Service Name")}</option>
                           </select>
                           <input
                             type="text"
@@ -804,13 +820,13 @@ export default function SettingsPage() {
                               onClick={() => addRoutingValue(editingRoutingField)}
                               className="px-4 py-2 bg-slate-600 text-white text-sm rounded-lg hover:bg-slate-700"
                             >
-                              Add
+                              {t("Add")}
                             </button>
                             <button
                               onClick={() => { setEditingRoutingField(null); setNewRoutingValue(''); }}
                               className="px-4 py-2 text-slate-600 dark:text-slate-400 text-sm hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-600"
                             >
-                              Cancel
+                              {t("Cancel")}
                             </button>
                           </div>
                         </div>
@@ -821,7 +837,7 @@ export default function SettingsPage() {
                         className="flex items-center gap-2 px-4 py-2 text-sm text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 border border-dashed border-slate-300 dark:border-slate-600 rounded-lg hover:border-slate-400 dark:hover:border-slate-600 transition-colors"
                       >
                         <Plus className="w-4 h-4" />
-                        Add Routing Rule
+                        {t("Add Routing Rule")}
                       </button>
                     )}
 
@@ -839,7 +855,7 @@ export default function SettingsPage() {
                       if (allRoutes.length === 0) {
                         return (
                           <div className="text-sm text-slate-500 py-8 text-center border border-dashed border-slate-200 dark:border-slate-700 rounded-lg">
-                            No routing rules configured. Webhooks won&apos;t be routed to this team.
+                            {t("No routing rules configured. Webhooks won't be routed to this team.")}
                           </div>
                         );
                       }
@@ -880,18 +896,18 @@ export default function SettingsPage() {
                         {routingSaving ? (
                           <>
                             <Loader2 className="w-4 h-4 animate-spin" />
-                            Saving...
+                            {t("Saving...")}
                           </>
                         ) : (
                           <>
                             <Check className="w-4 h-4" />
-                            Save Routing Configuration
+                            {t("Save Routing Configuration")}
                           </>
                         )}
                       </button>
                       {!canWrite && (
                         <p className="text-xs text-emerald-600 dark:text-emerald-400 mt-2">
-                          Configuration changes are disabled for your account.
+                          {t("Configuration changes are disabled for your account.")}
                         </p>
                       )}
                     </div>
@@ -908,13 +924,13 @@ export default function SettingsPage() {
                 <div className="flex items-center justify-between mb-6">
                   <div>
                     <h2 className="text-lg font-semibold text-slate-900 dark:text-white flex items-center gap-1">
-                      Output Destinations
+                      {t("Output Destinations")}
                       <HelpTip id="output-destinations" position="right">
-                        <strong>Output Destinations</strong> control where agent investigation results are posted. You can set default destinations (like a Slack channel) and override behavior based on how the agent was triggered.
+                        <strong>{t("Output Destinations")}</strong>{' '}{t("control where agent investigation results are posted. You can set default destinations (like a Slack channel) and override behavior based on how the agent was triggered.")}
                       </HelpTip>
                     </h2>
                     <p className="text-sm text-slate-500 mt-1">
-                      Configure where agent results are delivered
+                      {t("Configure where agent results are delivered")}
                     </p>
                   </div>
                 </div>
@@ -923,15 +939,15 @@ export default function SettingsPage() {
                 <div className="space-y-4">
                   <div>
                     <h3 className="text-sm font-medium text-slate-900 dark:text-white mb-3">
-                      Default Destinations
+                      {t("Default Destinations")}
                     </h3>
                     <p className="text-xs text-slate-500 mb-4">
-                      Agent results will be posted to these destinations by default
+                      {t("Agent results will be posted to these destinations by default")}
                     </p>
 
                     {outputConfig.default_destinations.length === 0 ? (
                       <div className="text-sm text-slate-500 py-8 text-center border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-lg">
-                        No default destinations configured. Results will only be posted to trigger-specific locations.
+                        {t("No default destinations configured. Results will only be posted to trigger-specific locations.")}
                       </div>
                     ) : (
                       <div className="space-y-2">
@@ -972,13 +988,13 @@ export default function SettingsPage() {
                         className="mt-3 flex items-center gap-2 px-3 py-2 text-sm text-emerald-600 dark:text-emerald-400 hover:bg-emerald-100/50 dark:hover:bg-emerald-900/20 rounded-lg"
                       >
                         <Plus className="w-4 h-4" />
-                        Add Destination
+                        {t("Add Destination")}
                       </button>
                     ) : (
                       <div className="mt-3 p-4 bg-slate-50 dark:bg-slate-700 rounded-lg space-y-3">
                         <div>
                           <label className="block text-xs text-slate-600 dark:text-slate-400 mb-1">
-                            Destination Type
+                            {t("Destination Type")}
                           </label>
                           <select
                             value={newDestinationType}
@@ -995,7 +1011,7 @@ export default function SettingsPage() {
                           <>
                             <div>
                               <label className="block text-xs text-slate-600 dark:text-slate-400 mb-1">
-                                Channel Name
+                                {t("Channel Name")}
                               </label>
                               <input
                                 type="text"
@@ -1009,7 +1025,7 @@ export default function SettingsPage() {
                             </div>
                             <div>
                               <label className="block text-xs text-slate-600 dark:text-slate-400 mb-1">
-                                Channel ID
+                                {t("Channel ID")}
                               </label>
                               <input
                                 type="text"
@@ -1034,7 +1050,7 @@ export default function SettingsPage() {
                             className="flex items-center gap-2 px-3 py-2 text-sm bg-emerald-100/50 text-emerald-700 rounded-lg hover:bg-emerald-100/80 disabled:opacity-50"
                           >
                             <Check className="w-4 h-4" />
-                            Add
+                            {t("Add")}
                           </button>
                           <button
                             onClick={() => {
@@ -1043,7 +1059,7 @@ export default function SettingsPage() {
                             }}
                             className="px-3 py-2 text-sm text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg"
                           >
-                            Cancel
+                            {t("Cancel")}
                           </button>
                         </div>
                       </div>
@@ -1053,19 +1069,19 @@ export default function SettingsPage() {
                   {/* Trigger Overrides */}
                   <div className="border-t border-slate-200 dark:border-slate-700 pt-4 mt-6">
                     <h3 className="text-sm font-medium text-slate-900 dark:text-white mb-3">
-                      Trigger-Specific Rules
+                      {t("Trigger-Specific Rules")}
                     </h3>
                     <p className="text-xs text-slate-500 mb-4">
-                      Override behavior for specific trigger sources
+                      {t("Override behavior for specific trigger sources")}
                     </p>
 
                     <div className="space-y-3">
                       <div className="flex items-center justify-between py-2">
                         <div>
                           <div className="text-sm font-medium text-slate-900 dark:text-white">
-                            When triggered from Slack
+                            {t("When triggered from Slack")}
                           </div>
-                          <div className="text-xs text-slate-500">Choose where to post results</div>
+                          <div className="text-xs text-slate-500">{t("Choose where to post results")}</div>
                         </div>
                         <select
                           value={outputConfig.trigger_overrides.slack || 'reply_in_thread'}
@@ -1077,17 +1093,17 @@ export default function SettingsPage() {
                           }
                           className="px-3 py-1.5 text-sm rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800"
                         >
-                          <option value="reply_in_thread">Reply in thread</option>
-                          <option value="use_default">Use default destinations</option>
+                          <option value="reply_in_thread">{t("Reply in thread")}</option>
+                          <option value="use_default">{t("Use default destinations")}</option>
                         </select>
                       </div>
 
                       <div className="flex items-center justify-between py-2">
                         <div>
                           <div className="text-sm font-medium text-slate-900 dark:text-white">
-                            When triggered from GitHub
+                            {t("When triggered from GitHub")}
                           </div>
-                          <div className="text-xs text-slate-500">Choose where to post results</div>
+                          <div className="text-xs text-slate-500">{t("Choose where to post results")}</div>
                         </div>
                         <select
                           value={outputConfig.trigger_overrides.github || 'comment_on_pr'}
@@ -1099,17 +1115,17 @@ export default function SettingsPage() {
                           }
                           className="px-3 py-1.5 text-sm rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800"
                         >
-                          <option value="comment_on_pr">Comment on PR/issue</option>
-                          <option value="use_default">Use default destinations</option>
+                          <option value="comment_on_pr">{t("Comment on PR/issue")}</option>
+                          <option value="use_default">{t("Use default destinations")}</option>
                         </select>
                       </div>
 
                       <div className="flex items-center justify-between py-2">
                         <div>
                           <div className="text-sm font-medium text-slate-900 dark:text-white">
-                            When triggered from API
+                            {t("When triggered from API")}
                           </div>
-                          <div className="text-xs text-slate-500">Choose where to post results</div>
+                          <div className="text-xs text-slate-500">{t("Choose where to post results")}</div>
                         </div>
                         <select
                           value={outputConfig.trigger_overrides.api || 'use_default'}
@@ -1121,8 +1137,8 @@ export default function SettingsPage() {
                           }
                           className="px-3 py-1.5 text-sm rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800"
                         >
-                          <option value="use_default">Use default destinations</option>
-                          <option value="no_output">No output (silent)</option>
+                          <option value="use_default">{t("Use default destinations")}</option>
+                          <option value="no_output">{t("No output (silent)")}</option>
                         </select>
                       </div>
                     </div>
@@ -1136,11 +1152,11 @@ export default function SettingsPage() {
                       title={!canWrite ? 'You do not have write access' : undefined}
                       className="px-4 py-2 bg-emerald-100/50 text-emerald-700 rounded-lg hover:bg-emerald-100/80 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      {outputConfigLoading ? 'Saving...' : 'Save Configuration'}
+                      {outputConfigLoading ? t('Saving...') : 'Save Configuration'}
                     </button>
                     {!canWrite && (
                       <p className="text-xs text-emerald-600 dark:text-emerald-400 mt-2">
-                        Configuration changes are disabled for your account.
+                        {t("Configuration changes are disabled for your account.")}
                       </p>
                     )}
                   </div>
@@ -1160,17 +1176,17 @@ export default function SettingsPage() {
                     </div>
                     <div>
                       <h2 className="text-lg font-semibold text-slate-900 dark:text-white flex items-center gap-2">
-                        Telemetry
+                        {t("Telemetry")}
                         <button
                           onClick={() => setShowTelemetryInfo(true)}
                           className="p-0.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
-                          aria-label="Learn more about telemetry"
+                          aria-label={t("Learn more about telemetry")}
                         >
                           <HelpCircle className="w-4 h-4" />
                         </button>
                       </h2>
                       <p className="text-sm text-slate-500 dark:text-slate-400">
-                        Share anonymous usage metrics to help improve OpenSRE
+                        {t("Share anonymous usage metrics to help improve OpenSRE")}
                       </p>
                     </div>
                   </div>
@@ -1215,13 +1231,13 @@ export default function SettingsPage() {
                     </div>
                     <div>
                       <h2 className="text-lg font-semibold text-slate-900 dark:text-white flex items-center gap-1">
-                        AI Pipeline
+                        {t("AI Pipeline")}
                         <HelpTip id="ai-pipeline" position="right">
-                          <strong>AI Pipeline</strong> automatically processes your incident data (Slack discussions, Confluence runbooks, Google Docs) on a schedule and extracts learnings to build your Knowledge Base. This enables agents to reference past incidents and solutions.
+                          <strong>{t("AI Pipeline")}</strong>{' '}{t("automatically processes your incident data (Slack discussions, Confluence runbooks, Google Docs) on a schedule and extracts learnings to build your Knowledge Base. This enables agents to reference past incidents and solutions.")}
                         </HelpTip>
                       </h2>
                       <p className="text-sm text-slate-500">
-                        Automatically learn from incidents and build knowledge base
+                        {t("Automatically learn from incidents and build knowledge base")}
                       </p>
                     </div>
                   </div>
@@ -1246,7 +1262,7 @@ export default function SettingsPage() {
                     <div className="flex items-center gap-4">
                       <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
                         <Clock className="w-4 h-4" />
-                        Schedule (cron):
+                        {t("Schedule (cron):")}
                       </div>
                       <input
                         type="text"
@@ -1256,14 +1272,14 @@ export default function SettingsPage() {
                         className="flex-1 max-w-xs px-3 py-1.5 text-sm rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 font-mono"
                       />
                       <span className="text-xs text-slate-500">
-                        Default: 2:00 AM daily
+                        {t("Default: 2:00 AM daily")}
                       </span>
                     </div>
 
                     {/* Data Sources / Ingestors */}
                     <div className="space-y-4">
                       <div className="text-sm font-medium text-slate-700 dark:text-slate-300">
-                        Data Sources
+                        {t("Data Sources")}
                       </div>
 
                       {/* Slack Ingestor */}
@@ -1298,13 +1314,13 @@ export default function SettingsPage() {
                           </div>
                           <div>
                             <div className="text-sm font-medium text-slate-900 dark:text-white">Slack</div>
-                            <div className="text-xs text-slate-500">Incident discussions & resolutions</div>
+                            <div className="text-xs text-slate-500">{t("Incident discussions & resolutions")}</div>
                           </div>
                         </label>
                         {pipelineConfig.ingestors.slack.enabled && (
                           <div className="mt-3 pl-7">
                             <label className="block text-xs text-slate-600 dark:text-slate-400 mb-1">
-                              Channels to monitor (comma-separated)
+                              {t("Channels to monitor (comma-separated)")}
                             </label>
                             <input
                               type="text"
@@ -1324,7 +1340,7 @@ export default function SettingsPage() {
                               placeholder="#incidents, #oncall, #postmortems"
                               className="w-full px-3 py-1.5 text-sm rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700"
                             />
-                            <p className="text-xs text-slate-400 mt-1">Leave empty to monitor all bot-accessible channels</p>
+                            <p className="text-xs text-slate-400 mt-1">{t("Leave empty to monitor all bot-accessible channels")}</p>
                           </div>
                         )}
                       </div>
@@ -1361,14 +1377,14 @@ export default function SettingsPage() {
                           </div>
                           <div>
                             <div className="text-sm font-medium text-slate-900 dark:text-white">Confluence</div>
-                            <div className="text-xs text-slate-500">Runbooks & documentation</div>
+                            <div className="text-xs text-slate-500">{t("Runbooks & documentation")}</div>
                           </div>
                         </label>
                         {pipelineConfig.ingestors.confluence.enabled && (
                           <div className="mt-3 pl-7 space-y-3">
                             <div>
                               <label className="block text-xs text-slate-600 dark:text-slate-400 mb-1">
-                                Confluence Base URL
+                                {t("Confluence Base URL")}
                               </label>
                               <input
                                 type="text"
@@ -1388,7 +1404,7 @@ export default function SettingsPage() {
                             </div>
                             <div>
                               <label className="block text-xs text-slate-600 dark:text-slate-400 mb-1">
-                                Space Keys (comma-separated)
+                                {t("Space Keys (comma-separated)")}
                               </label>
                               <input
                                 type="text"
@@ -1408,7 +1424,7 @@ export default function SettingsPage() {
                                 placeholder="ENG, OPS, RUNBOOKS"
                                 className="w-full px-3 py-1.5 text-sm rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700"
                               />
-                              <p className="text-xs text-slate-400 mt-1">Leave empty to include all accessible spaces</p>
+                              <p className="text-xs text-slate-400 mt-1">{t("Leave empty to include all accessible spaces")}</p>
                             </div>
                           </div>
                         )}
@@ -1446,13 +1462,13 @@ export default function SettingsPage() {
                           </div>
                           <div>
                             <div className="text-sm font-medium text-slate-900 dark:text-white">Google Docs</div>
-                            <div className="text-xs text-slate-500">Postmortems & procedures</div>
+                            <div className="text-xs text-slate-500">{t("Postmortems & procedures")}</div>
                           </div>
                         </label>
                         {pipelineConfig.ingestors.gdocs.enabled && (
                           <div className="mt-3 pl-7">
                             <label className="block text-xs text-slate-600 dark:text-slate-400 mb-1">
-                              Folder IDs (comma-separated, optional)
+                              {t("Folder IDs (comma-separated, optional)")}
                             </label>
                             <input
                               type="text"
@@ -1472,7 +1488,7 @@ export default function SettingsPage() {
                               placeholder="1abc123..., 2def456..."
                               className="w-full px-3 py-1.5 text-sm rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700"
                             />
-                            <p className="text-xs text-slate-400 mt-1">Leave empty to include all shared drive docs</p>
+                            <p className="text-xs text-slate-400 mt-1">{t("Leave empty to include all shared drive docs")}</p>
                           </div>
                         )}
                       </div>
@@ -1508,8 +1524,8 @@ export default function SettingsPage() {
                             {pipelineConfig.ingestors.agent_traces.enabled && <Check className="w-3 h-3 text-white" />}
                           </div>
                           <div>
-                            <div className="text-sm font-medium text-slate-900 dark:text-white">Agent Traces</div>
-                            <div className="text-xs text-slate-500">Tool calls, errors & decisions (auto-configured)</div>
+                            <div className="text-sm font-medium text-slate-900 dark:text-white">{t("Agent Traces")}</div>
+                            <div className="text-xs text-slate-500">{t("Tool calls, errors & decisions (auto-configured)")}</div>
                           </div>
                         </label>
                       </div>
@@ -1527,13 +1543,13 @@ export default function SettingsPage() {
                     </div>
                     <div>
                       <h2 className="text-lg font-semibold text-slate-900 dark:text-white flex items-center gap-1">
-                        Service Dependency Discovery
+                        {t("Service Dependency Discovery")}
                         <HelpTip id="dependency-discovery" position="right">
-                          <strong>Dependency Discovery</strong> analyzes your observability data (traces, metrics) to automatically map service relationships. This helps agents understand how services connect and identify cascading failures during incidents.
+                          <strong>{t("Dependency Discovery")}</strong>{' '}{t("analyzes your observability data (traces, metrics) to automatically map service relationships. This helps agents understand how services connect and identify cascading failures during incidents.")}
                         </HelpTip>
                       </h2>
                       <p className="text-sm text-slate-500">
-                        Automatically discover service dependencies from observability data
+                        {t("Automatically discover service dependencies from observability data")}
                       </p>
                     </div>
                   </div>
@@ -1558,7 +1574,7 @@ export default function SettingsPage() {
                     <div className="flex items-center gap-4">
                       <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
                         <Clock className="w-4 h-4" />
-                        Schedule (cron):
+                        {t("Schedule (cron):")}
                       </div>
                       <input
                         type="text"
@@ -1568,14 +1584,14 @@ export default function SettingsPage() {
                         className="flex-1 max-w-xs px-3 py-1.5 text-sm rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 font-mono"
                       />
                       <span className="text-xs text-slate-500">
-                        Default: Every 2 hours
+                        {t("Default: Every 2 hours")}
                       </span>
                     </div>
 
                     {/* Data Sources */}
                     <div>
                       <div className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-3">
-                        Discovery Sources
+                        {t("Discovery Sources")}
                       </div>
                       <div className="grid grid-cols-2 gap-3">
                         {[
@@ -1640,13 +1656,13 @@ export default function SettingsPage() {
                     </div>
                     <div>
                       <h2 className="text-lg font-semibold text-slate-900 dark:text-white flex items-center gap-1">
-                        Alert Correlation
+                        {t("Alert Correlation")}
                         <HelpTip id="alert-correlation" position="right">
-                          <strong>Alert Correlation</strong> groups related alerts together to reduce noise. It uses three methods: <em>temporal</em> (alerts within a time window), <em>topology</em> (alerts from related services), and <em>semantic</em> (alerts with similar descriptions).
+                          <strong>{t("Alert Correlation")}</strong>{' '}{t("groups related alerts together to reduce noise. It uses three methods:")}{' '}<em>{t("temporal")}</em>{' '}{t("(alerts within a time window),")}{' '}<em>{t("topology")}</em>{' '}{t("(alerts from related services), and")}{' '}<em>{t("semantic")}</em>{' '}{t("(alerts with similar descriptions).")}
                         </HelpTip>
                       </h2>
                       <p className="text-sm text-slate-500">
-                        Automatically correlate related alerts using temporal, topology, and semantic analysis
+                        {t("Automatically correlate related alerts using temporal, topology, and semantic analysis")}
                       </p>
                     </div>
                   </div>
@@ -1671,7 +1687,7 @@ export default function SettingsPage() {
                     <div className="flex items-center gap-4">
                       <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
                         <Clock className="w-4 h-4" />
-                        Temporal Window:
+                        {t("Temporal Window:")}
                       </div>
                       <input
                         type="number"
@@ -1682,7 +1698,7 @@ export default function SettingsPage() {
                         className="w-24 px-3 py-1.5 text-sm rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 font-mono"
                       />
                       <span className="text-xs text-slate-500">
-                        seconds (default: 300 = 5 min)
+                        {t("seconds (default: 300 = 5 min)")}
                       </span>
                     </div>
 
@@ -1690,7 +1706,7 @@ export default function SettingsPage() {
                     <div className="flex items-center gap-4">
                       <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
                         <Activity className="w-4 h-4" />
-                        Semantic Threshold:
+                        {t("Semantic Threshold:")}
                       </div>
                       <input
                         type="number"
@@ -1702,16 +1718,16 @@ export default function SettingsPage() {
                         className="w-24 px-3 py-1.5 text-sm rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 font-mono"
                       />
                       <span className="text-xs text-slate-500">
-                        0.0 - 1.0 (default: 0.75)
+                        {t("0.0 - 1.0 (default: 0.75)")}
                       </span>
                     </div>
 
                     <div className="mt-3 text-xs text-slate-500">
-                      When enabled, incoming alerts are correlated with recent alerts based on:
+                      {t("When enabled, incoming alerts are correlated with recent alerts based on:")}
                       <ul className="list-disc list-inside mt-2 space-y-1">
-                        <li><strong>Temporal:</strong> Alerts within the time window</li>
-                        <li><strong>Topology:</strong> Related services from dependency graph</li>
-                        <li><strong>Semantic:</strong> Similar alert descriptions (above threshold)</li>
+                        <li><strong>{t("Temporal:")}</strong>{' '}{t("Alerts within the time window")}</li>
+                        <li><strong>{t("Topology:")}</strong>{' '}{t("Related services from dependency graph")}</li>
+                        <li><strong>{t("Semantic:")}</strong>{' '}{t("Similar alert descriptions (above threshold)")}</li>
                       </ul>
                     </div>
                   </div>
@@ -1729,12 +1745,12 @@ export default function SettingsPage() {
                   {featuresSaving ? (
                     <>
                       <Loader2 className="w-4 h-4 animate-spin" />
-                      Saving...
+                      {t("Saving...")}
                     </>
                   ) : (
                     <>
                       <Check className="w-4 h-4" />
-                      Save Configuration
+                      {t("Save Configuration")}
                     </>
                   )}
                 </button>
@@ -1747,26 +1763,24 @@ export default function SettingsPage() {
                   {syncingCronJobs ? (
                     <>
                       <Loader2 className="w-4 h-4 animate-spin" />
-                      Syncing...
+                      {t("Syncing...")}
                     </>
                   ) : (
                     <>
                       <RefreshCcw className="w-4 h-4" />
-                      Apply Changes
+                      {t("Apply Changes")}
                     </>
                   )}
                 </button>
                 <span className="text-xs text-slate-500">
-                  {!canWrite ? 'Configuration changes are disabled for your account.' : 'Save config first, then apply to activate scheduled jobs'}
+                  {!canWrite ? t('Configuration changes are disabled for your account.') : t('Save config first, then apply to activate scheduled jobs')}
                 </span>
               </div>
 
               {/* Info Box */}
               <div className="bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-600 rounded-lg p-4">
                 <p className="text-sm text-slate-700 dark:text-slate-300">
-                  <span className="font-medium">How it works:</span> When enabled, these features run as scheduled Kubernetes CronJobs.
-                  The AI Pipeline processes incident data to build your knowledge base. Dependency Discovery analyzes
-                  observability data to map service relationships, helping agents understand your architecture during incidents.
+                  <span className="font-medium">{t("How it works:")}</span>{' '}{t("When enabled, these features run as scheduled Kubernetes CronJobs. The AI Pipeline processes incident data to build your knowledge base. Dependency Discovery analyzes observability data to map service relationships, helping agents understand your architecture during incidents.")}
                 </p>
               </div>
             </div>
@@ -1778,20 +1792,20 @@ export default function SettingsPage() {
               <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-xl p-4">
                 <div className="flex items-center gap-2 text-yellow-800 dark:text-yellow-200">
                   <AlertTriangle className="w-5 h-5" />
-                  <span className="font-medium">Debug Tools</span>
+                  <span className="font-medium">{t("Debug Tools")}</span>
                 </div>
                 <p className="text-sm text-yellow-700 dark:text-yellow-300 mt-1">
-                  These tools are for debugging and testing. Use with caution.
+                  {t("These tools are for debugging and testing. Use with caution.")}
                 </p>
               </div>
 
               {/* Quick Start Guide Section */}
               <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-6 shadow-sm">
                 <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
-                  <BookOpen className="w-5 h-5" /> Quick Start Guide
+                  <BookOpen className="w-5 h-5" />{' '}{t("Quick Start Guide")}
                 </h2>
                 <p className="text-sm text-slate-600 dark:text-slate-400 mb-4">
-                  Review the onboarding guide or reset it for testing purposes.
+                  {t("Review the onboarding guide or reset it for testing purposes.")}
                 </p>
                 <div className="flex flex-wrap gap-3">
                   <button
@@ -1802,17 +1816,17 @@ export default function SettingsPage() {
                     className="flex items-center gap-2 px-4 py-2 bg-emerald-100/50 text-emerald-700 rounded-lg hover:bg-emerald-100/80 transition-colors"
                   >
                     <BookOpen className="w-4 h-4" />
-                    View Quick Start Guide
+                    {t("View Quick Start Guide")}
                   </button>
                   <button
                     onClick={() => {
                       resetOnboarding();
-                      alert('Onboarding state reset. Refresh the page to see the welcome modal again.');
+                      alert(t("Onboarding state reset. Refresh the page to see the welcome modal again."));
                     }}
                     className="flex items-center gap-2 px-4 py-2 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
                   >
                     <RotateCcw className="w-4 h-4" />
-                    Reset Onboarding
+                    {t("Reset Onboarding")}
                   </button>
                 </div>
               </div>
@@ -1822,11 +1836,11 @@ export default function SettingsPage() {
 
           {activeTab === 'about' && (
             <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-6 shadow-sm">
-              <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">About</h2>
+              <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">{t("About")}</h2>
               <div className="space-y-3">
                 <div className="text-sm text-slate-500">OpenSRE</div>
                 {aboutError ? (
-                  <div className="text-sm text-rose-600">{aboutError}</div>
+                  <div className="text-sm text-rose-600">{t('Could not load version')}</div>
                 ) : (
                   <>
                     <div className="text-2xl font-semibold text-emerald-700 dark:text-emerald-400">

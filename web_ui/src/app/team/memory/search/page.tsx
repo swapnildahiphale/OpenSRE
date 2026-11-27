@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { Search } from 'lucide-react';
 import { Button, Panel, Skeleton, listRowHoverClass } from '@/components/ui-flow';
+import { useLocale } from '@/lib/i18n/LocaleProvider';
 
 interface Component {
   type: string;
@@ -52,6 +53,7 @@ function ResolutionPill({ resolved }: { resolved: boolean }) {
 }
 
 export default function MemorySearchPage() {
+  const { t } = useLocale();
   const searchParams = useSearchParams();
   const initialQuery = searchParams.get('q') ?? '';
 
@@ -116,20 +118,20 @@ export default function MemorySearchPage() {
         <div className="space-y-5">
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-2">
-              Incident description
+              {t("Incident description")}
             </label>
             <textarea
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="Describe the incident symptoms, affected services, and error patterns…"
+              placeholder={t("Describe the incident symptoms, affected services, and error patterns…")}
               className={`${inputClass} p-3 resize-none`}
               rows={4}
             />
           </div>
 
           <div>
-            <p className="text-xs text-slate-500 mb-2">Try an example:</p>
+            <p className="text-xs text-slate-500 mb-2">{t("Try an example:")}</p>
             <div className="flex flex-wrap gap-2">
               {EXAMPLE_QUERIES.map((example) => (
                 <button
@@ -146,8 +148,8 @@ export default function MemorySearchPage() {
 
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-2">
-              Pattern filter{' '}
-              <span className="font-normal text-slate-400">(optional)</span>
+              {t("Pattern filter")}{' '}
+              <span className="font-normal text-slate-400">{t("(optional)")}</span>
             </label>
             <input
               value={issueTypeFilter}
@@ -166,7 +168,7 @@ export default function MemorySearchPage() {
             <Search className="w-4 h-4" />
             {loading ? 'Searching…' : 'Search memory'}
           </Button>
-          <p className="text-xs text-slate-400 text-center">Press Enter to search</p>
+          <p className="text-xs text-slate-400 text-center">{t("Press Enter to search")}</p>
         </div>
       </div>
 
@@ -174,13 +176,13 @@ export default function MemorySearchPage() {
         {!searched && !loading && (
           <details className="rounded-xl border border-slate-200/60 bg-slate-50/50 px-4 py-3 text-sm text-slate-500">
             <summary className="cursor-pointer font-medium text-slate-600">
-              How similarity search works
+              {t("How similarity search works")}
             </summary>
             <ul className="list-disc list-inside mt-2 space-y-1 text-xs">
-              <li>Describe symptoms, affected services, and error patterns</li>
-              <li>More specific queries yield better matches</li>
-              <li>Results ranked by semantic similarity to past episodes</li>
-              <li>Use the pattern filter to narrow results after searching</li>
+              <li>{t("Describe symptoms, affected services, and error patterns")}</li>
+              <li>{t("More specific queries yield better matches")}</li>
+              <li>{t("Results ranked by semantic similarity to past episodes")}</li>
+              <li>{t("Use the pattern filter to narrow results after searching")}</li>
             </ul>
           </details>
         )}
@@ -195,13 +197,13 @@ export default function MemorySearchPage() {
 
         {searched && !loading && sortedResults.length === 0 && (
           <Panel className="rounded-[1.5rem] p-8 text-center shadow-[0_12px_30px_-12px_rgba(15,23,42,0.06)]">
-            <p className="text-slate-700 font-medium mb-2">No similar investigations found</p>
+            <p className="text-slate-700 font-medium mb-2">{t("No similar investigations found")}</p>
             <p className="text-sm text-slate-500 mb-3">
-              Try broadening your description or removing the pattern filter.
+              {t("Try broadening your description or removing the pattern filter.")}
             </p>
             <ul className="text-sm text-slate-400 space-y-1">
-              <li>Include service names and error codes when possible</li>
-              <li>Check that past investigations have been stored as episodes</li>
+              <li>{t("Include service names and error codes when possible")}</li>
+              <li>{t("Check that past investigations have been stored as episodes")}</li>
             </ul>
           </Panel>
         )}
@@ -268,7 +270,7 @@ export default function MemorySearchPage() {
                     href={`/team/memory/episodes?episode=${encodeURIComponent(r.episode_id)}`}
                     className="text-sm text-emerald-700 font-medium hover:underline"
                   >
-                    Open episode →
+                    {t("Open episode →")}
                   </Link>
                 </div>
               );
@@ -276,12 +278,12 @@ export default function MemorySearchPage() {
 
             <details className="rounded-xl border border-slate-200/60 bg-slate-50/50 px-4 py-3 text-sm text-slate-500">
               <summary className="cursor-pointer font-medium text-slate-600">
-                How similarity search works
+                {t("How similarity search works")}
               </summary>
               <ul className="list-disc list-inside mt-2 space-y-1 text-xs">
-                <li>Describe symptoms, affected services, and error patterns</li>
-                <li>More specific queries yield better matches</li>
-                <li>Results ranked by semantic similarity to past episodes</li>
+                <li>{t("Describe symptoms, affected services, and error patterns")}</li>
+                <li>{t("More specific queries yield better matches")}</li>
+                <li>{t("Results ranked by semantic similarity to past episodes")}</li>
               </ul>
             </details>
           </>

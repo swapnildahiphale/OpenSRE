@@ -7,6 +7,7 @@ import { Circle, ListTodo } from 'lucide-react';
 import { SuccessCheck } from '@/components/ui-flow/SuccessCheck';
 import type { TodoItem, TodoStatus } from '@/lib/todoSnapshot';
 import { todoProgress } from '@/lib/todoSnapshot';
+import { useLocale } from '@/lib/i18n/LocaleProvider';
 
 const STATUS_TEXT: Record<TodoStatus, string> = {
   completed: 'text-emerald-500',
@@ -56,6 +57,7 @@ function ItemRow({ t }: { t: TodoItem }) {
 }
 
 export default function TodoProgressPanel({ todos }: { todos: TodoItem[] }) {
+  const { t } = useLocale();
   if (todos.length === 0) return null;
 
   const { total, completed } = todoProgress(todos);
@@ -64,9 +66,9 @@ export default function TodoProgressPanel({ todos }: { todos: TodoItem[] }) {
     <div className="rounded-xl border border-slate-200/80 dark:border-stone-700 bg-white dark:bg-stone-800 p-3">
       <div className="flex items-center gap-2 mb-2">
         <ListTodo className="w-4 h-4 text-emerald-600 flex-shrink-0" />
-        <span className="text-sm font-medium text-slate-700 dark:text-stone-300">Plan</span>
+        <span className="text-sm font-medium text-slate-700 dark:text-stone-300">{t("Plan")}</span>
         <span className="text-xs text-slate-400 ml-auto tabular-nums">
-          {completed}/{total} done
+          {completed}/{total}{' '}{t("done")}
         </span>
       </div>
 

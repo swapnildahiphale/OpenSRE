@@ -6,6 +6,7 @@ import { apiFetch } from '@/lib/apiClient';
 import { defaultOrgId } from '@/lib/defaultOrgId';
 import { useIdentity } from '@/lib/useIdentity';
 import { Network, RefreshCcw, Plus, X, ChevronRight, Settings, Key, Edit2 } from 'lucide-react';
+import { useLocale } from '@/lib/i18n/LocaleProvider';
 
 // Types
 interface OrgNode {
@@ -143,6 +144,7 @@ function Modal({
 }
 
 export default function OrgTreePage() {
+  const { t } = useLocale();
   const { identity } = useIdentity();
   const [nodes, setNodes] = useState<OrgNode[]>([]);
   const [tree, setTree] = useState<OrgNode[]>([]);
@@ -378,8 +380,8 @@ export default function OrgTreePage() {
           <div className="flex items-center gap-3">
             <Network className="w-7 h-7 text-stone-500" />
             <div>
-              <h1 className="text-2xl font-semibold text-stone-900 dark:text-white">Organization Tree</h1>
-              <p className="text-sm text-stone-500">Manage teams and hierarchy for <span className="font-mono">{orgId}</span></p>
+              <h1 className="text-2xl font-semibold text-stone-900 dark:text-white">{t("Organization Tree")}</h1>
+              <p className="text-sm text-stone-500">{t("Manage teams and hierarchy for")}{' '}<span className="font-mono">{orgId}</span></p>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -387,14 +389,14 @@ export default function OrgTreePage() {
               onClick={() => { setNewNodeParent(''); setAddNodeOpen(true); }}
               className="flex items-center gap-2 px-3 py-2 text-sm font-medium bg-forest text-white rounded-lg hover:bg-forest-dark"
             >
-              <Plus className="w-4 h-4" /> Add Node
+              <Plus className="w-4 h-4" />{' '}{t("Add Node")}
             </button>
           <button
               onClick={loadNodes}
             disabled={loading}
             className="flex items-center gap-2 px-3 py-2 text-sm font-medium bg-stone-100 dark:bg-stone-700 rounded-lg hover:bg-stone-200 dark:hover:bg-stone-700 disabled:opacity-70"
           >
-              <RefreshCcw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} /> Refresh
+              <RefreshCcw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />{' '}{t("Refresh")}
           </button>
           </div>
         </div>
@@ -409,15 +411,15 @@ export default function OrgTreePage() {
         <div className="flex items-center gap-6 text-sm">
           <div className="flex items-center gap-2">
             <span className="w-3 h-3 rounded-full bg-emerald-600" />
-            <span className="text-stone-600 dark:text-stone-400">Organization</span>
+            <span className="text-stone-600 dark:text-stone-400">{t("Organization")}</span>
           </div>
           <div className="flex items-center gap-2">
             <span className="w-3 h-3 rounded-full bg-amber-500" />
-            <span className="text-stone-600 dark:text-stone-400">Unit (Group)</span>
+            <span className="text-stone-600 dark:text-stone-400">{t("Unit (Group)")}</span>
           </div>
           <div className="flex items-center gap-2">
             <span className="w-3 h-3 rounded-full bg-blue-600" />
-            <span className="text-stone-600 dark:text-stone-400">Team</span>
+            <span className="text-stone-600 dark:text-stone-400">{t("Team")}</span>
           </div>
         </div>
 
@@ -453,16 +455,16 @@ export default function OrgTreePage() {
 
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between py-2 border-b border-stone-100 dark:border-stone-700">
-                    <span className="text-stone-500">Node ID</span>
+                    <span className="text-stone-500">{t("Node ID")}</span>
                     <span className="font-mono text-stone-900 dark:text-white">{selectedNode.node_id}</span>
                   </div>
                   <div className="flex justify-between py-2 border-b border-stone-100 dark:border-stone-700">
-                    <span className="text-stone-500">Parent</span>
+                    <span className="text-stone-500">{t("Parent")}</span>
                     <span className="font-mono text-stone-900 dark:text-white">{selectedNode.parent_id || '(root)'}</span>
                   </div>
                   {selectedNode.created_at && (
                     <div className="flex justify-between py-2 border-b border-stone-100 dark:border-stone-700">
-                      <span className="text-stone-500">Created</span>
+                      <span className="text-stone-500">{t("Created")}</span>
                       <span className="text-stone-900 dark:text-white">
                         {new Date(selectedNode.created_at).toLocaleDateString()}
                       </span>
@@ -475,43 +477,43 @@ export default function OrgTreePage() {
                     onClick={() => openAddNodeWithParent(selectedNode.node_id)}
                     className="flex items-center justify-center gap-1 px-3 py-2 text-sm bg-forest text-white rounded-lg hover:bg-forest-dark"
                   >
-                    <Plus className="w-4 h-4" /> Add Child
+                    <Plus className="w-4 h-4" />{' '}{t("Add Child")}
                   </button>
                   <button
                     onClick={openEditNode}
                     className="flex items-center justify-center gap-1 px-3 py-2 text-sm bg-stone-100 dark:bg-stone-700 rounded-lg hover:bg-stone-200 dark:hover:bg-stone-700"
                   >
-                    <Edit2 className="w-4 h-4" /> Edit
+                    <Edit2 className="w-4 h-4" />{' '}{t("Edit")}
                   </button>
                   <button
                     onClick={() => { loadConfig(); setConfigOpen(true); }}
                     className="flex items-center justify-center gap-1 px-3 py-2 text-sm bg-stone-100 dark:bg-stone-700 rounded-lg hover:bg-stone-200 dark:hover:bg-stone-700"
                   >
-                    <Settings className="w-4 h-4" /> Config
+                    <Settings className="w-4 h-4" />{' '}{t("Config")}
                   </button>
                   {selectedNode.node_type === 'team' && (
                     <button
                       onClick={() => { loadTokens(selectedNode.node_id); setTokensOpen(true); }}
                       className="flex items-center justify-center gap-1 px-3 py-2 text-sm bg-stone-100 dark:bg-stone-700 rounded-lg hover:bg-stone-200 dark:hover:bg-stone-700"
                     >
-                      <Key className="w-4 h-4" /> Tokens
+                      <Key className="w-4 h-4" />{' '}{t("Tokens")}
                     </button>
                   )}
                 </div>
               </div>
             ) : (
               <div className="text-center py-12 text-stone-500">
-                Click a node to see details
+                {t("Click a node to see details")}
               </div>
             )}
           </div>
         </div>
 
         {/* Add Node Modal */}
-        <Modal isOpen={addNodeOpen} onClose={() => setAddNodeOpen(false)} title="Add New Node">
+        <Modal isOpen={addNodeOpen} onClose={() => setAddNodeOpen(false)} title={t("Add New Node")}>
           <div className="space-y-4">
             <div>
-              <label className="block text-sm text-stone-600 dark:text-stone-400 mb-1">Node ID</label>
+              <label className="block text-sm text-stone-600 dark:text-stone-400 mb-1">{t("Node ID")}</label>
               <input
                 value={newNodeId}
                 onChange={(e) => setNewNodeId(e.target.value)}
@@ -520,7 +522,7 @@ export default function OrgTreePage() {
               />
             </div>
             <div>
-              <label className="block text-sm text-stone-600 dark:text-stone-400 mb-1">Display Name</label>
+              <label className="block text-sm text-stone-600 dark:text-stone-400 mb-1">{t("Display Name")}</label>
               <input
                 value={newNodeName}
                 onChange={(e) => setNewNodeName(e.target.value)}
@@ -529,13 +531,13 @@ export default function OrgTreePage() {
               />
             </div>
             <div>
-              <label className="block text-sm text-stone-600 dark:text-stone-400 mb-1">Parent Node</label>
+              <label className="block text-sm text-stone-600 dark:text-stone-400 mb-1">{t("Parent Node")}</label>
               <select
                 value={newNodeParent}
                 onChange={(e) => setNewNodeParent(e.target.value)}
                 className="w-full px-3 py-2 rounded-lg border border-stone-200 dark:border-stone-600 bg-white dark:bg-stone-700"
               >
-                <option value="">(root — auto, or top-level)</option>
+                <option value="">{t("(root — auto, or top-level)")}</option>
                 {nodes.map((n) => (
                   <option key={n.node_id} value={n.node_id}>
                     {n.node_id} ({n.node_type})
@@ -549,23 +551,23 @@ export default function OrgTreePage() {
                 onClick={() => setAddNodeOpen(false)}
                 className="px-4 py-2 text-sm bg-stone-100 dark:bg-stone-700 rounded-lg hover:bg-stone-200 dark:hover:bg-stone-700"
               >
-                Cancel
+                {t("Cancel")}
               </button>
               <button
                 onClick={handleCreateNode}
                 className="px-4 py-2 text-sm bg-forest text-white rounded-lg hover:bg-forest-dark"
               >
-                Create Node
+                {t("Create Node")}
               </button>
             </div>
           </div>
         </Modal>
 
         {/* Edit Node Modal */}
-        <Modal isOpen={editNodeOpen} onClose={() => setEditNodeOpen(false)} title="Edit Node">
+        <Modal isOpen={editNodeOpen} onClose={() => setEditNodeOpen(false)} title={t("Edit Node")}>
           <div className="space-y-4">
             <div>
-              <label className="block text-sm text-stone-600 dark:text-stone-400 mb-1">Node ID (read-only)</label>
+              <label className="block text-sm text-stone-600 dark:text-stone-400 mb-1">{t("Node ID (read-only)")}</label>
               <input
                 value={selectedNode?.node_id || ''}
                 disabled
@@ -573,7 +575,7 @@ export default function OrgTreePage() {
               />
             </div>
             <div>
-              <label className="block text-sm text-stone-600 dark:text-stone-400 mb-1">Display Name</label>
+              <label className="block text-sm text-stone-600 dark:text-stone-400 mb-1">{t("Display Name")}</label>
               <input
                 value={editNodeName}
                 onChange={(e) => setEditNodeName(e.target.value)}
@@ -581,13 +583,13 @@ export default function OrgTreePage() {
               />
             </div>
             <div>
-              <label className="block text-sm text-stone-600 dark:text-stone-400 mb-1">Parent Node</label>
+              <label className="block text-sm text-stone-600 dark:text-stone-400 mb-1">{t("Parent Node")}</label>
               <select
                 value={editNodeParent}
                 onChange={(e) => setEditNodeParent(e.target.value)}
                 className="w-full px-3 py-2 rounded-lg border border-stone-200 dark:border-stone-600 bg-white dark:bg-stone-700"
               >
-                <option value="">(root - no parent)</option>
+                <option value="">{t("(root - no parent)")}</option>
                 {nodes.filter(n => n.node_id !== selectedNode?.node_id).map((n) => (
                   <option key={n.node_id} value={n.node_id}>
                     {n.node_id} ({n.node_type})
@@ -600,13 +602,13 @@ export default function OrgTreePage() {
                 onClick={() => setEditNodeOpen(false)}
                 className="px-4 py-2 text-sm bg-stone-100 dark:bg-stone-700 rounded-lg hover:bg-stone-200 dark:hover:bg-stone-700"
               >
-                Cancel
+                {t("Cancel")}
               </button>
               <button
                 onClick={handleSaveEdit}
                 className="px-4 py-2 text-sm bg-forest text-white rounded-lg hover:bg-forest-dark"
               >
-                Save Changes
+                {t("Save Changes")}
               </button>
             </div>
           </div>
@@ -616,13 +618,13 @@ export default function OrgTreePage() {
         <Modal isOpen={configOpen} onClose={() => setConfigOpen(false)} title={`Config: ${selectedNode?.node_id}`}>
           <div className="space-y-4">
             <div>
-              <label className="block text-sm text-stone-600 dark:text-stone-400 mb-1">Effective Config (inherited)</label>
+              <label className="block text-sm text-stone-600 dark:text-stone-400 mb-1">{t("Effective Config (inherited)")}</label>
               <pre className="text-xs bg-stone-50 dark:bg-stone-900 p-3 rounded-lg overflow-auto max-h-40 border border-stone-200 dark:border-stone-700">
                 {effectiveConfig ? JSON.stringify(effectiveConfig, null, 2) : 'Loading...'}
         </pre>
             </div>
             <div>
-              <label className="block text-sm text-stone-600 dark:text-stone-400 mb-1">Local Config (JSON)</label>
+              <label className="block text-sm text-stone-600 dark:text-stone-400 mb-1">{t("Local Config (JSON)")}</label>
               <textarea
                 value={configPatch}
                 onChange={(e) => setConfigPatch(e.target.value)}
@@ -635,13 +637,13 @@ export default function OrgTreePage() {
                 onClick={() => setConfigOpen(false)}
                 className="px-4 py-2 text-sm bg-stone-100 dark:bg-stone-700 rounded-lg hover:bg-stone-200 dark:hover:bg-stone-700"
               >
-                Close
+                {t("Close")}
               </button>
               <button
                 onClick={saveConfig}
                 className="px-4 py-2 text-sm bg-forest text-white rounded-lg hover:bg-forest-dark"
               >
-                Save Config
+                {t("Save Config")}
               </button>
             </div>
           </div>
@@ -654,29 +656,29 @@ export default function OrgTreePage() {
               onClick={issueToken}
               className="w-full px-4 py-2 text-sm bg-forest text-white rounded-lg hover:bg-forest-dark"
             >
-              Issue New Token
+              {t("Issue New Token")}
             </button>
             
             {tokens.length === 0 ? (
               <div className="text-center py-6 text-stone-500 text-sm">
-                No tokens issued for this team
+                {t("No tokens issued for this team")}
               </div>
             ) : (
               <div className="space-y-2">
-                {tokens.map((t) => (
-                  <div key={t.token_id} className="flex items-center justify-between p-3 bg-stone-50 dark:bg-stone-700 rounded-lg">
+                {tokens.map((token) => (
+                  <div key={token.token_id} className="flex items-center justify-between p-3 bg-stone-50 dark:bg-stone-700 rounded-lg">
                     <div>
-                      <div className="font-mono text-xs text-stone-900 dark:text-white">{t.token_id}</div>
+                      <div className="font-mono text-xs text-stone-900 dark:text-white">{token.token_id}</div>
                       <div className="text-xs text-stone-500">
-                        {t.revoked_at ? `Revoked: ${new Date(t.revoked_at).toLocaleDateString()}` : 'Active'}
+                        {token.revoked_at ? `Revoked: ${new Date(token.revoked_at).toLocaleDateString()}` : 'Active'}
                       </div>
                     </div>
-                    {!t.revoked_at && (
+                    {!token.revoked_at && (
                       <button
-                        onClick={() => revokeToken(t.token_id)}
+                        onClick={() => revokeToken(token.token_id)}
                         className="px-3 py-1 text-xs bg-red-600 text-white rounded-lg hover:bg-red-700"
                       >
-                        Revoke
+                        {t("Revoke")}
                       </button>
                     )}
                   </div>
@@ -687,9 +689,9 @@ export default function OrgTreePage() {
         </Modal>
 
         {/* Issued Token Modal */}
-        <Modal isOpen={!!issuedToken} onClose={() => setIssuedToken(null)} title="Token Issued">
+        <Modal isOpen={!!issuedToken} onClose={() => setIssuedToken(null)} title={t("Token Issued")}>
           <p className="text-sm text-stone-600 dark:text-stone-400 mb-3">
-            Copy this token now — it won&apos;t be shown again.
+            {t("Copy this token now — it won't be shown again.")}
           </p>
           <div className="relative">
             <pre className="p-3 bg-stone-100 dark:bg-stone-800 rounded-lg text-xs font-mono break-all whitespace-pre-wrap select-all border border-stone-200 dark:border-stone-700">
@@ -703,7 +705,7 @@ export default function OrgTreePage() {
               }}
               className="absolute top-2 right-2 px-2 py-1 text-xs bg-forest text-white rounded hover:bg-forest-dark"
             >
-              Copy
+              {t("Copy")}
             </button>
           </div>
           <div className="flex justify-end mt-4">
@@ -711,7 +713,7 @@ export default function OrgTreePage() {
               onClick={() => setIssuedToken(null)}
               className="px-4 py-2 text-sm bg-forest text-white rounded-lg hover:bg-forest-dark"
             >
-              Done
+              {t("Done")}
             </button>
           </div>
         </Modal>

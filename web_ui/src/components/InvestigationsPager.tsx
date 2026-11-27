@@ -5,6 +5,7 @@ import {
   buildInvestigationPageNumbers,
   investigationTotalPages,
 } from '@/lib/investigationsPager';
+import { useLocale } from '@/lib/i18n/LocaleProvider';
 
 export const INVESTIGATIONS_PAGE_SIZE = 20;
 
@@ -21,6 +22,7 @@ export function InvestigationsPager({
   pageSize = INVESTIGATIONS_PAGE_SIZE,
   onPageChange,
 }: InvestigationsPagerProps) {
+  const { t } = useLocale();
   const totalPages = investigationTotalPages(total, pageSize);
   if (totalPages <= 1) return null;
 
@@ -29,7 +31,7 @@ export function InvestigationsPager({
   return (
     <nav
       className="mt-6 flex flex-wrap items-center justify-center gap-2"
-      aria-label="Investigations pagination"
+      aria-label={t("Investigations pagination")}
     >
       <button
         type="button"
@@ -37,7 +39,7 @@ export function InvestigationsPager({
         disabled={page <= 1}
         className={pagerButtonClass(page <= 1)}
       >
-        Previous
+        {t("Previous")}
       </button>
       {pageNumbers.map((n) => (
         <button
@@ -60,7 +62,7 @@ export function InvestigationsPager({
         disabled={page >= totalPages}
         className={pagerButtonClass(page >= totalPages)}
       >
-        Next
+        {t("Next")}
       </button>
     </nav>
   );

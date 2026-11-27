@@ -13,6 +13,7 @@ import {
   ChevronRight,
   ArrowDown,
 } from 'lucide-react';
+import { useLocale } from '@/lib/i18n/LocaleProvider';
 
 export interface InvestigationReportData {
   version?: number;
@@ -161,6 +162,7 @@ function normalizeReport(raw: InvestigationReportData & Record<string, any>): In
 }
 
 export default function InvestigationReport({ report }: { report: InvestigationReportData }) {
+  const { t } = useLocale();
   const [timelineExpanded, setTimelineExpanded] = useState(false);
 
   const normalized = normalizeReport(report as any);
@@ -210,7 +212,7 @@ export default function InvestigationReport({ report }: { report: InvestigationR
         <div className="px-4 py-3 border-t border-stone-100 dark:border-stone-700">
           <SectionHeader
             icon={<Shield className="w-4 h-4 text-stone-500" />}
-            title="Executive Summary"
+            title={t("Executive Summary")}
           />
           <p className="text-sm text-stone-700 dark:text-stone-300 leading-relaxed">
             {normalized.executive_summary}
@@ -223,24 +225,24 @@ export default function InvestigationReport({ report }: { report: InvestigationR
         <div className="px-4 py-3 border-t border-stone-100 dark:border-stone-700">
           <SectionHeader
             icon={<Target className="w-4 h-4 text-stone-500" />}
-            title="Impact"
+            title={t("Impact")}
           />
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             {normalized.impact.user_facing && (
               <div className="bg-stone-50 dark:bg-stone-700/50 rounded-lg p-2.5">
-                <div className="text-xs text-stone-500 uppercase tracking-wide mb-1">User-Facing</div>
+                <div className="text-xs text-stone-500 uppercase tracking-wide mb-1">{t("User-Facing")}</div>
                 <div className="text-sm text-stone-700 dark:text-stone-300">{normalized.impact.user_facing}</div>
               </div>
             )}
             {normalized.impact.service_impact && (
               <div className="bg-stone-50 dark:bg-stone-700/50 rounded-lg p-2.5">
-                <div className="text-xs text-stone-500 uppercase tracking-wide mb-1">Service Impact</div>
+                <div className="text-xs text-stone-500 uppercase tracking-wide mb-1">{t("Service Impact")}</div>
                 <div className="text-sm text-stone-700 dark:text-stone-300">{normalized.impact.service_impact}</div>
               </div>
             )}
             {normalized.impact.blast_radius && (
               <div className="bg-stone-50 dark:bg-stone-700/50 rounded-lg p-2.5">
-                <div className="text-xs text-stone-500 uppercase tracking-wide mb-1">Blast Radius</div>
+                <div className="text-xs text-stone-500 uppercase tracking-wide mb-1">{t("Blast Radius")}</div>
                 <div className="text-sm text-stone-700 dark:text-stone-300">{normalized.impact.blast_radius}</div>
               </div>
             )}
@@ -253,7 +255,7 @@ export default function InvestigationReport({ report }: { report: InvestigationR
         <div className="px-4 py-3 border-t border-stone-100 dark:border-stone-700">
           <SectionHeader
             icon={<AlertTriangle className="w-4 h-4 text-stone-500" />}
-            title="Root Cause"
+            title={t("Root Cause")}
           />
           {normalized.root_cause.confidence && (
             <span
@@ -280,7 +282,7 @@ export default function InvestigationReport({ report }: { report: InvestigationR
         <div className="px-4 py-3 border-t border-stone-100 dark:border-stone-700">
           <SectionHeader
             icon={<FileSearch className="w-4 h-4 text-stone-500" />}
-            title="Evidence"
+            title={t("Evidence")}
           />
           <div>
             {normalized.evidence.map((item, i) => (
@@ -300,7 +302,7 @@ export default function InvestigationReport({ report }: { report: InvestigationR
         <div className="px-4 py-3 border-t border-stone-100 dark:border-stone-700">
           <SectionHeader
             icon={<Clock className="w-4 h-4 text-stone-500" />}
-            title="Timeline"
+            title={t("Timeline")}
           />
           <div className="relative ml-2">
             {visibleTimeline.map((entry, i) => (
@@ -325,11 +327,11 @@ export default function InvestigationReport({ report }: { report: InvestigationR
             >
               {timelineExpanded ? (
                 <>
-                  <ChevronDown className="w-3 h-3" /> Show less
+                  <ChevronDown className="w-3 h-3" />{' '}{t("Show less")}
                 </>
               ) : (
                 <>
-                  <ChevronRight className="w-3 h-3" /> Show {timeline.length - 5} more
+                  <ChevronRight className="w-3 h-3" />{' '}{t("Show")}{' '}{timeline.length - 5}{' '}{t("more")}
                 </>
               )}
             </button>
@@ -342,7 +344,7 @@ export default function InvestigationReport({ report }: { report: InvestigationR
         <div className="px-4 py-3 border-t border-stone-100 dark:border-stone-700">
           <SectionHeader
             icon={<CheckCircle2 className="w-4 h-4 text-stone-500" />}
-            title="Recommended Fix"
+            title={t("Recommended Fix")}
           />
           <div className="space-y-1.5">
             {normalized.action_items.map((item, i) => (
@@ -373,7 +375,7 @@ export default function InvestigationReport({ report }: { report: InvestigationR
         <div className="px-4 py-3 border-t border-stone-100 dark:border-stone-700">
           <SectionHeader
             icon={<Lightbulb className="w-4 h-4 text-stone-500" />}
-            title="Lessons Learned"
+            title={t("Lessons Learned")}
           />
           <ul className="space-y-1">
             {normalized.lessons_learned.map((lesson, i) => (

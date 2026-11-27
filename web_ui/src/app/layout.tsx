@@ -3,6 +3,8 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { RootChrome } from "@/components/shell/RootChrome";
 import { SignInGate } from "@/components/SignInGate";
+import { DEFAULT_LOCALE } from "@/lib/i18n/locale";
+import { LocaleProvider } from "@/lib/i18n/LocaleProvider";
 import { ThemeProvider } from "@/components/ThemeProvider";
 
 const geistSans = Geist({
@@ -34,7 +36,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="h-full" suppressHydrationWarning>
+    <html lang={DEFAULT_LOCALE} className="h-full" suppressHydrationWarning>
       <head>
         {/* CRITICAL: This script MUST run before any rendering to prevent flash */}
         <script
@@ -61,9 +63,11 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased h-full bg-[#f9fafb] font-sans`}
       >
         <ThemeProvider>
-          <SignInGate>
-            <RootChrome>{children}</RootChrome>
-          </SignInGate>
+          <LocaleProvider>
+            <SignInGate>
+              <RootChrome>{children}</RootChrome>
+            </SignInGate>
+          </LocaleProvider>
         </ThemeProvider>
       </body>
     </html>

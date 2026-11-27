@@ -1,6 +1,7 @@
 'use client';
 
 import { clsx } from 'clsx';
+import { useLocale } from '@/lib/i18n/LocaleProvider';
 
 export const SUMMARIZE_FOLLOW_UP = 'Summarize what you found so far';
 
@@ -16,8 +17,9 @@ export default function InvestigationHaltBanner({
   message,
   className,
   onFollowUp,
-  followUpLabel = 'Summarize findings',
+  followUpLabel,
 }: Props) {
+  const { t } = useLocale();
   return (
     <div
       data-testid="investigation-halt-banner"
@@ -34,7 +36,7 @@ export default function InvestigationHaltBanner({
           onClick={onFollowUp}
           className="mt-2 text-sm font-medium text-yellow-800 dark:text-yellow-200 underline underline-offset-2 hover:text-yellow-950 dark:hover:text-yellow-50"
         >
-          {followUpLabel}
+          {followUpLabel ?? t('Summarize findings')}
         </button>
       ) : null}
     </div>

@@ -34,6 +34,7 @@ import { QuickStartWizard } from '@/components/onboarding/QuickStartWizard';
 import { ContinueOnboardingButton } from '@/components/onboarding/ContinueOnboardingButton';
 import { HelpTip } from '@/components/onboarding/HelpTip';
 import { PageHeader, Button, Skeleton, TeamPageShell } from '@/components/ui-flow';
+import { useLocale } from '@/lib/i18n/LocaleProvider';
 
 interface AgentModel {
   name: string;
@@ -84,6 +85,7 @@ type RawMeResponse = {
 };
 
 export default function AgentSettingsPage() {
+  const { t } = useLocale();
   const router = useRouter();
   const { identity } = useIdentity();
   const [agents, setAgents] = useState<Record<string, AgentConfig>>({});
@@ -553,9 +555,9 @@ export default function AgentSettingsPage() {
       header={
         <>
         <PageHeader
-          eyebrow="Team console"
-          title="Agents"
-          subtitle="Configure your multi-agent system topology, prompts, and behaviors"
+          eyebrow={t("Team console")}
+          title={t("Agents")}
+          subtitle={t("Configure your multi-agent system topology, prompts, and behaviors")}
           actions={
             <>
               <div className="flex items-center bg-slate-100 rounded-full p-1">
@@ -569,7 +571,7 @@ export default function AgentSettingsPage() {
                   }`}
                 >
                   <Network className="w-4 h-4" />
-                  Visual
+                  {t("Visual")}
                 </button>
                 <button
                   type="button"
@@ -590,7 +592,7 @@ export default function AgentSettingsPage() {
                 onClick={() => { window.location.href = '/team/templates'; }}
               >
                 <LayoutTemplate className="w-4 h-4" />
-                Templates
+                {t("Templates")}
               </Button>
 
               <div className="relative">
@@ -599,7 +601,7 @@ export default function AgentSettingsPage() {
                   onClick={() => setShowAgentTypeMenu(!showAgentTypeMenu)}
                 >
                   <Plus className="w-4 h-4" />
-                  Add Agent
+                  {t("Add Agent")}
                 </Button>
 
                 {showAgentTypeMenu && (
@@ -614,8 +616,8 @@ export default function AgentSettingsPage() {
                     >
                       <Bot className="w-4 h-4 text-slate-500" />
                       <div>
-                        <div className="text-sm font-medium text-slate-900">Add Local Agent</div>
-                        <div className="text-xs text-slate-500">Create a new internal agent</div>
+                        <div className="text-sm font-medium text-slate-900">{t("Add Local Agent")}</div>
+                        <div className="text-xs text-slate-500">{t("Create a new internal agent")}</div>
                       </div>
                     </button>
                     <button
@@ -628,8 +630,8 @@ export default function AgentSettingsPage() {
                     >
                       <ExternalLink className="w-4 h-4 text-slate-500" />
                       <div>
-                        <div className="text-sm font-medium text-slate-900">Add Remote A2A Agent</div>
-                        <div className="text-xs text-slate-500">Integrate external AI agent</div>
+                        <div className="text-sm font-medium text-slate-900">{t("Add Remote A2A Agent")}</div>
+                        <div className="text-xs text-slate-500">{t("Integrate external AI agent")}</div>
                       </div>
                     </button>
                   </div>
@@ -641,8 +643,8 @@ export default function AgentSettingsPage() {
                 onClick={() => loadAgents()}
                 disabled={loading}
                 className="p-2 text-slate-400 hover:text-slate-600 rounded-full hover:bg-slate-100 transition-colors disabled:opacity-50"
-                title="Refresh from server"
-                aria-label="Refresh"
+                title={t("Refresh from server")}
+                aria-label={t("Refresh")}
               >
                 <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
               </button>
@@ -654,7 +656,7 @@ export default function AgentSettingsPage() {
                   ) : (
                     <Save className="w-4 h-4" />
                   )}
-                  Save
+                  {t("Save")}
                 </Button>
               )}
             </>
@@ -687,16 +689,16 @@ export default function AgentSettingsPage() {
             <div className="mb-4 flex items-center justify-between flex-shrink-0 w-full">
               <div className="flex items-center gap-3 text-sm text-slate-500">
                 <span className="flex items-center gap-1">
-                  Lineage: <span className="font-mono">{lineageLabel}</span>
+                  {t("Lineage:")}{' '}<span className="font-mono">{lineageLabel}</span>
                   <HelpTip id="config-lineage" position="right">
-                    <strong>Lineage</strong> shows the configuration inheritance path. Settings flow from Organization to Team level, with more specific levels overriding general ones.
+                    <strong>{t("Lineage")}</strong>{' '}{t("shows the configuration inheritance path. Settings flow from Organization to Team level, with more specific levels overriding general ones.")}
                   </HelpTip>
                 </span>
                 <button
                   onClick={() => setShowInheritanceModal(true)}
                   className="text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 dark:hover:text-emerald-400 underline underline-offset-2"
                 >
-                  Show inheritance details
+                  {t("Show inheritance details")}
                 </button>
               </div>
             </div>
@@ -706,12 +708,12 @@ export default function AgentSettingsPage() {
               <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-5 shadow-sm flex flex-col overflow-hidden">
                 <div className="flex items-center justify-between mb-3 flex-shrink-0">
                   <div className="text-sm font-semibold text-slate-900 dark:text-white flex items-center gap-1">
-                    Active Configuration
+                    {t("Active Configuration")}
                     <HelpTip id="effective-config" position="right">
                       The <strong>active configuration</strong> is the final merged result of organization defaults combined with your team&apos;s overrides. This is what OpenSRE actually uses at runtime.
                     </HelpTip>
                   </div>
-                  <span className="text-xs text-slate-400">Read-only</span>
+                  <span className="text-xs text-slate-400">{t("Read-only")}</span>
                 </div>
                 <pre className="flex-1 min-h-0 overflow-auto bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 rounded-lg p-3 text-xs font-mono text-slate-700 dark:text-slate-200">
                   {effectivePretty || '(not loaded)'}
@@ -722,9 +724,9 @@ export default function AgentSettingsPage() {
               <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-5 shadow-sm flex flex-col overflow-hidden">
                 <div className="flex items-center justify-between mb-3 flex-shrink-0">
                   <div className="text-sm font-semibold text-slate-900 dark:text-white flex items-center gap-1">
-                    Team Overrides
+                    {t("Team Overrides")}
                     <HelpTip id="team-overrides" position="right">
-                      <strong>Team Overrides</strong> are your team&apos;s custom settings. Changes here only affect your team, not the organization. Edit the JSON below and click Save to update your configuration.
+                      <strong>{t("Team Overrides")}</strong> are your team&apos;s custom settings. Changes here only affect your team, not the organization. Edit the JSON below and click Save to update your configuration.
                     </HelpTip>
                   </div>
                 </div>
@@ -738,7 +740,7 @@ export default function AgentSettingsPage() {
 
                 <div className="mt-3 flex justify-between items-center flex-shrink-0">
                   <p className="text-xs text-slate-500">
-                    Edit and save to update your team&apos;s configuration.
+                    {t("Edit and save to update your team's configuration.")}
                   </p>
                   <button
                     onClick={saveOverrides}
@@ -746,7 +748,7 @@ export default function AgentSettingsPage() {
                     className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-emerald-100/50 text-emerald-700 rounded-lg hover:bg-emerald-100/80 disabled:opacity-70"
                   >
                     {saving ? <span className="live-dot w-2 h-2 rounded-full shrink-0" aria-hidden /> : <Save className="w-4 h-4" />}
-                    Save
+                    {t("Save")}
                   </button>
                 </div>
               </div>
@@ -893,15 +895,15 @@ export default function AgentSettingsPage() {
               <div className="flex items-center gap-4 text-xs text-slate-600 dark:text-slate-400">
                 <div className="flex items-center gap-1.5">
                   <div className="w-2.5 h-2.5 rounded-full bg-green-500" />
-                  <span>Enabled</span>
+                  <span>{t("Enabled")}</span>
                 </div>
                 <div className="flex items-center gap-1.5">
                   <Sparkles className="w-3 h-3 text-amber-500" />
-                  <span>Entrance Agent</span>
+                  <span>{t("Entrance Agent")}</span>
                 </div>
                 <div className="flex items-center gap-1.5">
                   <div className="w-6 h-px bg-slate-400" />
-                  <span>→ Uses</span>
+                  <span>{t("→ Uses")}</span>
                 </div>
               </div>
             </div>
@@ -909,7 +911,7 @@ export default function AgentSettingsPage() {
             {/* Click hint - Fixed position, outside transformed container */}
             {!selectedAgent && (
               <div className="absolute bottom-4 right-4 text-xs text-slate-400 dark:text-slate-600 z-10">
-                Click an agent to configure
+                {t("Click an agent to configure")}
               </div>
             )}
           </div>
@@ -950,12 +952,12 @@ export default function AgentSettingsPage() {
                     {editingAgent.enabled ? (
                       <>
                         <ToggleRight className="w-4 h-4" />
-                        On
+                        {t("On")}
                       </>
                     ) : (
                       <>
                         <ToggleLeft className="w-4 h-4" />
-                        Off
+                        {t("Off")}
                       </>
                     )}
                   </button>
@@ -975,7 +977,7 @@ export default function AgentSettingsPage() {
                 <div className="flex items-center gap-2">
                   <span className="text-xs px-2 py-1 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-600 flex items-center gap-1">
                     <Sparkles className="w-3 h-3" />
-                    Orchestrator
+                    {t("Orchestrator")}
                   </span>
                 </div>
               )}
@@ -986,13 +988,13 @@ export default function AgentSettingsPage() {
                 <div className="bg-slate-50 dark:bg-slate-800 rounded-xl p-4 border border-slate-200 dark:border-slate-700">
                   <div className="flex items-center gap-2 mb-4">
                     <Zap className="w-5 h-5 text-slate-500" />
-                    <h3 className="font-semibold text-slate-900 dark:text-white">Model</h3>
+                    <h3 className="font-semibold text-slate-900 dark:text-white">{t("Model")}</h3>
                   </div>
 
                   <div className="grid grid-cols-2 gap-4 mb-4">
                     <div>
                       <label className="block text-xs font-medium text-slate-500 mb-1">
-                        Model Name
+                        {t("Model Name")}
                       </label>
                       <select
                         value={editingAgent.model.name}
@@ -1004,7 +1006,7 @@ export default function AgentSettingsPage() {
                         }
                         className="w-full px-3 py-2 text-sm rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700"
                       >
-                        <option value="inherit">inherit (session default)</option>
+                        <option value="inherit">{t("inherit (session default)")}</option>
                         <option value="sonnet">sonnet</option>
                         <option value="opus">opus</option>
                         <option value="haiku">haiku</option>
@@ -1019,7 +1021,7 @@ export default function AgentSettingsPage() {
                     <div className="flex items-center gap-2">
                       <Brain className="w-5 h-5 text-slate-500" />
                       <h3 className="font-semibold text-slate-900 dark:text-white">
-                        System Prompt
+                        {t("System Prompt")}
                       </h3>
                     </div>
                     <button
@@ -1029,12 +1031,12 @@ export default function AgentSettingsPage() {
                       {showPrompt ? (
                         <>
                           <EyeOff className="w-4 h-4" />
-                          Hide
+                          {t("Hide")}
                         </>
                       ) : (
                         <>
                           <Eye className="w-4 h-4" />
-                          Show / Edit
+                          {t("Show / Edit")}
                         </>
                       )}
                     </button>
@@ -1051,7 +1053,7 @@ export default function AgentSettingsPage() {
                       }
                       rows={12}
                       className="w-full px-3 py-2 text-sm font-mono rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 resize-y"
-                      placeholder="Enter system prompt..."
+                      placeholder={t("Enter system prompt...")}
                     />
                   ) : (
                     <div className="text-sm text-slate-500 italic">
@@ -1068,10 +1070,10 @@ export default function AgentSettingsPage() {
                     <div className="flex items-center gap-2">
                       <Users className="w-5 h-5 text-slate-500" />
                       <h3 className="font-semibold text-slate-900 dark:text-white">
-                        Sub-Agents
+                        {t("Sub-Agents")}
                       </h3>
                       <span className="text-xs text-slate-500">
-                        (click to add/remove)
+                        {t("(click to add/remove)")}
                       </span>
                     </div>
                   </div>
@@ -1134,7 +1136,7 @@ export default function AgentSettingsPage() {
 
                             return (
                               <div>
-                                <div className="text-xs text-slate-500 mb-2">Add sub-agent:</div>
+                                <div className="text-xs text-slate-500 mb-2">{t("Add sub-agent:")}</div>
                                 <div className="flex flex-wrap gap-2">
                                   {availableAgents.map((agentId) => {
                                     const agent = agents[agentId];
@@ -1175,7 +1177,7 @@ export default function AgentSettingsPage() {
 
                     {Object.keys(editingAgent.sub_agents || {}).length === 0 && (
                       <p className="text-sm text-slate-500 italic">
-                        No sub-agents. Add agents above to make this an orchestrator.
+                        {t("No sub-agents. Add agents above to make this an orchestrator.")}
                       </p>
                     )}
                   </div>
@@ -1214,7 +1216,7 @@ export default function AgentSettingsPage() {
               <div className="flex items-center gap-2">
                 <span className="text-xs px-2 py-1 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-600 flex items-center gap-1">
                   <ExternalLink className="w-3 h-3" />
-                  Remote A2A Agent
+                  {t("Remote A2A Agent")}
                 </span>
               </div>
 
@@ -1224,13 +1226,13 @@ export default function AgentSettingsPage() {
                 <div className="bg-slate-50 dark:bg-slate-800 rounded-xl p-4 border border-slate-200 dark:border-slate-700">
                   <div className="flex items-center gap-2 mb-4">
                     <Globe className="w-5 h-5 text-slate-500" />
-                    <h3 className="font-semibold text-slate-900 dark:text-white">Connection</h3>
+                    <h3 className="font-semibold text-slate-900 dark:text-white">{t("Connection")}</h3>
                   </div>
 
                   <div className="space-y-3">
                     <div>
                       <label className="block text-xs font-medium text-slate-500 mb-1">
-                        Endpoint URL
+                        {t("Endpoint URL")}
                       </label>
                       <div className="px-3 py-2 text-sm rounded-lg border border-slate-200 dark:border-slate-600 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 font-mono break-all">
                         {editingRemoteAgent.url}
@@ -1240,7 +1242,7 @@ export default function AgentSettingsPage() {
                     <div className="grid grid-cols-2 gap-3">
                       <div>
                         <label className="block text-xs font-medium text-slate-500 mb-1">
-                          Authentication
+                          {t("Authentication")}
                         </label>
                         <div className="px-3 py-2 text-sm rounded-lg border border-slate-200 dark:border-slate-600 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300">
                           {editingRemoteAgent.auth.type === 'none' && 'None'}
@@ -1252,7 +1254,7 @@ export default function AgentSettingsPage() {
 
                       <div>
                         <label className="block text-xs font-medium text-slate-500 mb-1">
-                          Timeout (seconds)
+                          {t("Timeout (seconds)")}
                         </label>
                         <div className="px-3 py-2 text-sm rounded-lg border border-slate-200 dark:border-slate-600 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300">
                           {editingRemoteAgent.timeout || 300}s
@@ -1266,7 +1268,7 @@ export default function AgentSettingsPage() {
                 <div className="bg-slate-50 dark:bg-slate-800 rounded-xl p-4 border border-slate-200 dark:border-slate-700">
                   <div className="flex items-center gap-2 mb-4">
                     <Activity className="w-5 h-5 text-green-500" />
-                    <h3 className="font-semibold text-slate-900 dark:text-white">Test Connection</h3>
+                    <h3 className="font-semibold text-slate-900 dark:text-white">{t("Test Connection")}</h3>
                   </div>
 
                   <button
@@ -1301,12 +1303,12 @@ export default function AgentSettingsPage() {
                     {testingConnection ? (
                       <>
                         <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                        Testing...
+                        {t("Testing...")}
                       </>
                     ) : (
                       <>
                         <Activity className="w-4 h-4" />
-                        Test Connection
+                        {t("Test Connection")}
                       </>
                     )}
                   </button>
@@ -1328,7 +1330,7 @@ export default function AgentSettingsPage() {
                 <div className="bg-slate-50 dark:bg-slate-800 rounded-xl p-4 border border-slate-200 dark:border-slate-700">
                   <div className="flex items-center gap-2 mb-4">
                     <Settings className="w-5 h-5 text-slate-500" />
-                    <h3 className="font-semibold text-slate-900 dark:text-white">Actions</h3>
+                    <h3 className="font-semibold text-slate-900 dark:text-white">{t("Actions")}</h3>
                   </div>
 
                   <div className="flex gap-3">
@@ -1340,7 +1342,7 @@ export default function AgentSettingsPage() {
                       className="flex-1 px-4 py-2 bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-300 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
                     >
                       <Edit2 className="w-4 h-4" />
-                      Edit
+                      {t("Edit")}
                     </button>
 
                     <button
@@ -1390,7 +1392,7 @@ export default function AgentSettingsPage() {
                       className="flex-1 px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
                     >
                       <Trash2 className="w-4 h-4" />
-                      Remove
+                      {t("Remove")}
                     </button>
                   </div>
                 </div>
@@ -1409,7 +1411,7 @@ export default function AgentSettingsPage() {
           <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl w-full max-w-md mx-4 p-6">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold text-slate-900 dark:text-white">
-                Add New Agent
+                {t("Add New Agent")}
               </h3>
               <button
                 onClick={() => { setShowAddAgent(false); setNewAgentId(''); }}
@@ -1422,7 +1424,7 @@ export default function AgentSettingsPage() {
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                  Agent Name
+                  {t("Agent Name")}
                 </label>
                 <input
                   type="text"
@@ -1433,7 +1435,7 @@ export default function AgentSettingsPage() {
                   autoFocus
                 />
                 <p className="text-xs text-slate-500 mt-1">
-                  ID will be: {newAgentId.trim().toLowerCase().replace(/\s+/g, '_') || '...'}
+                  {t("ID will be:")}{' '}{newAgentId.trim().toLowerCase().replace(/\s+/g, '_') || '...'}
                 </p>
               </div>
 
@@ -1442,14 +1444,14 @@ export default function AgentSettingsPage() {
                   onClick={() => { setShowAddAgent(false); setNewAgentId(''); }}
                   className="px-4 py-2 text-sm text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
                 >
-                  Cancel
+                  {t("Cancel")}
                 </button>
                 <button
                   onClick={handleAddAgent}
                   disabled={!newAgentId.trim()}
                   className="px-4 py-2 text-sm bg-emerald-100/50 text-emerald-700 rounded-lg hover:bg-emerald-100/80 disabled:opacity-50"
                 >
-                  Create Agent
+                  {t("Create Agent")}
                 </button>
               </div>
             </div>
@@ -1465,7 +1467,7 @@ export default function AgentSettingsPage() {
               <div className="flex items-center gap-2">
                 <ExternalLink className="w-5 h-5 text-slate-500" />
                 <h3 className="text-lg font-semibold text-slate-900 dark:text-white">
-                  Add Remote A2A Agent
+                  {t("Add Remote A2A Agent")}
                 </h3>
               </div>
               <button
@@ -1492,7 +1494,7 @@ export default function AgentSettingsPage() {
               {/* ID */}
               <div>
                 <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                  Agent ID *
+                  {t("Agent ID *")}
                 </label>
                 <input
                   type="text"
@@ -1506,7 +1508,7 @@ export default function AgentSettingsPage() {
               {/* Name */}
               <div>
                 <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                  Display Name *
+                  {t("Display Name *")}
                 </label>
                 <input
                   type="text"
@@ -1520,7 +1522,7 @@ export default function AgentSettingsPage() {
               {/* URL */}
               <div>
                 <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                  A2A Endpoint URL *
+                  {t("A2A Endpoint URL *")}
                 </label>
                 <input
                   type="url"
@@ -1534,12 +1536,12 @@ export default function AgentSettingsPage() {
               {/* Description */}
               <div>
                 <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                  Description
+                  {t("Description")}
                 </label>
                 <textarea
                   value={newRemoteAgent.description}
                   onChange={(e) => setNewRemoteAgent({ ...newRemoteAgent, description: e.target.value })}
-                  placeholder="What does this agent do?"
+                  placeholder={t("What does this agent do?")}
                   className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700"
                   rows={2}
                 />
@@ -1548,7 +1550,7 @@ export default function AgentSettingsPage() {
               {/* Auth Type */}
               <div>
                 <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                  Authentication
+                  {t("Authentication")}
                 </label>
                 <select
                   value={newRemoteAgent.auth.type}
@@ -1558,10 +1560,10 @@ export default function AgentSettingsPage() {
                   })}
                   className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700"
                 >
-                  <option value="none">No Authentication (Public)</option>
-                  <option value="bearer">Bearer Token</option>
-                  <option value="apikey">API Key</option>
-                  <option value="oauth2">OAuth 2.0 Client Credentials</option>
+                  <option value="none">{t("No Authentication (Public)")}</option>
+                  <option value="bearer">{t("Bearer Token")}</option>
+                  <option value="apikey">{t("API Key")}</option>
+                  <option value="oauth2">{t("OAuth 2.0 Client Credentials")}</option>
                 </select>
               </div>
 
@@ -1569,7 +1571,7 @@ export default function AgentSettingsPage() {
               {newRemoteAgent.auth.type === 'bearer' && (
                 <div>
                   <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                    Bearer Token *
+                    {t("Bearer Token *")}
                   </label>
                   <input
                     type="password"
@@ -1589,7 +1591,7 @@ export default function AgentSettingsPage() {
                 <>
                   <div>
                     <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                      API Key *
+                      {t("API Key *")}
                     </label>
                     <input
                       type="password"
@@ -1604,7 +1606,7 @@ export default function AgentSettingsPage() {
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                        Location
+                        {t("Location")}
                       </label>
                       <select
                         value={newRemoteAgent.auth.location || 'header'}
@@ -1614,13 +1616,13 @@ export default function AgentSettingsPage() {
                         })}
                         className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700"
                       >
-                        <option value="header">Header</option>
-                        <option value="query">Query Param</option>
+                        <option value="header">{t("Header")}</option>
+                        <option value="query">{t("Query Param")}</option>
                       </select>
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                        Key Name
+                        {t("Key Name")}
                       </label>
                       <input
                         type="text"
@@ -1641,7 +1643,7 @@ export default function AgentSettingsPage() {
                 <>
                   <div>
                     <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                      Token URL *
+                      {t("Token URL *")}
                     </label>
                     <input
                       type="url"
@@ -1657,7 +1659,7 @@ export default function AgentSettingsPage() {
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                        Client ID *
+                        {t("Client ID *")}
                       </label>
                       <input
                         type="text"
@@ -1671,7 +1673,7 @@ export default function AgentSettingsPage() {
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                        Client Secret *
+                        {t("Client Secret *")}
                       </label>
                       <input
                         type="password"
@@ -1686,7 +1688,7 @@ export default function AgentSettingsPage() {
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                      Scope (Optional)
+                      {t("Scope (Optional)")}
                     </label>
                     <input
                       type="text"
@@ -1705,7 +1707,7 @@ export default function AgentSettingsPage() {
               {/* Timeout */}
               <div>
                 <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                  Timeout (seconds)
+                  {t("Timeout (seconds)")}
                 </label>
                 <input
                   type="number"
@@ -1766,7 +1768,7 @@ export default function AgentSettingsPage() {
                   {testingConnection ? (
                     <span className="flex items-center gap-2">
                       <span className="live-dot w-2 h-2 rounded-full shrink-0" aria-hidden />
-                      Testing...
+                      {t("Testing...")}
                     </span>
                   ) : (
                     'Test Connection'
@@ -1790,7 +1792,7 @@ export default function AgentSettingsPage() {
                     }}
                     className="px-4 py-2 text-sm text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
                   >
-                    Cancel
+                    {t("Cancel")}
                   </button>
                   <button
                     onClick={async () => {
@@ -1856,7 +1858,7 @@ export default function AgentSettingsPage() {
                     {saving ? (
                       <span className="flex items-center gap-2">
                         <span className="live-dot w-2 h-2 rounded-full shrink-0" aria-hidden />
-                        Adding...
+                        {t("Adding...")}
                       </span>
                     ) : (
                       'Add Remote Agent'
@@ -1877,7 +1879,7 @@ export default function AgentSettingsPage() {
               <div className="flex items-center gap-2">
                 <ExternalLink className="w-5 h-5 text-slate-500" />
                 <h3 className="text-lg font-semibold text-slate-900 dark:text-white">
-                  Edit Remote A2A Agent
+                  {t("Edit Remote A2A Agent")}
                 </h3>
               </div>
               <button
@@ -1895,7 +1897,7 @@ export default function AgentSettingsPage() {
               {/* ID (disabled) */}
               <div>
                 <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                  Agent ID
+                  {t("Agent ID")}
                 </label>
                 <input
                   type="text"
@@ -1908,7 +1910,7 @@ export default function AgentSettingsPage() {
               {/* Name */}
               <div>
                 <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                  Display Name *
+                  {t("Display Name *")}
                 </label>
                 <input
                   type="text"
@@ -1921,7 +1923,7 @@ export default function AgentSettingsPage() {
               {/* URL */}
               <div>
                 <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                  A2A Endpoint URL *
+                  {t("A2A Endpoint URL *")}
                 </label>
                 <input
                   type="url"
@@ -1934,7 +1936,7 @@ export default function AgentSettingsPage() {
               {/* Description */}
               <div>
                 <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                  Description
+                  {t("Description")}
                 </label>
                 <textarea
                   value={newRemoteAgent.description}
@@ -1947,7 +1949,7 @@ export default function AgentSettingsPage() {
               {/* Auth Type */}
               <div>
                 <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                  Authentication
+                  {t("Authentication")}
                 </label>
                 <select
                   value={newRemoteAgent.auth.type}
@@ -1957,10 +1959,10 @@ export default function AgentSettingsPage() {
                   })}
                   className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700"
                 >
-                  <option value="none">No Authentication (Public)</option>
-                  <option value="bearer">Bearer Token</option>
-                  <option value="apikey">API Key</option>
-                  <option value="oauth2">OAuth 2.0 Client Credentials</option>
+                  <option value="none">{t("No Authentication (Public)")}</option>
+                  <option value="bearer">{t("Bearer Token")}</option>
+                  <option value="apikey">{t("API Key")}</option>
+                  <option value="oauth2">{t("OAuth 2.0 Client Credentials")}</option>
                 </select>
               </div>
 
@@ -1968,7 +1970,7 @@ export default function AgentSettingsPage() {
               {newRemoteAgent.auth.type === 'bearer' && (
                 <div>
                   <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                    Bearer Token *
+                    {t("Bearer Token *")}
                   </label>
                   <input
                     type="password"
@@ -1988,7 +1990,7 @@ export default function AgentSettingsPage() {
                 <>
                   <div>
                     <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                      API Key *
+                      {t("API Key *")}
                     </label>
                     <input
                       type="password"
@@ -2003,7 +2005,7 @@ export default function AgentSettingsPage() {
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                        Location
+                        {t("Location")}
                       </label>
                       <select
                         value={newRemoteAgent.auth.location || 'header'}
@@ -2013,13 +2015,13 @@ export default function AgentSettingsPage() {
                         })}
                         className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700"
                       >
-                        <option value="header">Header</option>
-                        <option value="query">Query Param</option>
+                        <option value="header">{t("Header")}</option>
+                        <option value="query">{t("Query Param")}</option>
                       </select>
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                        Key Name
+                        {t("Key Name")}
                       </label>
                       <input
                         type="text"
@@ -2040,7 +2042,7 @@ export default function AgentSettingsPage() {
                 <>
                   <div>
                     <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                      Token URL *
+                      {t("Token URL *")}
                     </label>
                     <input
                       type="url"
@@ -2055,7 +2057,7 @@ export default function AgentSettingsPage() {
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                        Client ID *
+                        {t("Client ID *")}
                       </label>
                       <input
                         type="text"
@@ -2069,7 +2071,7 @@ export default function AgentSettingsPage() {
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                        Client Secret *
+                        {t("Client Secret *")}
                       </label>
                       <input
                         type="password"
@@ -2084,7 +2086,7 @@ export default function AgentSettingsPage() {
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                      Scope (Optional)
+                      {t("Scope (Optional)")}
                     </label>
                     <input
                       type="text"
@@ -2102,7 +2104,7 @@ export default function AgentSettingsPage() {
               {/* Timeout */}
               <div>
                 <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                  Timeout (seconds)
+                  {t("Timeout (seconds)")}
                 </label>
                 <input
                   type="number"
@@ -2123,7 +2125,7 @@ export default function AgentSettingsPage() {
                   }}
                   className="px-4 py-2 text-sm text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
                 >
-                  Cancel
+                  {t("Cancel")}
                 </button>
                 <button
                   onClick={async () => {
@@ -2185,7 +2187,7 @@ export default function AgentSettingsPage() {
                   {saving ? (
                     <span className="flex items-center gap-2">
                       <span className="live-dot w-2 h-2 rounded-full shrink-0" aria-hidden />
-                      Saving...
+                      {t("Saving...")}
                     </span>
                   ) : (
                     'Save Changes'
@@ -2229,7 +2231,7 @@ export default function AgentSettingsPage() {
           <div className="bg-white dark:bg-slate-800 rounded-2xl w-full max-w-4xl max-h-[85vh] flex flex-col shadow-xl mx-4">
             {/* Modal Header */}
             <div className="flex items-center justify-between p-4 border-b border-slate-200 dark:border-slate-700">
-              <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Configuration Inheritance</h2>
+              <h2 className="text-lg font-semibold text-slate-900 dark:text-white">{t("Configuration Inheritance")}</h2>
               <button
                 onClick={() => setShowInheritanceModal(false)}
                 className="p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
@@ -2241,10 +2243,10 @@ export default function AgentSettingsPage() {
             {/* Modal Explanation */}
             <div className="p-4 border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50">
               <p className="text-sm text-slate-600 dark:text-slate-400">
-                <strong>Lineage:</strong> {lineageLabel}
+                <strong>{t("Lineage:")}</strong> {lineageLabel}
               </p>
               <p className="text-sm text-slate-500 dark:text-slate-500 mt-1">
-                This shows what&apos;s configured at each level of the hierarchy. Settings from parent nodes are inherited and can be overridden by child nodes.
+                {t("This shows what's configured at each level of the hierarchy. Settings from parent nodes are inherited and can be overridden by child nodes.")}
               </p>
             </div>
 

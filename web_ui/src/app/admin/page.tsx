@@ -28,6 +28,8 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
+import { formatRelativeTime } from '@/lib/formatRelativeTime';
+import { useLocale } from '@/lib/i18n/LocaleProvider';
 
 interface DurationPercentiles {
   p50: number;
@@ -89,6 +91,7 @@ interface IntegrationHealth {
 }
 
 export default function AdminHomePage() {
+  const { locale, t } = useLocale();
   const { identity, error } = useIdentity();
   const [stats, setStats] = useState<OrgStats | null>(null);
   const [activities, setActivities] = useState<ActivityItem[]>([]);
@@ -165,20 +168,6 @@ export default function AdminHomePage() {
     return iconMap[name.toLowerCase()] || Settings;
   };
 
-  const formatRelativeTime = (timestamp: string) => {
-    const now = Date.now();
-    const then = new Date(timestamp).getTime();
-    const diff = now - then;
-    const minutes = Math.floor(diff / 60000);
-    const hours = Math.floor(diff / 3600000);
-    const days = Math.floor(diff / 86400000);
-
-    if (minutes < 1) return 'just now';
-    if (minutes < 60) return `${minutes}m ago`;
-    if (hours < 24) return `${hours}h ago`;
-    return `${days}d ago`;
-  };
-
   const formatDuration = (seconds: number | null) => {
     if (seconds === null) return 'N/A';
     if (seconds < 60) return `${seconds}s`;
@@ -221,21 +210,21 @@ export default function AdminHomePage() {
         return (
           <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
             <CheckCircle className="w-3 h-3" />
-            Healthy
+            {t("Healthy")}
           </span>
         );
       case 'degraded':
         return (
           <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400">
             <AlertCircle className="w-3 h-3" />
-            Degraded
+            {t("Degraded")}
           </span>
         );
       case 'down':
         return (
           <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-clay-light/15 text-clay-dark dark:bg-red-900/30 dark:text-clay-light">
             <XCircle className="w-3 h-3" />
-            Down
+            {t("Down")}
           </span>
         );
     }
@@ -247,21 +236,21 @@ export default function AdminHomePage() {
         return (
           <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
             <CheckCircle className="w-3 h-3" />
-            Connected
+            {t("Connected")}
           </span>
         );
       case 'error':
         return (
           <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-clay-light/15 text-clay-dark dark:bg-red-900/30 dark:text-clay-light">
             <XCircle className="w-3 h-3" />
-            Error
+            {t("Error")}
           </span>
         );
       case 'not_configured':
         return (
           <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-stone-100 text-stone-700 dark:bg-stone-700 dark:text-stone-400">
             <AlertCircle className="w-3 h-3" />
-            Not Configured
+            {t("Not Configured")}
           </span>
         );
     }
@@ -297,17 +286,17 @@ export default function AdminHomePage() {
           <div className="flex items-center gap-3">
             <ShieldCheck className="w-7 h-7 text-stone-500" />
             <div>
-              <h1 className="text-2xl font-semibold text-stone-900 dark:text-white">Admin Dashboard</h1>
-              <p className="text-sm text-stone-500">Monitor organization health and activity</p>
+              <h1 className="text-2xl font-semibold text-stone-900 dark:text-white">{t("Admin Dashboard")}</h1>
+              <p className="text-sm text-stone-500">{t("Monitor organization health and activity")}</p>
             </div>
           </div>
           <div className="flex items-center gap-4">
             <div className="text-xs text-stone-500 text-right">
               <div>
-                Signed in as: <span className="font-mono">{identity?.auth_kind || 'unknown'}</span>
+                {t("Signed in as:")}{' '}<span className="font-mono">{identity?.auth_kind || 'unknown'}</span>
               </div>
               <div className="mt-1">
-                Organization: <span className="font-mono">{identity?.org_id || '—'}</span>
+                {t("Organization:")}{' '}<span className="font-mono">{identity?.org_id || '—'}</span>
               </div>
             </div>
           </div>
@@ -321,12 +310,12 @@ export default function AdminHomePage() {
 
         {/* Organization Overview Stats */}
         <div>
-          <h2 className="text-lg font-semibold text-stone-900 dark:text-white mb-4">Organization Overview</h2>
+          <h2 className="text-lg font-semibold text-stone-900 dark:text-white mb-4">{t("Organization Overview")}</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
             <div className="bg-white dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded-xl p-5 shadow-sm">
               <div className="flex items-center justify-between">
                 <div>
-                  <div className="text-sm text-stone-500">Total Teams</div>
+                  <div className="text-sm text-stone-500">{t("Total Teams")}</div>
                   <div className="text-3xl font-bold text-stone-900 dark:text-white mt-1">
                     {stats?.totalTeams || 0}
                   </div>
@@ -338,7 +327,7 @@ export default function AdminHomePage() {
             <div className="bg-white dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded-xl p-5 shadow-sm">
               <div className="flex items-center justify-between">
                 <div>
-                  <div className="text-sm text-stone-500">Active Teams (7d)</div>
+                  <div className="text-sm text-stone-500">{t("Active Teams (7d)")}</div>
                   <div className="text-3xl font-bold text-stone-900 dark:text-white mt-1">
                     {stats?.activeTeams || 0}
                   </div>
@@ -350,7 +339,7 @@ export default function AdminHomePage() {
             <div className="bg-white dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded-xl p-5 shadow-sm">
               <div className="flex items-center justify-between">
                 <div>
-                  <div className="text-sm text-stone-500">Agent Runs (30d)</div>
+                  <div className="text-sm text-stone-500">{t("Agent Runs (30d)")}</div>
                   <div className="text-3xl font-bold text-stone-900 dark:text-white mt-1">
                     {stats?.totalRuns || 0}
                   </div>
@@ -362,7 +351,7 @@ export default function AdminHomePage() {
             <div className="bg-white dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded-xl p-5 shadow-sm">
               <div className="flex items-center justify-between">
                 <div>
-                  <div className="text-sm text-stone-500">Success Rate</div>
+                  <div className="text-sm text-stone-500">{t("Success Rate")}</div>
                   <div className="text-3xl font-bold text-stone-900 dark:text-white mt-1">
                     {stats?.successRate || 0}%
                   </div>
@@ -374,7 +363,7 @@ export default function AdminHomePage() {
             <div className="bg-white dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded-xl p-5 shadow-sm">
               <div className="flex items-center justify-between">
                 <div>
-                  <div className="text-sm text-stone-500">MTTD (Agent Run Duration)</div>
+                  <div className="text-sm text-stone-500">{t("MTTD (Agent Run Duration)")}</div>
                   {stats?.durationPercentiles ? (
                     <div>
                       <div className="text-3xl font-bold text-stone-900 dark:text-white mt-1">
@@ -401,16 +390,16 @@ export default function AdminHomePage() {
             <div className="bg-white dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded-xl shadow-sm">
               <div className="p-5 border-b border-stone-200 dark:border-stone-700">
                 <div className="flex items-center justify-between">
-                  <h2 className="text-lg font-semibold text-stone-900 dark:text-white">Recent Activity</h2>
+                  <h2 className="text-lg font-semibold text-stone-900 dark:text-white">{t("Recent Activity")}</h2>
                   <button className="text-xs text-stone-500 hover:text-stone-700 dark:hover:text-stone-300 flex items-center gap-1">
                     <RefreshCw className="w-3 h-3" />
-                    Refresh
+                    {t("Refresh")}
                   </button>
                 </div>
               </div>
               <div className="divide-y divide-stone-200 dark:divide-stone-700">
                 {activities.length === 0 && (
-                  <div className="p-8 text-center text-sm text-stone-500">No recent activity</div>
+                  <div className="p-8 text-center text-sm text-stone-500">{t("No recent activity")}</div>
                 )}
                 {activities.map((activity) => (
                   <div key={activity.id} className="p-4 hover:bg-stone-50 dark:hover:bg-stone-800/50 transition-colors">
@@ -426,7 +415,7 @@ export default function AdminHomePage() {
                           <p className="text-sm text-stone-900 dark:text-white">{activity.description}</p>
                         </div>
                         <div className="flex items-center gap-2 mt-1">
-                          <span className="text-xs text-stone-500">{formatRelativeTime(activity.timestamp)}</span>
+                          <span className="text-xs text-stone-500">{formatRelativeTime(activity.timestamp, locale)}</span>
                           {activity.teamName && (
                             <>
                               <span className="text-xs text-stone-400">•</span>
@@ -448,7 +437,7 @@ export default function AdminHomePage() {
             <div className="bg-white dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded-xl shadow-sm">
               <div className="p-5 border-b border-stone-200 dark:border-stone-700">
                 <div className="flex items-center justify-between">
-                  <h2 className="text-lg font-semibold text-stone-900 dark:text-white">Pending Items</h2>
+                  <h2 className="text-lg font-semibold text-stone-900 dark:text-white">{t("Pending Items")}</h2>
                   {totalPending > 0 && (
                     <span className="px-2 py-1 rounded-full text-xs font-medium bg-forest-light/15 text-forest dark:bg-forest/30 dark:text-forest-light">
                       {totalPending}
@@ -464,7 +453,7 @@ export default function AdminHomePage() {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <AlertCircle className="w-4 h-4 text-stone-600" />
-                      <span className="text-sm font-medium text-stone-900 dark:text-white">Remediations</span>
+                      <span className="text-sm font-medium text-stone-900 dark:text-white">{t("Remediations")}</span>
                     </div>
                     {pending.remediations > 0 && (
                       <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-forest-light/15 text-forest dark:bg-forest/30 dark:text-forest-light">
@@ -472,7 +461,7 @@ export default function AdminHomePage() {
                       </span>
                     )}
                   </div>
-                  <p className="text-xs text-stone-500 mt-1">Awaiting approval</p>
+                  <p className="text-xs text-stone-500 mt-1">{t("Awaiting approval")}</p>
                 </Link>
 
                 <Link
@@ -482,7 +471,7 @@ export default function AdminHomePage() {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <Settings className="w-4 h-4 text-stone-600" />
-                      <span className="text-sm font-medium text-stone-900 dark:text-white">Config Changes</span>
+                      <span className="text-sm font-medium text-stone-900 dark:text-white">{t("Config Changes")}</span>
                     </div>
                     {pending.configChanges > 0 && (
                       <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-stone-100 text-stone-700 dark:bg-stone-700 dark:text-stone-400">
@@ -490,7 +479,7 @@ export default function AdminHomePage() {
                       </span>
                     )}
                   </div>
-                  <p className="text-xs text-stone-500 mt-1">Awaiting approval</p>
+                  <p className="text-xs text-stone-500 mt-1">{t("Awaiting approval")}</p>
                 </Link>
 
                 <Link
@@ -500,7 +489,7 @@ export default function AdminHomePage() {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <Clock className="w-4 h-4 text-stone-600" />
-                      <span className="text-sm font-medium text-stone-900 dark:text-white">Expiring Tokens</span>
+                      <span className="text-sm font-medium text-stone-900 dark:text-white">{t("Expiring Tokens")}</span>
                     </div>
                     {pending.expiringTokens > 0 && (
                       <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400">
@@ -508,7 +497,7 @@ export default function AdminHomePage() {
                       </span>
                     )}
                   </div>
-                  <p className="text-xs text-stone-500 mt-1">Expiring within 7 days</p>
+                  <p className="text-xs text-stone-500 mt-1">{t("Expiring within 7 days")}</p>
                 </Link>
               </div>
             </div>
@@ -516,11 +505,11 @@ export default function AdminHomePage() {
             {/* System Health */}
             <div className="bg-white dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded-xl shadow-sm">
               <div className="p-5 border-b border-stone-200 dark:border-stone-700">
-                <h2 className="text-lg font-semibold text-stone-900 dark:text-white">System Health</h2>
+                <h2 className="text-lg font-semibold text-stone-900 dark:text-white">{t("System Health")}</h2>
               </div>
               <div className="p-5 space-y-4">
                 <div>
-                  <div className="text-xs font-medium text-stone-500 uppercase mb-2">Services</div>
+                  <div className="text-xs font-medium text-stone-500 uppercase mb-2">{t("Services")}</div>
                   <div className="space-y-2">
                     {services.map((service) => (
                       <div key={service.name} className="flex items-center justify-between">
@@ -532,7 +521,7 @@ export default function AdminHomePage() {
                 </div>
 
                 <div className="border-t border-stone-200 dark:border-stone-700 pt-4">
-                  <div className="text-xs font-medium text-stone-500 uppercase mb-2">Integrations</div>
+                  <div className="text-xs font-medium text-stone-500 uppercase mb-2">{t("Integrations")}</div>
                   <div className="space-y-2">
                     {integrations.map((integration) => {
                       const Icon = integration.icon;
@@ -556,32 +545,32 @@ export default function AdminHomePage() {
         {/* Team Performance Breakdown */}
         {stats?.teams && stats.teams.length > 0 && (
           <div>
-            <h2 className="text-lg font-semibold text-stone-900 dark:text-white mb-4">Team Performance (Last 30 Days)</h2>
+            <h2 className="text-lg font-semibold text-stone-900 dark:text-white mb-4">{t("Team Performance (Last 30 Days)")}</h2>
             <div className="bg-white dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded-xl shadow-sm overflow-hidden">
               <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead className="bg-stone-50 dark:bg-stone-700 border-b border-stone-200 dark:border-stone-600">
                     <tr>
                       <th className="px-6 py-3 text-left text-xs font-medium text-stone-500 dark:text-stone-400 uppercase tracking-wider">
-                        Team
+                        {t("Team")}
                       </th>
                       <th className="px-6 py-3 text-right text-xs font-medium text-stone-500 dark:text-stone-400 uppercase tracking-wider">
-                        Total Runs
+                        {t("Total Runs")}
                       </th>
                       <th className="px-6 py-3 text-center text-xs font-medium text-stone-500 dark:text-stone-400 uppercase tracking-wider">
-                        Trend
+                        {t("Trend")}
                       </th>
                       <th className="px-6 py-3 text-right text-xs font-medium text-stone-500 dark:text-stone-400 uppercase tracking-wider">
-                        Success Rate
+                        {t("Success Rate")}
                       </th>
                       <th className="px-6 py-3 text-right text-xs font-medium text-stone-500 dark:text-stone-400 uppercase tracking-wider">
                         MTTD
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-stone-500 dark:text-stone-400 uppercase tracking-wider">
-                        Most Used Agent
+                        {t("Most Used Agent")}
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-stone-500 dark:text-stone-400 uppercase tracking-wider">
-                        Last Run
+                        {t("Last Run")}
                       </th>
                     </tr>
                   </thead>
@@ -668,7 +657,7 @@ export default function AdminHomePage() {
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-left">
                           <div className="text-sm text-stone-500 dark:text-stone-400">
-                            {team.last_run_at ? formatRelativeTime(team.last_run_at) : 'Never'}
+                            {team.last_run_at ? formatRelativeTime(team.last_run_at, locale) : t('Never')}
                           </div>
                         </td>
                       </tr>
@@ -682,7 +671,7 @@ export default function AdminHomePage() {
 
         {/* Quick Actions */}
         <div>
-          <h2 className="text-lg font-semibold text-stone-900 dark:text-white mb-4">Quick Actions</h2>
+          <h2 className="text-lg font-semibold text-stone-900 dark:text-white mb-4">{t("Quick Actions")}</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             <Link
               href="/admin/org-tree"
@@ -693,8 +682,8 @@ export default function AdminHomePage() {
                   <Users className="w-5 h-5" />
                 </div>
                 <div>
-                  <div className="font-medium text-stone-900 dark:text-white">Add New Team</div>
-                  <div className="text-xs text-stone-500">Create team in org tree</div>
+                  <div className="font-medium text-stone-900 dark:text-white">{t("Add New Team")}</div>
+                  <div className="text-xs text-stone-500">{t("Create team in org tree")}</div>
                 </div>
               </div>
             </Link>
@@ -708,8 +697,8 @@ export default function AdminHomePage() {
                   <Key className="w-5 h-5" />
                 </div>
                 <div>
-                  <div className="font-medium text-stone-900 dark:text-white">Issue Token</div>
-                  <div className="text-xs text-stone-500">Generate API token</div>
+                  <div className="font-medium text-stone-900 dark:text-white">{t("Issue Token")}</div>
+                  <div className="text-xs text-stone-500">{t("Generate API token")}</div>
                 </div>
               </div>
             </Link>
@@ -723,8 +712,8 @@ export default function AdminHomePage() {
                   <FileText className="w-5 h-5" />
                 </div>
                 <div>
-                  <div className="font-medium text-stone-900 dark:text-white">View Audit Log</div>
-                  <div className="text-xs text-stone-500">Review admin actions</div>
+                  <div className="font-medium text-stone-900 dark:text-white">{t("View Audit Log")}</div>
+                  <div className="text-xs text-stone-500">{t("Review admin actions")}</div>
                 </div>
               </div>
             </Link>

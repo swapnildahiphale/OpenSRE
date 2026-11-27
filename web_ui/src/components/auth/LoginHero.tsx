@@ -1,6 +1,9 @@
+'use client';
+
 import Link from 'next/link';
 import { OpenSreBrandLogo } from '@/components/brand/OpenSreBrandLogo';
 import styles from './LoginHero.module.css';
+import { useLocale } from '@/lib/i18n/LocaleProvider';
 
 const ROTATING_WORDS = [
   'investigator.',
@@ -11,6 +14,7 @@ const ROTATING_WORDS = [
 
 /** Marketing left pane — opensre.in hero copy + word slider (login mockup Option C). */
 export function LoginHero() {
+  const { t } = useLocale();
   return (
     <div
       className="relative flex flex-col justify-center min-h-[50vh] lg:min-h-screen px-10 py-16 lg:px-16 xl:px-20 border-b lg:border-b-0 lg:border-r border-slate-200/60"
@@ -41,29 +45,27 @@ export function LoginHero() {
 
         <div className={styles.copy}>
           <h1 className={styles.headline}>
-            <span className={styles.headlineLine}>Your incidents</span>
-            <span className={styles.headlineLine}>deserve a better</span>
+            <span className={styles.headlineLine}>{t("Your incidents")}</span>
+            <span className={styles.headlineLine}>{t("deserve a better")}</span>
             <span className={`${styles.headlineLine} ${styles.container} text-emerald-800`}>
               <span className={styles.list}>
                 {ROTATING_WORDS.map((word) => (
-                  <span key={word}>{word}</span>
+                  <span key={word}>{t(word)}</span>
                 ))}
-                <span aria-hidden="true">{ROTATING_WORDS[0]}</span>
+                <span aria-hidden="true">{t(ROTATING_WORDS[0])}</span>
               </span>
             </span>
           </h1>
 
           <p className="text-slate-600 text-lg leading-relaxed max-w-md">
-            An AI SRE that autonomously investigates production incidents,
-            remembers every past investigation, and maps your entire service
-            topology.
+            {t("An AI SRE that autonomously investigates production incidents, remembers every past investigation, and maps your entire service topology.")}
           </p>
 
           <a
             href="https://opensre.in"
             className="text-sm text-emerald-700 hover:text-emerald-900 font-mono transition-colors"
           >
-            Learn more at opensre.in →
+            {t("Learn more at opensre.in →")}
           </a>
         </div>
       </div>

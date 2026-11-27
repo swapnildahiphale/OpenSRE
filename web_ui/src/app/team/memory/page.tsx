@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { ArrowRight, Search } from 'lucide-react';
 import { formatRelativeTime } from '@/lib/formatRelativeTime';
 import { Panel, Skeleton, listRowHoverClass } from '@/components/ui-flow';
+import { useLocale } from '@/lib/i18n/LocaleProvider';
 
 interface IssueTypeCount {
   issue_type: string;
@@ -70,6 +71,7 @@ function ResolutionPill({ resolved }: { resolved: boolean }) {
 }
 
 export default function MemoryPage() {
+  const { t } = useLocale();
   const router = useRouter();
   const [overview, setOverview] = useState<MemoryOverview | null>(null);
   const [loading, setLoading] = useState(true);
@@ -153,11 +155,11 @@ export default function MemoryPage() {
             <div className="relative flex-1 flex flex-col">
               <div className="flex items-center justify-between">
                 <span className="text-[11px] uppercase tracking-[0.22em] text-slate-500">
-                  Total episodes
+                  {t("Total episodes")}
                 </span>
                 {data.episodes_this_week > 0 && (
                   <span className="inline-flex items-center h-7 px-3 rounded-full text-xs font-medium bg-emerald-100/70 text-emerald-800 border border-emerald-200/80">
-                    Growing
+                    {t("Growing")}
                   </span>
                 )}
               </div>
@@ -167,7 +169,7 @@ export default function MemoryPage() {
                 </span>
                 {data.episodes_this_week > 0 && (
                   <span className="text-emerald-600 font-mono text-sm font-medium">
-                    / +{data.episodes_this_week} this week
+                    / +{data.episodes_this_week}{' '}{t("this week")}
                   </span>
                 )}
               </div>
@@ -188,7 +190,7 @@ export default function MemoryPage() {
                     {data.resolved}
                   </div>
                   <div className="text-slate-500 mt-0.5 text-[11px] uppercase tracking-wider">
-                    resolved
+                    {t("resolved")}
                   </div>
                 </div>
                 <div>
@@ -196,7 +198,7 @@ export default function MemoryPage() {
                     {data.unresolved}
                   </div>
                   <div className="text-slate-500 mt-0.5 text-[11px] uppercase tracking-wider">
-                    unresolved
+                    {t("unresolved")}
                   </div>
                 </div>
                 <div>
@@ -204,7 +206,7 @@ export default function MemoryPage() {
                     {patternCount}
                   </div>
                   <div className="text-slate-500 mt-0.5 text-[11px] uppercase tracking-wider">
-                    patterns
+                    {t("patterns")}
                   </div>
                 </div>
               </div>
@@ -217,24 +219,24 @@ export default function MemoryPage() {
             href="/team/memory/episodes"
             className="border-t border-slate-200 pt-6 block hover:text-emerald-700 transition-colors"
           >
-            <div className="text-[11px] uppercase tracking-[0.22em] text-slate-500">Resolution</div>
+            <div className="text-[11px] uppercase tracking-[0.22em] text-slate-500">{t("Resolution")}</div>
             <div className="mt-4 text-4xl font-medium tracking-tight font-mono tabular-nums text-slate-900">
               {data.resolution_rate}%
             </div>
-            <div className="mt-2 text-xs text-slate-400">root cause identified</div>
+            <div className="mt-2 text-xs text-slate-400">{t("root cause identified")}</div>
           </Link>
           <Link
             href="/team/memory/strategies"
             className="border-t border-slate-200 pt-6 block hover:text-emerald-700 transition-colors"
           >
-            <div className="text-[11px] uppercase tracking-[0.22em] text-slate-500">Strategies</div>
+            <div className="text-[11px] uppercase tracking-[0.22em] text-slate-500">{t("Strategies")}</div>
             <div className="mt-4 text-4xl font-medium tracking-tight font-mono tabular-nums text-slate-900">
               {data.strategy_count}
             </div>
-            <div className="mt-2 text-xs text-slate-400">playbooks learned</div>
+            <div className="mt-2 text-xs text-slate-400">{t("playbooks learned")}</div>
           </Link>
           <div className="border-t border-slate-200 pt-6">
-            <div className="text-[11px] uppercase tracking-[0.22em] text-slate-500">Top pattern</div>
+            <div className="text-[11px] uppercase tracking-[0.22em] text-slate-500">{t("Top pattern")}</div>
             {topPattern ? (
               <>
                 <div className="mt-4 text-4xl font-medium tracking-tight font-mono tabular-nums text-slate-900">
@@ -260,19 +262,19 @@ export default function MemoryPage() {
       <section className="grid grid-cols-12 gap-8">
         <div className="col-span-12 md:col-span-8">
           <div className="flex items-end justify-between mb-4">
-            <h2 className="text-xl font-medium tracking-tight text-slate-900">Recent episodes</h2>
+            <h2 className="text-xl font-medium tracking-tight text-slate-900">{t("Recent episodes")}</h2>
             <Link
               href="/team/memory/episodes"
               className="text-sm text-emerald-700 font-medium hover:underline inline-flex items-center gap-1"
             >
-              All episodes
+              {t("All episodes")}
               <ArrowRight className="w-3.5 h-3.5" />
             </Link>
           </div>
           <Panel className="rounded-[2.5rem] shadow-[0_20px_40px_-15px_rgba(15,23,42,0.05)]">
             {data.recent_episodes.length === 0 ? (
               <p className="px-5 py-10 text-sm text-slate-500 text-center">
-                No episodes yet. Run an investigation to start building memory.
+                {t("No episodes yet. Run an investigation to start building memory.")}
               </p>
             ) : (
               <ul className="divide-y divide-slate-100">
@@ -337,10 +339,10 @@ export default function MemoryPage() {
         <aside className="col-span-12 md:col-span-4 space-y-8">
           <div>
             <div className="text-[11px] uppercase tracking-[0.22em] text-slate-500 mb-4">
-              Issue types
+              {t("Issue types")}
             </div>
             {data.issue_type_counts.length === 0 ? (
-              <p className="text-sm text-slate-500">No issue types recorded yet.</p>
+              <p className="text-sm text-slate-500">{t("No issue types recorded yet.")}</p>
             ) : (
               <div className="flex flex-wrap gap-1.5">
                 {visibleIssueTypes.map((row, i) => (
@@ -361,8 +363,8 @@ export default function MemoryPage() {
                     type="button"
                     onClick={expandIssueTypes}
                     className="inline-flex items-center h-7 px-2.5 rounded-full text-xs font-medium font-mono border border-slate-200/70 bg-slate-50 text-slate-500 hover:bg-slate-100 hover:border-slate-300 hover:text-slate-600 transition"
-                    aria-label="Show more issue types"
-                    title="Show more issue types"
+                    aria-label={t("Show more issue types")}
+                    title={t("Show more issue types")}
                   >
                     …
                   </button>
@@ -373,7 +375,7 @@ export default function MemoryPage() {
 
           <div>
             <div className="text-[11px] uppercase tracking-[0.22em] text-slate-500 mb-4">
-              Semantic search
+              {t("Semantic search")}
             </div>
             <form onSubmit={handleSidebarSearch} className="relative">
               <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
@@ -381,11 +383,11 @@ export default function MemoryPage() {
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search past investigations…"
+                placeholder={t("Search past investigations…")}
                 className="w-full h-11 pl-10 pr-4 rounded-full border border-slate-200/80 bg-white text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-300"
               />
             </form>
-            <p className="mt-2 text-xs text-slate-400">Opens the Search tab with your query</p>
+            <p className="mt-2 text-xs text-slate-400">{t("Opens the Search tab with your query")}</p>
           </div>
         </aside>
       </section>
@@ -394,11 +396,11 @@ export default function MemoryPage() {
       <section className="grid grid-cols-12 gap-8">
         <div className="col-span-12 md:col-span-5">
           <div className="text-[11px] uppercase tracking-[0.22em] text-slate-500 mb-4">
-            Pattern activity · 14d
+            {t("Pattern activity · 14d")}
           </div>
           <div className="rounded-[2.5rem] border border-slate-200/70 p-6 overflow-hidden relative bg-white shadow-[0_20px_40px_-15px_rgba(15,23,42,0.05)]">
             {data.issue_type_counts.length === 0 ? (
-              <p className="text-sm text-slate-500">No pattern activity yet.</p>
+              <p className="text-sm text-slate-500">{t("No pattern activity yet.")}</p>
             ) : (
               <>
                 <div className="absolute right-6 top-6 font-mono text-[11px] text-slate-400">
@@ -429,17 +431,17 @@ export default function MemoryPage() {
         <div className="col-span-12 md:col-span-7">
           <div className="flex items-end justify-between mb-4">
             <div className="text-[11px] uppercase tracking-[0.22em] text-slate-500">
-              Latest strategies
+              {t("Latest strategies")}
             </div>
             <Link
               href="/team/memory/strategies"
               className="text-sm text-emerald-700 font-medium hover:underline"
             >
-              Strategies →
+              {t("Strategies →")}
             </Link>
           </div>
           {data.latest_strategies.length === 0 ? (
-            <p className="text-sm text-slate-500">No strategies generated yet.</p>
+            <p className="text-sm text-slate-500">{t("No strategies generated yet.")}</p>
           ) : (
             <ul className="divide-y divide-slate-100">
               {data.latest_strategies.map((st) => (
@@ -460,7 +462,7 @@ export default function MemoryPage() {
                       href="/team/memory/strategies"
                       className="text-sm text-slate-700 leading-relaxed hover:text-emerald-700 transition-colors"
                     >
-                      View playbook →
+                      {t("View playbook →")}
                     </Link>
                   </div>
                 </li>

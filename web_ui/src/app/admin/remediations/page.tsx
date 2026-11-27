@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useIdentity } from '@/lib/useIdentity';
+import { useLocale } from '@/lib/i18n/LocaleProvider';
 
 interface Remediation {
   id: string;
@@ -48,6 +49,7 @@ const actionIcons: Record<string, string> = {
 };
 
 export default function RemediationsPage() {
+  const { t } = useLocale();
   const { identity, loading: authLoading } = useIdentity();
   const [remediations, setRemediations] = useState<Remediation[]>([]);
   const [loading, setLoading] = useState(true);
@@ -151,16 +153,16 @@ export default function RemediationsPage() {
       {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="text-3xl font-bold text-stone-900">Remediation Queue</h1>
+          <h1 className="text-3xl font-bold text-stone-900">{t("Remediation Queue")}</h1>
           <p className="text-stone-600 mt-1">
-            Review and approve auto-remediation actions proposed by agents
+            {t("Review and approve auto-remediation actions proposed by agents")}
           </p>
         </div>
         
         {criticalCount > 0 && (
           <div className="bg-red-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 animate-pulse">
             <span className="text-xl">🚨</span>
-            <span className="font-semibold">{criticalCount} Critical</span>
+            <span className="font-semibold">{criticalCount}{' '}{t("Critical")}</span>
           </div>
         )}
       </div>
@@ -169,25 +171,25 @@ export default function RemediationsPage() {
       <div className="grid grid-cols-4 gap-4 mb-6">
         <div className="bg-forest-light/10 rounded-lg p-4">
           <div className="text-2xl font-bold text-forest">{pendingCount}</div>
-          <div className="text-sm text-forest-dark">Pending Approval</div>
+          <div className="text-sm text-forest-dark">{t("Pending Approval")}</div>
         </div>
         <div className="bg-green-50 rounded-lg p-4">
           <div className="text-2xl font-bold text-green-600">
             {remediations.filter(r => r.status === 'executed').length}
           </div>
-          <div className="text-sm text-green-800">Executed</div>
+          <div className="text-sm text-green-800">{t("Executed")}</div>
         </div>
         <div className="bg-stone-50 rounded-lg p-4">
           <div className="text-2xl font-bold text-stone-600">
             {remediations.filter(r => r.status === 'rejected').length}
           </div>
-          <div className="text-sm text-stone-800">Rejected</div>
+          <div className="text-sm text-stone-800">{t("Rejected")}</div>
         </div>
         <div className="bg-clay-light/10 rounded-lg p-4">
           <div className="text-2xl font-bold text-clay">
             {remediations.filter(r => r.status === 'failed').length}
           </div>
-          <div className="text-sm text-red-800">Failed</div>
+          <div className="text-sm text-red-800">{t("Failed")}</div>
         </div>
       </div>
 
@@ -213,7 +215,7 @@ export default function RemediationsPage() {
         {remediations.length === 0 ? (
           <div className="text-center py-12 bg-stone-50 rounded-lg">
             <div className="text-4xl mb-4">✅</div>
-            <div className="text-stone-600">No remediations {filter !== 'all' ? `with status "${filter}"` : ''}</div>
+            <div className="text-stone-600">{t("No remediations")}{' '}{filter !== 'all' ? `with status "${filter}"` : ''}</div>
           </div>
         ) : (
           remediations.map((rem) => (
@@ -252,7 +254,7 @@ export default function RemediationsPage() {
                   
                   {rem.parameters && Object.keys(rem.parameters).length > 0 && (
                     <div className="text-sm text-stone-500 mb-2">
-                      <span className="font-medium">Parameters:</span>{' '}
+                      <span className="font-medium">{t("Parameters:")}</span>{' '}
                       <code className="bg-stone-100 px-2 py-1 rounded">
                         {JSON.stringify(rem.parameters)}
                       </code>
@@ -260,19 +262,19 @@ export default function RemediationsPage() {
                   )}
                   
                   <div className="text-sm text-stone-500">
-                    Proposed {new Date(rem.proposed_at).toLocaleString()}
+                    {t("Proposed")}{' '}{new Date(rem.proposed_at).toLocaleString()}
                     {rem.proposed_by && ` by ${rem.proposed_by}`}
                   </div>
                   
                   {rem.execution_error && (
                     <div className="mt-3 p-3 bg-clay-light/10 rounded text-clay-dark text-sm">
-                      <span className="font-medium">Error:</span> {rem.execution_error}
+                      <span className="font-medium">{t("Error:")}</span> {rem.execution_error}
                     </div>
                   )}
                   
                   {rem.execution_result && (
                     <div className="mt-3 p-3 bg-green-50 rounded text-green-700 text-sm">
-                      <span className="font-medium">Result:</span>{' '}
+                      <span className="font-medium">{t("Result:")}</span>{' '}
                       <code>{JSON.stringify(rem.execution_result)}</code>
                     </div>
                   )}
@@ -285,7 +287,7 @@ export default function RemediationsPage() {
                         onClick={() => setSelectedRemediation(rem)}
                         className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium"
                       >
-                        Review
+                        {t("Review")}
                       </button>
                     </>
                   )}
@@ -295,7 +297,7 @@ export default function RemediationsPage() {
                       onClick={() => handleRollback(rem)}
                       className="px-4 py-2 bg-forest text-white rounded-lg hover:bg-forest-dark font-medium"
                     >
-                      Rollback
+                      {t("Rollback")}
                     </button>
                   )}
                 </div>
@@ -311,14 +313,14 @@ export default function RemediationsPage() {
           <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
             <div className="p-6 border-b">
               <h2 className="text-xl font-bold text-stone-900">
-                Review Remediation
+                {t("Review Remediation")}
               </h2>
             </div>
             
             <div className="p-6 space-y-4">
               <div>
                 <label className="block text-sm font-medium text-stone-700 mb-1">
-                  Action
+                  {t("Action")}
                 </label>
                 <div className="flex items-center gap-2">
                   <span className="text-2xl">
@@ -332,7 +334,7 @@ export default function RemediationsPage() {
               
               <div>
                 <label className="block text-sm font-medium text-stone-700 mb-1">
-                  Target
+                  {t("Target")}
                 </label>
                 <code className="block bg-stone-100 px-3 py-2 rounded font-mono">
                   {selectedRemediation.target}
@@ -341,7 +343,7 @@ export default function RemediationsPage() {
               
               <div>
                 <label className="block text-sm font-medium text-stone-700 mb-1">
-                  Reason
+                  {t("Reason")}
                 </label>
                 <p className="text-stone-700 bg-stone-50 p-3 rounded">
                   {selectedRemediation.reason}
@@ -351,7 +353,7 @@ export default function RemediationsPage() {
               {selectedRemediation.rollback_action && (
                 <div>
                   <label className="block text-sm font-medium text-stone-700 mb-1">
-                    Rollback Plan
+                    {t("Rollback Plan")}
                   </label>
                   <p className="text-stone-600 bg-yellow-50 p-3 rounded">
                     {selectedRemediation.rollback_action}
@@ -361,14 +363,14 @@ export default function RemediationsPage() {
               
               <div>
                 <label className="block text-sm font-medium text-stone-700 mb-1">
-                  Comment (optional)
+                  {t("Comment (optional)")}
                 </label>
                 <textarea
                   value={reviewComment}
                   onChange={(e) => setReviewComment(e.target.value)}
                   className="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-forest focus:border-forest"
                   rows={3}
-                  placeholder="Add a comment..."
+                  placeholder={t("Add a comment...")}
                 />
               </div>
             </div>
@@ -382,7 +384,7 @@ export default function RemediationsPage() {
                 className="px-4 py-2 text-stone-700 bg-white border rounded-lg hover:bg-stone-50"
                 disabled={reviewing}
               >
-                Cancel
+                {t("Cancel")}
               </button>
               <button
                 onClick={() => handleReview('reject')}

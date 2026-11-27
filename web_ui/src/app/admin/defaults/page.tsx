@@ -22,6 +22,7 @@ import {
   AlertTriangle,
   Building,
 } from 'lucide-react';
+import { useLocale } from '@/lib/i18n/LocaleProvider';
 
 interface MCPServer {
   name: string;
@@ -39,6 +40,7 @@ interface AgentPrompt {
 }
 
 export default function OrgDefaultsPage() {
+  const { t } = useLocale();
   const { identity } = useIdentity();
   const [activeTab, setActiveTab] = useState<'prompts' | 'mcps'>('prompts');
   const [loading, setLoading] = useState(true);
@@ -395,7 +397,7 @@ export default function OrgDefaultsPage() {
                               onClick={() => setEditingAgent(null)}
                               className="px-4 py-2 text-sm text-stone-600 dark:text-stone-400"
                             >
-                              Cancel
+                              {t("Cancel")}
                             </button>
                             <button
                               onClick={() => handleSavePrompt(agent)}
@@ -421,7 +423,7 @@ export default function OrgDefaultsPage() {
                                     className="flex items-center gap-1 px-3 py-1 text-xs text-clay hover:text-clay-dark"
                                   >
                                     <Trash2 className="w-3 h-3" />
-                                    Remove
+                                    {t("Remove")}
                                   </button>
                                 )}
                                 <button
@@ -508,7 +510,7 @@ export default function OrgDefaultsPage() {
                           onChange={() => handleToggleMcp(index)}
                           className="rounded"
                         />
-                        <span className="text-xs text-stone-500">Enabled</span>
+                        <span className="text-xs text-stone-500">{t("Enabled")}</span>
                       </label>
                       <button
                         onClick={() => handleDeleteMcp(index)}
@@ -530,7 +532,7 @@ export default function OrgDefaultsPage() {
                   <h3 className="text-lg font-semibold mb-4">Add Default MCP Server</h3>
                   <div className="space-y-4">
                     <div>
-                      <label className="block text-sm text-stone-600 dark:text-stone-400 mb-1">Name</label>
+                      <label className="block text-sm text-stone-600 dark:text-stone-400 mb-1">{t("Name")}</label>
                       <input
                         value={newMcp.name}
                         onChange={(e) => setNewMcp({ ...newMcp, name: e.target.value })}
@@ -576,7 +578,7 @@ export default function OrgDefaultsPage() {
                     )}
                     {newMcp.transport === 'stdio' && (
                       <div>
-                        <label className="block text-sm text-stone-600 dark:text-stone-400 mb-1">Command</label>
+                        <label className="block text-sm text-stone-600 dark:text-stone-400 mb-1">{t("Command")}</label>
                         <input
                           value={newMcp.command || ''}
                           onChange={(e) => setNewMcp({ ...newMcp, command: e.target.value })}
@@ -591,7 +593,7 @@ export default function OrgDefaultsPage() {
                       onClick={() => setShowAddMcp(false)}
                       className="px-4 py-2 text-sm bg-stone-100 dark:bg-stone-700 rounded-lg"
                     >
-                      Cancel
+                      {t("Cancel")}
                     </button>
                     <button
                       onClick={handleAddMcp}

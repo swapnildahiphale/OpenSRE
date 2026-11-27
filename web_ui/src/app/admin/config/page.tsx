@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import Link from 'next/link';
 import { useIdentity } from '@/lib/useIdentity';
 import { Eye, EyeOff, Check, X, AlertTriangle, Settings, Network, Code, Bot, Sparkles, ExternalLink, ArrowLeft, Home, LayoutTemplate, Plus, Trash2, ToggleLeft, ToggleRight, Server, Zap, Brain, Wrench, Users, Loader2, CheckCircle, XCircle } from 'lucide-react';
+import { useLocale } from '@/lib/i18n/LocaleProvider';
 
 interface AgentConfig {
   id: string;
@@ -200,6 +201,7 @@ function AgentNode({
 }
 
 export default function AdminConfigPage() {
+  const { t } = useLocale();
   const { identity, loading: identityLoading } = useIdentity();
   const [activeTab, setActiveTab] = useState<ConfigTab>('agents');
   const [effectiveConfig, setEffectiveConfig] = useState<EffectiveConfig | null>(null);
@@ -783,7 +785,7 @@ export default function AdminConfigPage() {
   if (identityLoading || loading) {
     return (
       <div className="min-h-screen bg-stone-950 text-stone-100 p-8">
-        <div className="animate-pulse">Loading configuration...</div>
+        <div className="animate-pulse">{t("Loading configuration...")}</div>
       </div>
     );
   }
@@ -792,7 +794,7 @@ export default function AdminConfigPage() {
     return (
       <div className="min-h-screen bg-stone-950 text-stone-100 p-8">
         <div className="text-red-400">
-          No organization found. Use an org-scoped admin token to access configurations.
+          {t("No organization found. Use an org-scoped admin token to access configurations.")}
         </div>
       </div>
     );
@@ -808,10 +810,10 @@ export default function AdminConfigPage() {
             className="flex items-center gap-1.5 text-stone-400 hover:text-white transition-colors"
           >
             <Home className="w-4 h-4" />
-            <span>Admin Dashboard</span>
+            <span>{t("Admin Dashboard")}</span>
           </Link>
           <span className="text-stone-600">/</span>
-          <span className="text-white">Configuration</span>
+          <span className="text-white">{t("Configuration")}</span>
         </div>
       </div>
 
@@ -819,15 +821,15 @@ export default function AdminConfigPage() {
       <div className="border-b border-stone-800 bg-stone-900/50 px-8 py-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-white">Configuration</h1>
+            <h1 className="text-2xl font-bold text-white">{t("Configuration")}</h1>
             <p className="text-stone-400 mt-1">
-              Manage agent, tool, and integration settings
+              {t("Manage agent, tool, and integration settings")}
             </p>
           </div>
           
           {/* Node Selector */}
           <div className="flex items-center gap-4">
-            <label className="text-sm text-stone-400">Viewing:</label>
+            <label className="text-sm text-stone-400">{t("Viewing:")}</label>
             <select
               value={selectedNode}
               onChange={(e) => setSelectedNode(e.target.value)}
@@ -885,7 +887,7 @@ export default function AdminConfigPage() {
           <div className="space-y-6">
             <div className="flex items-center justify-between">
               <div>
-                <h2 className="text-lg font-semibold text-white">Agent Configuration</h2>
+                <h2 className="text-lg font-semibold text-white">{t("Agent Configuration")}</h2>
                 {selectedNode === identity?.org_id && (
                   <p className="text-sm text-forest-light mt-1">
                     🌐 Org-Level Configuration - All teams inherit these settings
@@ -897,10 +899,10 @@ export default function AdminConfigPage() {
                 <button
                   onClick={() => window.location.href = '/admin/templates'}
                   className="flex items-center gap-2 px-4 py-2.5 bg-stone-800 hover:bg-stone-700 text-stone-300 rounded-lg transition-all"
-                  title="View agent templates marketplace"
+                  title={t("View agent templates marketplace")}
                 >
                   <LayoutTemplate className="w-4 h-4" />
-                  Templates
+                  {t("Templates")}
                 </button>
                 {/* Add Agent Button */}
                 <div className="relative">
@@ -909,7 +911,7 @@ export default function AdminConfigPage() {
                     className="flex items-center gap-2 px-4 py-2.5 bg-forest hover:bg-forest-light/100 text-white rounded-lg transition-all"
                   >
                     <span className="text-lg leading-none">+</span>
-                    Add Agent
+                    {t("Add Agent")}
                   </button>
                   {showAgentTypeMenu && (
                     <div className="absolute right-0 mt-2 w-56 bg-stone-800 rounded-lg shadow-xl border border-stone-700 z-50">
@@ -922,8 +924,8 @@ export default function AdminConfigPage() {
                       >
                         <Bot className="w-4 h-4 text-forest-light" />
                         <div>
-                          <div className="text-sm font-medium text-white">Add Local Agent</div>
-                          <div className="text-xs text-stone-400">Create a new internal agent</div>
+                          <div className="text-sm font-medium text-white">{t("Add Local Agent")}</div>
+                          <div className="text-xs text-stone-400">{t("Create a new internal agent")}</div>
                         </div>
                       </button>
                       <button
@@ -935,8 +937,8 @@ export default function AdminConfigPage() {
                       >
                         <ExternalLink className="w-4 h-4 text-forest" />
                         <div>
-                          <div className="text-sm font-medium text-white">Add Remote A2A Agent</div>
-                          <div className="text-xs text-stone-400">Integrate external AI agent</div>
+                          <div className="text-sm font-medium text-white">{t("Add Remote A2A Agent")}</div>
+                          <div className="text-xs text-stone-400">{t("Integrate external AI agent")}</div>
                         </div>
                       </button>
                     </div>
@@ -953,7 +955,7 @@ export default function AdminConfigPage() {
                     }`}
                   >
                     <Network className="w-4 h-4" />
-                    Visual
+                    {t("Visual")}
                   </button>
                   <button
                     onClick={() => setAgentViewMode('json')}
@@ -1052,15 +1054,15 @@ export default function AdminConfigPage() {
                         <div className="flex items-center gap-4 text-xs text-stone-400">
                           <div className="flex items-center gap-1.5">
                             <div className="w-2.5 h-2.5 rounded-full bg-green-500" />
-                            <span>Enabled</span>
+                            <span>{t("Enabled")}</span>
                           </div>
                           <div className="flex items-center gap-1.5">
                             <Sparkles className="w-3 h-3 text-amber-500" />
-                            <span>Entrance Agent</span>
+                            <span>{t("Entrance Agent")}</span>
                           </div>
                           <div className="flex items-center gap-1.5">
                             <div className="w-6 h-px bg-stone-500" />
-                            <span>→ Uses</span>
+                            <span>{t("→ Uses")}</span>
                           </div>
                         </div>
                       </div>
@@ -1068,7 +1070,7 @@ export default function AdminConfigPage() {
                       {/* Click hint */}
                       {!selectedAgentId && (
                         <div className="absolute bottom-4 right-4 text-xs text-stone-500">
-                          Click an agent to configure
+                          {t("Click an agent to configure")}
                         </div>
                       )}
                     </div>
@@ -1112,12 +1114,12 @@ export default function AdminConfigPage() {
                               {agentDraft.enabled ? (
                                 <>
                                   <ToggleRight className="w-4 h-4" />
-                                  On
+                                  {t("On")}
                                 </>
                               ) : (
                                 <>
                                   <ToggleLeft className="w-4 h-4" />
-                                  Off
+                                  {t("Off")}
                                 </>
                               )}
                             </button>
@@ -1144,7 +1146,7 @@ export default function AdminConfigPage() {
                             <div className="flex items-center gap-2">
                               <span className="text-xs px-2 py-1 rounded-full bg-forest/30 text-forest-light flex items-center gap-1">
                                 <Sparkles className="w-3 h-3" />
-                                Orchestrator
+                                {t("Orchestrator")}
                               </span>
                             </div>
                           );
@@ -1156,13 +1158,13 @@ export default function AdminConfigPage() {
                           <div className="bg-stone-800 rounded-xl p-4 border border-stone-700">
                             <div className="flex items-center gap-2 mb-4">
                               <Zap className="w-5 h-5 text-yellow-500" />
-                              <h3 className="font-semibold text-white">Model</h3>
+                              <h3 className="font-semibold text-white">{t("Model")}</h3>
                             </div>
 
                             <div className="grid grid-cols-2 gap-4">
                               <div>
                                 <label className="block text-xs font-medium text-stone-500 mb-1">
-                                  Model Name
+                                  {t("Model Name")}
                                 </label>
                                 <select
                                   value={agentDraft.model?.name || 'inherit'}
@@ -1174,7 +1176,7 @@ export default function AdminConfigPage() {
                                   }
                                   className="w-full px-3 py-2 text-sm rounded-lg border border-stone-600 bg-stone-900 text-white"
                                 >
-                                  <option value="inherit">inherit</option>
+                                  <option value="inherit">{t("inherit")}</option>
                                   <option value="sonnet">sonnet</option>
                                   <option value="opus">opus</option>
                                   <option value="haiku">haiku</option>
@@ -1183,7 +1185,7 @@ export default function AdminConfigPage() {
 
                               <div>
                                 <label className="block text-xs font-medium text-stone-500 mb-1">
-                                  Max Turns
+                                  {t("Max Turns")}
                                 </label>
                                 <input
                                   type="number"
@@ -1208,7 +1210,7 @@ export default function AdminConfigPage() {
                               <div className="flex items-center gap-2">
                                 <Brain className="w-5 h-5 text-forest" />
                                 <h3 className="font-semibold text-white">
-                                  System Prompt
+                                  {t("System Prompt")}
                                 </h3>
                               </div>
                               <button
@@ -1218,12 +1220,12 @@ export default function AdminConfigPage() {
                                 {showPrompt ? (
                                   <>
                                     <EyeOff className="w-4 h-4" />
-                                    Hide
+                                    {t("Hide")}
                                   </>
                                 ) : (
                                   <>
                                     <Eye className="w-4 h-4" />
-                                    Show / Edit
+                                    {t("Show / Edit")}
                                   </>
                                 )}
                               </button>
@@ -1241,7 +1243,7 @@ export default function AdminConfigPage() {
                                   }
                                   rows={12}
                                   className="w-full px-3 py-2 text-sm font-mono rounded-lg border border-stone-600 bg-stone-900 text-white resize-y"
-                                  placeholder="Enter system prompt..."
+                                  placeholder={t("Enter system prompt...")}
                                 />
                               </div>
                             ) : (
@@ -1258,7 +1260,7 @@ export default function AdminConfigPage() {
                             <div className="flex items-center justify-between mb-4">
                               <div className="flex items-center gap-2">
                                 <Wrench className="w-5 h-5 text-forest" />
-                                <h3 className="font-semibold text-white">Tools</h3>
+                                <h3 className="font-semibold text-white">{t("Tools")}</h3>
                               </div>
                               <button
                                 onClick={() => setShowToolPicker(!showToolPicker)}
@@ -1267,12 +1269,12 @@ export default function AdminConfigPage() {
                                 {showToolPicker ? (
                                   <>
                                     <EyeOff className="w-4 h-4" />
-                                    Hide
+                                    {t("Hide")}
                                   </>
                                 ) : (
                                   <>
                                     <Eye className="w-4 h-4" />
-                                    Manage Tools
+                                    {t("Manage Tools")}
                                   </>
                                 )}
                               </button>
@@ -1467,7 +1469,7 @@ export default function AdminConfigPage() {
                               <div className="flex items-center gap-2">
                                 <Server className="w-5 h-5 text-forest" />
                                 <h3 className="font-semibold text-white">
-                                  MCP Servers
+                                  {t("MCP Servers")}
                                 </h3>
                                 <span className="text-xs text-stone-500">
                                   (click to enable/disable)
@@ -1588,10 +1590,10 @@ export default function AdminConfigPage() {
                               <div className="flex items-center gap-2">
                                 <Users className="w-5 h-5 text-indigo-500" />
                                 <h3 className="font-semibold text-white">
-                                  Sub-Agents
+                                  {t("Sub-Agents")}
                                 </h3>
                                 <span className="text-xs text-stone-500">
-                                  (click to add/remove)
+                                  {t("(click to add/remove)")}
                                 </span>
                               </div>
                             </div>
@@ -1684,7 +1686,7 @@ export default function AdminConfigPage() {
 
                                       return (
                                         <div>
-                                          <div className="text-xs text-stone-500 mb-2">Add sub-agent:</div>
+                                          <div className="text-xs text-stone-500 mb-2">{t("Add sub-agent:")}</div>
                                           <div className="flex flex-wrap gap-2">
                                             {availableToAdd.map((agentId) => {
                                               const agent = combinedAgents[agentId];
@@ -1750,13 +1752,13 @@ export default function AdminConfigPage() {
             {agentViewMode === 'json' && (
               <div className="grid grid-cols-2 gap-6">
                 <div className="space-y-3">
-                  <h3 className="text-sm font-medium text-stone-400">Effective Configuration</h3>
+                  <h3 className="text-sm font-medium text-stone-400">{t("Effective Configuration")}</h3>
                   <pre className="bg-stone-900 border border-stone-800 rounded-lg p-4 text-xs font-mono overflow-auto max-h-[500px] text-stone-300">
                     {JSON.stringify({ agents: effectiveConfig.agents }, null, 2)}
                   </pre>
                 </div>
                 <div className="space-y-3">
-                  <h3 className="text-sm font-medium text-stone-400">Raw Configuration</h3>
+                  <h3 className="text-sm font-medium text-stone-400">{t("Raw Configuration")}</h3>
                   <pre className="bg-stone-900 border border-stone-800 rounded-lg p-4 text-xs font-mono overflow-auto max-h-[500px] text-stone-300">
                     {JSON.stringify(rawConfig?.config?.agents || {}, null, 2)}
                   </pre>
@@ -1771,7 +1773,7 @@ export default function AdminConfigPage() {
           <div className="space-y-6">
             <div className="flex items-center justify-between">
               <div>
-                <h2 className="text-lg font-semibold text-white">Built-in Tools</h2>
+                <h2 className="text-lg font-semibold text-white">{t("Built-in Tools")}</h2>
                 <p className="text-sm text-stone-400 mt-1">
                   {toolMetadata.length} tools available across all categories
                 </p>
@@ -1836,7 +1838,7 @@ export default function AdminConfigPage() {
                                 {isEnabled ? (
                                   <>
                                     <ToggleRight className="w-4 h-4 text-green-500" />
-                                    <span className="text-xs text-green-500">Enabled</span>
+                                    <span className="text-xs text-green-500">{t("Enabled")}</span>
                                   </>
                                 ) : (
                                   <>
@@ -1861,7 +1863,7 @@ export default function AdminConfigPage() {
         {activeTab === 'mcps' && effectiveConfig && (
           <div className="space-y-6">
             <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-white">MCP Servers</h2>
+              <h2 className="text-lg font-semibold text-white">{t("MCP Servers")}</h2>
               <button
                 onClick={() => setShowAddMcpModal(true)}
                 className="flex items-center gap-2 px-4 py-2.5 bg-forest hover:bg-forest-light/100 text-white rounded-lg transition-all"
@@ -1885,7 +1887,7 @@ export default function AdminConfigPage() {
                         <span className="text-white">{mcp.name || id}</span>
                         <span className="text-xs text-stone-500">{mcp.type || 'mcp'}</span>
                       </div>
-                      <span className="text-xs text-stone-500">Inherited</span>
+                      <span className="text-xs text-stone-500">{t("Inherited")}</span>
                     </div>
                   ))}
                 </div>
@@ -1893,7 +1895,7 @@ export default function AdminConfigPage() {
 
               {Object.keys((effectiveConfig.mcp_servers as Record<string, any>) || {}).length > 0 && (
                 <div>
-                  <h3 className="text-sm font-medium text-stone-400 mb-2">MCP Servers</h3>
+                  <h3 className="text-sm font-medium text-stone-400 mb-2">{t("MCP Servers")}</h3>
                   <div className="grid gap-2">
                     {Object.entries((effectiveConfig.mcp_servers as Record<string, any>) || {}).map(([id, mcp]) => (
                       <div
@@ -1927,7 +1929,7 @@ export default function AdminConfigPage() {
           <div className="space-y-6">
             <div className="flex items-center justify-between">
               <div>
-                <h2 className="text-lg font-semibold text-white">Integrations</h2>
+                <h2 className="text-lg font-semibold text-white">{t("Integrations")}</h2>
                 <p className="text-sm text-stone-400 mt-1">
                   Configure third-party service connections. Click Configure to set credentials.
                 </p>
@@ -1993,7 +1995,7 @@ export default function AdminConfigPage() {
                         className="flex items-center gap-2 px-4 py-2 text-sm bg-stone-800 hover:bg-stone-700 rounded-lg transition-colors"
                       >
                         <Settings className="w-4 h-4" />
-                        Configure
+                        {t("Configure")}
                       </button>
                     </div>
                   </div>
@@ -2007,7 +2009,7 @@ export default function AdminConfigPage() {
         {activeTab === 'raw' && rawConfig && (
           <div className="space-y-6">
             <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-white">Raw Configuration</h2>
+              <h2 className="text-lg font-semibold text-white">{t("Raw Configuration")}</h2>
               <div className="text-sm text-stone-400">
                 Version {rawConfig.version} • 
                 {rawConfig.updated_at && ` Updated ${new Date(rawConfig.updated_at).toLocaleString()}`}
@@ -2038,7 +2040,7 @@ export default function AdminConfigPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <h2 className="text-xl font-semibold text-white">
-                    Configure {integrationSchemas[editingIntegration].name}
+                    {t("Configure")}{' '}{integrationSchemas[editingIntegration].name}
                   </h2>
                   <p className="text-sm text-stone-400 mt-1">
                     {integrationSchemas[editingIntegration].description}
@@ -2224,7 +2226,7 @@ export default function AdminConfigPage() {
                 }}
                 className="px-4 py-2 text-stone-400 hover:text-white transition-colors"
               >
-                Cancel
+                {t("Cancel")}
               </button>
               <button
                 onClick={saveIntegrationConfig}
@@ -2243,13 +2245,13 @@ export default function AdminConfigPage() {
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
           <div className="bg-stone-900 border border-stone-700 rounded-xl w-full max-w-md">
             <div className="p-6 border-b border-stone-800">
-              <h2 className="text-xl font-semibold text-white">Add New Agent</h2>
+              <h2 className="text-xl font-semibold text-white">{t("Add New Agent")}</h2>
             </div>
 
             <div className="p-6 space-y-4">
               <div>
                 <label className="block text-sm font-medium text-stone-400 mb-2">
-                  Agent ID *
+                  {t("Agent ID *")}
                 </label>
                 <input
                   type="text"
@@ -2273,7 +2275,7 @@ export default function AdminConfigPage() {
                 }}
                 className="px-4 py-2 bg-stone-800 hover:bg-stone-700 text-white rounded-lg transition-colors"
               >
-                Cancel
+                {t("Cancel")}
               </button>
               <button
                 onClick={handleCreateAgent}
@@ -2295,7 +2297,7 @@ export default function AdminConfigPage() {
               <div className="flex items-center gap-2">
                 <ExternalLink className="w-5 h-5 text-forest" />
                 <h3 className="text-lg font-semibold text-white">
-                  Add Remote A2A Agent
+                  {t("Add Remote A2A Agent")}
                 </h3>
               </div>
               <button
@@ -2322,7 +2324,7 @@ export default function AdminConfigPage() {
               {/* ID */}
               <div>
                 <label className="block text-sm font-medium text-stone-400 mb-1">
-                  Agent ID *
+                  {t("Agent ID *")}
                 </label>
                 <input
                   type="text"
@@ -2336,7 +2338,7 @@ export default function AdminConfigPage() {
               {/* Name */}
               <div>
                 <label className="block text-sm font-medium text-stone-400 mb-1">
-                  Display Name *
+                  {t("Display Name *")}
                 </label>
                 <input
                   type="text"
@@ -2350,7 +2352,7 @@ export default function AdminConfigPage() {
               {/* URL */}
               <div>
                 <label className="block text-sm font-medium text-stone-400 mb-1">
-                  A2A Endpoint URL *
+                  {t("A2A Endpoint URL *")}
                 </label>
                 <input
                   type="url"
@@ -2364,12 +2366,12 @@ export default function AdminConfigPage() {
               {/* Description */}
               <div>
                 <label className="block text-sm font-medium text-stone-400 mb-1">
-                  Description
+                  {t("Description")}
                 </label>
                 <textarea
                   value={newRemoteAgent.description}
                   onChange={(e) => setNewRemoteAgent({ ...newRemoteAgent, description: e.target.value })}
-                  placeholder="What does this agent do?"
+                  placeholder={t("What does this agent do?")}
                   className="w-full px-3 py-2 rounded-lg border border-stone-700 bg-stone-800 text-white"
                   rows={2}
                 />
@@ -2378,7 +2380,7 @@ export default function AdminConfigPage() {
               {/* Auth Type */}
               <div>
                 <label className="block text-sm font-medium text-stone-400 mb-1">
-                  Authentication
+                  {t("Authentication")}
                 </label>
                 <select
                   value={newRemoteAgent.auth.type}
@@ -2388,10 +2390,10 @@ export default function AdminConfigPage() {
                   })}
                   className="w-full px-3 py-2 rounded-lg border border-stone-700 bg-stone-800 text-white"
                 >
-                  <option value="none">No Authentication (Public)</option>
-                  <option value="bearer">Bearer Token</option>
-                  <option value="apikey">API Key</option>
-                  <option value="oauth2">OAuth 2.0 Client Credentials</option>
+                  <option value="none">{t("No Authentication (Public)")}</option>
+                  <option value="bearer">{t("Bearer Token")}</option>
+                  <option value="apikey">{t("API Key")}</option>
+                  <option value="oauth2">{t("OAuth 2.0 Client Credentials")}</option>
                 </select>
               </div>
 
@@ -2399,7 +2401,7 @@ export default function AdminConfigPage() {
               {newRemoteAgent.auth.type === 'bearer' && (
                 <div>
                   <label className="block text-sm font-medium text-stone-400 mb-1">
-                    Bearer Token *
+                    {t("Bearer Token *")}
                   </label>
                   <input
                     type="password"
@@ -2419,7 +2421,7 @@ export default function AdminConfigPage() {
                 <>
                   <div>
                     <label className="block text-sm font-medium text-stone-400 mb-1">
-                      API Key *
+                      {t("API Key *")}
                     </label>
                     <input
                       type="password"
@@ -2434,7 +2436,7 @@ export default function AdminConfigPage() {
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className="block text-sm font-medium text-stone-400 mb-1">
-                        Location
+                        {t("Location")}
                       </label>
                       <select
                         value={newRemoteAgent.auth.location || 'header'}
@@ -2444,13 +2446,13 @@ export default function AdminConfigPage() {
                         })}
                         className="w-full px-3 py-2 rounded-lg border border-stone-700 bg-stone-800 text-white"
                       >
-                        <option value="header">Header</option>
-                        <option value="query">Query Param</option>
+                        <option value="header">{t("Header")}</option>
+                        <option value="query">{t("Query Param")}</option>
                       </select>
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-stone-400 mb-1">
-                        Key Name
+                        {t("Key Name")}
                       </label>
                       <input
                         type="text"
@@ -2471,7 +2473,7 @@ export default function AdminConfigPage() {
                 <>
                   <div>
                     <label className="block text-sm font-medium text-stone-400 mb-1">
-                      Token URL *
+                      {t("Token URL *")}
                     </label>
                     <input
                       type="url"
@@ -2487,7 +2489,7 @@ export default function AdminConfigPage() {
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className="block text-sm font-medium text-stone-400 mb-1">
-                        Client ID *
+                        {t("Client ID *")}
                       </label>
                       <input
                         type="text"
@@ -2501,7 +2503,7 @@ export default function AdminConfigPage() {
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-stone-400 mb-1">
-                        Client Secret *
+                        {t("Client Secret *")}
                       </label>
                       <input
                         type="password"
@@ -2516,7 +2518,7 @@ export default function AdminConfigPage() {
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-stone-400 mb-1">
-                      Scope (Optional)
+                      {t("Scope (Optional)")}
                     </label>
                     <input
                       type="text"
@@ -2535,7 +2537,7 @@ export default function AdminConfigPage() {
               {/* Timeout */}
               <div>
                 <label className="block text-sm font-medium text-stone-400 mb-1">
-                  Timeout (seconds)
+                  {t("Timeout (seconds)")}
                 </label>
                 <input
                   type="number"
@@ -2594,7 +2596,7 @@ export default function AdminConfigPage() {
                   {testingConnection ? (
                     <span className="flex items-center gap-2">
                       <Loader2 className="w-4 h-4 animate-spin" />
-                      Testing...
+                      {t("Testing...")}
                     </span>
                   ) : (
                     'Test Connection'
@@ -2618,7 +2620,7 @@ export default function AdminConfigPage() {
                     }}
                     className="px-4 py-2 text-sm text-stone-400 hover:text-white"
                   >
-                    Cancel
+                    {t("Cancel")}
                   </button>
                   <button
                     onClick={async () => {
@@ -2671,7 +2673,7 @@ export default function AdminConfigPage() {
                     {saving ? (
                       <span className="flex items-center gap-2">
                         <Loader2 className="w-4 h-4 animate-spin" />
-                        Adding...
+                        {t("Adding...")}
                       </span>
                     ) : (
                       'Add Remote Agent'
@@ -2689,7 +2691,7 @@ export default function AdminConfigPage() {
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
           <div className="bg-stone-900 border border-stone-700 rounded-xl w-full max-w-2xl max-h-[90vh] overflow-auto">
             <div className="p-6 border-b border-stone-800 sticky top-0 bg-stone-900 z-10">
-              <h2 className="text-xl font-semibold text-white">Add Custom MCP Server</h2>
+              <h2 className="text-xl font-semibold text-white">{t("Add Custom MCP Server")}</h2>
               <p className="text-sm text-stone-400 mt-1">Add a custom Model Context Protocol server</p>
             </div>
 
@@ -2709,7 +2711,7 @@ export default function AdminConfigPage() {
 
               <div>
                 <label className="block text-sm font-medium text-stone-400 mb-2">
-                  Description
+                  {t("Description")}
                 </label>
                 <input
                   type="text"
@@ -2768,7 +2770,7 @@ export default function AdminConfigPage() {
                 }}
                 className="px-4 py-2 bg-stone-800 hover:bg-stone-700 text-white rounded-lg transition-colors"
               >
-                Cancel
+                {t("Cancel")}
               </button>
               <button
                 onClick={handleCreateMcp}
