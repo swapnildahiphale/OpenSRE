@@ -18,6 +18,7 @@ import {
   AlertTriangle,
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui-flow';
+import { useLocale } from '@/lib/i18n/LocaleProvider';
 
 interface AgentPrompt {
   agent: string;
@@ -42,6 +43,7 @@ interface ProposedPromptChange {
 
 
 export default function TeamPromptsPage() {
+  const { t } = useLocale();
   const { identity } = useIdentity();
   const [prompts, setPrompts] = useState<AgentPrompt[]>([]);
   const [proposedChanges, setProposedChanges] = useState<ProposedPromptChange[]>([]);
@@ -245,7 +247,7 @@ export default function TeamPromptsPage() {
           </div>
           <div>
             <h1 className="text-2xl font-semibold text-stone-900 dark:text-white">
-              Agent Prompts
+              {t("Agent Prompts")}
             </h1>
             <p className="text-sm text-stone-500">
               Customize system prompts for your team's AI agents.
@@ -354,7 +356,7 @@ export default function TeamPromptsPage() {
                       <div className="space-y-4">
                         <div>
                           <label className="block text-sm font-medium text-stone-700 dark:text-stone-300 mb-2">
-                            System Prompt
+                            {t("System Prompt")}
                           </label>
                           <textarea
                             value={editedPrompt}
@@ -372,7 +374,7 @@ export default function TeamPromptsPage() {
                             onClick={() => setEditingAgent(null)}
                             className="px-4 py-2 text-sm text-stone-600 dark:text-stone-400"
                           >
-                            Cancel
+                            {t("Cancel")}
                           </button>
                           <button
                             onClick={() => handleSave(prompt.agent)}
@@ -393,7 +395,7 @@ export default function TeamPromptsPage() {
                         <div>
                           <div className="flex items-center justify-between mb-2">
                             <label className="text-sm font-medium text-stone-700 dark:text-stone-300">
-                              System Prompt
+                              {t("System Prompt")}
                             </label>
                             <div className="flex items-center gap-2">
                               {prompt.isCustom && (
@@ -411,7 +413,7 @@ export default function TeamPromptsPage() {
                                 className="flex items-center gap-1 px-3 py-1 text-xs bg-stone-100 dark:bg-stone-700 rounded-lg hover:bg-stone-200 dark:hover:bg-stone-700"
                               >
                                 <Edit3 className="w-3 h-3" />
-                                Edit
+                                {t("Edit")}
                               </button>
                             </div>
                           </div>
@@ -472,7 +474,7 @@ export default function TeamPromptsPage() {
                         <p className="text-sm text-stone-600 dark:text-stone-400">{change.reason}</p>
                         {change.learnedFrom && (
                           <p className="text-xs text-stone-500 mt-1">
-                            Learned from: {change.learnedFrom}
+                            {t("Learned from:")}{' '}{change.learnedFrom}
                           </p>
                         )}
                       </div>
@@ -482,13 +484,13 @@ export default function TeamPromptsPage() {
                         onClick={() => handleReject(change.id)}
                         className="px-3 py-1.5 text-sm border border-stone-300 dark:border-stone-600 rounded-lg hover:bg-stone-100 dark:hover:bg-stone-800"
                       >
-                        Reject
+                        {t("Reject")}
                       </button>
                       <button
                         onClick={() => handleApprove(change.id)}
                         className="px-3 py-1.5 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700"
                       >
-                        Approve
+                        {t("Approve")}
                       </button>
                     </div>
                   </div>

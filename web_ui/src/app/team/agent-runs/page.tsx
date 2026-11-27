@@ -43,6 +43,7 @@ import {
   Plus,
   FileText,
 } from 'lucide-react';
+import { useLocale } from '@/lib/i18n/LocaleProvider';
 
 interface AgentRun {
   id: string;
@@ -139,6 +140,7 @@ function StatusFilterItem({
 }
 
 export default function TeamAgentRunsPage() {
+  const { locale, t } = useLocale();
   const router = useRouter();
   const searchParams = useSearchParams();
   const page = parseInvestigationsPageParam(searchParams.get('page'));
@@ -322,9 +324,9 @@ export default function TeamAgentRunsPage() {
       header={
         <div className="flex flex-wrap items-end justify-between gap-6">
           <PageHeader
-            eyebrow="Investigations"
-            title="Runs"
-            subtitle="Episode and thread summaries"
+            eyebrow={t("Investigations")}
+            title={t("Runs")}
+            subtitle={t("Episode and thread summaries")}
           />
           {!loading && investigationTotal > 0 && (
             <div className="flex items-center gap-3 shrink-0">
@@ -332,7 +334,7 @@ export default function TeamAgentRunsPage() {
                 <span className="inline-flex items-center gap-2 h-9 px-3.5 rounded-full text-[13px] font-medium bg-slate-100 text-slate-600">
                   <span className="live-dot w-2 h-2 rounded-full shrink-0" aria-hidden />
                   <span className="font-mono tabular-nums">
-                    {runningCount} running
+                    {runningCount}{' '}{t("running")}
                   </span>
                 </span>
               )}
@@ -340,8 +342,8 @@ export default function TeamAgentRunsPage() {
                 type="button"
                 onClick={handleRefresh}
                 className="p-2 text-slate-400 hover:text-slate-600 rounded-full hover:bg-slate-100 transition-colors"
-                aria-label="Refresh"
-                title="Refresh"
+                aria-label={t("Refresh")}
+                title={t("Refresh")}
               >
                 <RotateCw className={clsx('w-5 h-5', refreshing && 'animate-spin')} />
               </button>
@@ -358,11 +360,11 @@ export default function TeamAgentRunsPage() {
         </div>
       ) : investigationTotal === 0 ? (
         <EmptyState
-          title="No investigations yet"
+          title={t("No investigations yet")}
           action={
             <Button variant="primary" onClick={openInvestigation}>
               <Plus className="w-3.5 h-3.5" />
-              New Investigation
+              {t("New Investigation")}
             </Button>
           }
         />
@@ -371,12 +373,12 @@ export default function TeamAgentRunsPage() {
           <aside className="col-span-12 lg:col-span-3">
             <div className="sticky top-[80px] space-y-8">
               <div>
-                <FilterSectionLabel>Status</FilterSectionLabel>
+                <FilterSectionLabel>{t("Status")}</FilterSectionLabel>
                 <ul className="space-y-1.5">
                   {STATUS_OPTIONS.map((opt) => (
                     <StatusFilterItem
                       key={opt.value}
-                      label={opt.label}
+                      label={t(opt.label)}
                       active={filterStatus === opt.value}
                       onClick={() => setFilterStatus(opt.value)}
                     />
@@ -386,7 +388,7 @@ export default function TeamAgentRunsPage() {
 
               {issueTypeFreqs.length > 0 && (
                 <div>
-                  <FilterSectionLabel>Issue type</FilterSectionLabel>
+                  <FilterSectionLabel>{t("Issue type")}</FilterSectionLabel>
                   <div className="flex flex-wrap gap-1.5">
                     {visibleIssueTypes.map(({ value, count }) => (
                       <Chip
@@ -404,8 +406,8 @@ export default function TeamAgentRunsPage() {
                         type="button"
                         onClick={expandIssueTypes}
                         className="px-2.5 py-1 rounded-full text-xs font-medium border border-slate-200/70 bg-slate-50 text-slate-500 hover:bg-slate-100 hover:border-slate-300 hover:text-slate-600 font-mono transition"
-                        aria-label="Show more issue types"
-                        title="Show more issue types"
+                        aria-label={t("Show more issue types")}
+                        title={t("Show more issue types")}
                       >
                         …
                       </button>
@@ -415,14 +417,14 @@ export default function TeamAgentRunsPage() {
               )}
 
               <div>
-                <FilterSectionLabel>Channel</FilterSectionLabel>
+                <FilterSectionLabel>{t("Channel")}</FilterSectionLabel>
                 <div className="flex flex-wrap gap-1.5">
                   <Chip
                     active={filterChannel === 'all'}
                     onClick={() => setFilterChannel('all')}
                     className="h-auto px-2.5 py-1 normal-case"
                   >
-                    all
+                    {t("all")}
                   </Chip>
                   {channelOptions.map((ch) => (
                     <Chip
@@ -444,7 +446,7 @@ export default function TeamAgentRunsPage() {
                     onClick={clearAllFilters}
                     className="text-[12px] text-slate-500 hover:text-slate-800 transition-colors"
                   >
-                    clear all
+                    {t("clear all")}
                   </button>
                 </div>
               )}
@@ -456,7 +458,7 @@ export default function TeamAgentRunsPage() {
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
               <input
                 type="text"
-                placeholder="Search investigations..."
+                placeholder={t("Search investigations...")}
                 value={searchText}
                 onChange={(e) => setSearchText(e.target.value)}
                 className="w-full pl-10 pr-4 py-2.5 text-sm rounded-xl border border-slate-200/70 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-400/50"
@@ -465,11 +467,11 @@ export default function TeamAgentRunsPage() {
 
             {filtered.length === 0 ? (
               <EmptyState
-                title="No investigations match your filters"
+                title={t("No investigations match your filters")}
                 action={
                   hasActiveFilters ? (
                     <Button variant="secondary" onClick={clearAllFilters}>
-                      Clear filters
+                      {t("Clear filters")}
                     </Button>
                   ) : undefined
                 }
@@ -513,7 +515,7 @@ export default function TeamAgentRunsPage() {
                                 />
                               )}
                               <span className="text-xs text-slate-400 font-mono tabular-nums ml-auto">
-                                {formatRelativeTime(conv.latestRun.startedAt)}
+                                {formatRelativeTime(conv.latestRun.startedAt, locale)}
                               </span>
                             </div>
 
@@ -555,7 +557,7 @@ export default function TeamAgentRunsPage() {
                                 <>
                                   <span>·</span>
                                   <span className="font-mono tabular-nums">
-                                    {conv.turnCount} turns
+                                    {conv.turnCount}{' '}{t("turns")}
                                   </span>
                                 </>
                               )}

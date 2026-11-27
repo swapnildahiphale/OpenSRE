@@ -14,6 +14,7 @@ import {
   CheckCircle2,
 } from 'lucide-react';
 import { apiFetch } from '@/lib/apiClient';
+import { useLocale } from '@/lib/i18n/LocaleProvider';
 
 interface Template {
   id: string;
@@ -60,6 +61,7 @@ const CATEGORY_ICONS: Record<string, string> = {
 };
 
 export default function AdminTemplatesPage() {
+  const { t } = useLocale();
   const { identity } = useIdentity();
   const [templates, setTemplates] = useState<Template[]>([]);
   const [loading, setLoading] = useState(true);
@@ -159,10 +161,10 @@ export default function AdminTemplatesPage() {
               className="hover:text-stone-200 transition-colors flex items-center gap-1"
             >
               <Home className="w-4 h-4" />
-              Admin Dashboard
+              {t("Admin Dashboard")}
             </button>
             <span>/</span>
-            <span className="text-stone-200">Templates</span>
+            <span className="text-stone-200">{t("Templates")}</span>
           </div>
 
           <div className="flex items-center justify-between">
@@ -295,7 +297,7 @@ export default function AdminTemplatesPage() {
                     ))}
                     {template.required_mcps.length > 3 && (
                       <span className="text-xs px-2 py-1 bg-stone-800 text-stone-400 rounded">
-                        +{template.required_mcps.length - 3} more
+                        +{template.required_mcps.length - 3}{' '}{t("more")}
                       </span>
                     )}
                   </div>
@@ -340,7 +342,7 @@ export default function AdminTemplatesPage() {
               {/* Description */}
               <div>
                 <h3 className="text-sm font-semibold text-white mb-2">
-                  Description
+                  {t("Description")}
                 </h3>
                 <p className="text-stone-300">
                   {selectedTemplate.description}
@@ -442,7 +444,7 @@ export default function AdminTemplatesPage() {
                   onClick={() => setShowPreview(false)}
                   className="px-4 py-2 text-stone-300 hover:bg-stone-800 rounded-lg transition-colors"
                 >
-                  Cancel
+                  {t("Cancel")}
                 </button>
                 <button
                   onClick={() => handleApply(selectedTemplate.id)}

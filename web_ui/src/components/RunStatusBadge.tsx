@@ -1,3 +1,6 @@
+'use client';
+
+import { useLocale } from '@/lib/i18n/LocaleProvider';
 import {
   Activity,
   CheckCircle,
@@ -67,7 +70,11 @@ export function RunStatusBadge({
   size?: BadgeSize;
 }) {
   const iconClass = ICON_SIZE[size];
-  const label = status.replace(/_/g, ' ');
+  const { t } = useLocale();
+  const label = status === 'running' || status === 'completed' || status === 'interrupted'
+    || status === 'failed' || status === 'timeout'
+    ? t(status)
+    : status.replace(/_/g, ' ');
 
   return (
     <span
@@ -97,7 +104,8 @@ export function EpisodeResolutionBadge({
   showIcon?: boolean;
 }) {
   const iconClass = ICON_SIZE[size];
-  const label = resolved ? 'resolved' : 'unresolved';
+  const { t } = useLocale();
+  const label = t(resolved ? 'resolved' : 'unresolved');
   const color = resolved ? RESOLUTION_COLORS.resolved : RESOLUTION_COLORS.unresolved;
   const textClass = 'text-xs';
 

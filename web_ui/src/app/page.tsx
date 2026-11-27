@@ -5,8 +5,10 @@ import { useIdentity } from '@/lib/useIdentity';
 import { Shield, Network, Bot, Settings } from 'lucide-react';
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { useLocale } from '@/lib/i18n/LocaleProvider';
 
 export default function HomePage() {
+  const { t } = useLocale();
   const { identity, loading, error } = useIdentity();
   const router = useRouter();
 
@@ -20,16 +22,16 @@ export default function HomePage() {
   return (
     <div className="p-8 space-y-8">
       <div className="space-y-2">
-        <h1 className="text-2xl font-semibold text-stone-900 dark:text-white">OpenSRE Config UI</h1>
+        <h1 className="text-2xl font-semibold text-stone-900 dark:text-white">{t("OpenSRE Config UI")}</h1>
         <p className="text-stone-500 dark:text-stone-400">
-          Manage team configuration (team mode) and org structure / tokens (admin mode).
+          {t("Manage team configuration (team mode) and org structure / tokens (admin mode).")}
         </p>
       </div>
 
       <div className="bg-white dark:bg-stone-800 rounded-xl border border-stone-200 dark:border-stone-700 shadow-sm p-5 space-y-3">
         <div className="flex items-center justify-between gap-4">
           <div>
-            <div className="text-sm font-semibold text-stone-900 dark:text-white">Session</div>
+            <div className="text-sm font-semibold text-stone-900 dark:text-white">{t("Session")}</div>
             <div className="text-xs text-stone-500 mt-1">
               {loading
                 ? 'Checking token…'
@@ -43,15 +45,15 @@ export default function HomePage() {
             className="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium bg-forest text-white hover:bg-forest-dark dark:bg-forest dark:text-white dark:hover:bg-forest-dark transition-colors"
           >
             <Settings className="w-4 h-4" />
-            Token / Settings
+            {t("Token / Settings")}
           </Link>
         </div>
 
         {!loading && !identity && (
           <div className="text-sm text-stone-600 dark:text-stone-300">
-            Paste an <strong>admin token</strong> or <strong>team token</strong> in <Link className="underline" href="/settings">Settings</Link>{' '}
+            Paste an <strong>{t("admin token")}</strong> or <strong>{t("team token")}</strong> in <Link className="underline" href="/settings">{t("Settings")}</Link>{' '}
             to enable the correct pages.
-            {error ? <div className="mt-2 text-xs text-clay">Error: {error}</div> : null}
+            {error ? <div className="mt-2 text-xs text-clay">{t("Error:")}{' '}{error}</div> : null}
           </div>
         )}
       </div>
@@ -59,44 +61,44 @@ export default function HomePage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="bg-white dark:bg-stone-800 rounded-xl border border-stone-200 dark:border-stone-700 shadow-sm p-5 space-y-3">
           <div className="flex items-center gap-2 text-sm font-semibold text-stone-900 dark:text-white">
-            <Bot className="w-4 h-4" /> Team mode
+            <Bot className="w-4 h-4" />{' '}{t("Team mode")}
           </div>
           <p className="text-sm text-stone-600 dark:text-stone-300">
-            View effective config + lineage and manage team overrides.
+            {t("View effective config + lineage and manage team overrides.")}
           </p>
           <Link
             href="/team/agents"
             className="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium bg-forest text-white hover:bg-forest-dark transition-colors"
           >
-            Open Team Configuration
+            {t("Open Team Configuration")}
           </Link>
         </div>
 
         <div className="bg-white dark:bg-stone-800 rounded-xl border border-stone-200 dark:border-stone-700 shadow-sm p-5 space-y-3">
           <div className="flex items-center gap-2 text-sm font-semibold text-stone-900 dark:text-white">
-            <Shield className="w-4 h-4" /> Admin mode
+            <Shield className="w-4 h-4" />{' '}{t("Admin mode")}
           </div>
           <p className="text-sm text-stone-600 dark:text-stone-300">
-            Manage org tree, tokens, and security policies.
+            {t("Manage org tree, tokens, and security policies.")}
           </p>
           <div className="flex flex-wrap gap-2">
             <Link
               href="/admin/org-tree"
               className="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium bg-forest text-white hover:bg-forest-dark dark:bg-forest dark:text-white dark:hover:bg-forest-dark transition-colors"
             >
-              <Network className="w-4 h-4" /> Org Tree
+              <Network className="w-4 h-4" />{' '}{t("Org Tree")}
             </Link>
             <Link
               href="/settings"
               className="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium bg-forest text-white hover:bg-forest-dark dark:bg-forest dark:text-white dark:hover:bg-forest-dark transition-colors"
             >
-              <Settings className="w-4 h-4" /> Settings
+              <Settings className="w-4 h-4" />{' '}{t("Settings")}
             </Link>
           </div>
         </div>
 
         <div className="bg-white dark:bg-stone-800 rounded-xl border border-stone-200 dark:border-stone-700 shadow-sm p-5 space-y-3">
-          <div className="text-sm font-semibold text-stone-900 dark:text-white">What should work</div>
+          <div className="text-sm font-semibold text-stone-900 dark:text-white">{t("What should work")}</div>
           <ul className="text-sm text-stone-600 dark:text-stone-300 space-y-1">
             <li>- Team token: read/write via <code>/api/config/me/*</code></li>
             <li>- Admin token: org + tokens via <code>/api/v1/admin/*</code></li>

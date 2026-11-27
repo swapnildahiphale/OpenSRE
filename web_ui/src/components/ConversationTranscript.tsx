@@ -15,6 +15,7 @@ import { humanizeToolSummary, nestBashUnderSkills } from '@/lib/toolDisplay';
 import { earlierThoughtCount, splitLatestThought } from '@/lib/thinkingDisplay';
 import { shouldCollapseTurnTree } from '@/lib/turnCollapse';
 import { deriveTodoSnapshot, isTodoTool } from '@/lib/todoSnapshot';
+import { useLocale } from '@/lib/i18n/LocaleProvider';
 
 const statusIcon = (status: string) => {
   switch (status) {
@@ -53,6 +54,7 @@ const AGENT_COLORS: Record<string, string> = {
 const TOOL_BORDER = 'border-l-emerald-600';
 
 function ToolInput({ call }: { call: ToolItem }) {
+  const { t } = useLocale();
   const input = call.input;
   if (!input || Object.keys(input).length === 0) return null;
   if (call.toolName === 'Bash' && input.command) {
@@ -103,8 +105,8 @@ function ToolInput({ call }: { call: ToolItem }) {
         </p>
       );
     }
-    if (call.toolName === 'TaskList') return <p className="text-xs text-slate-500">snapshot request</p>;
-    if (call.toolName === 'TaskGet') return <p className="text-xs text-slate-500">read task</p>;
+    if (call.toolName === 'TaskList') return <p className="text-xs text-slate-500">{t("snapshot request")}</p>;
+    if (call.toolName === 'TaskGet') return <p className="text-xs text-slate-500">{t("read task")}</p>;
   }
   return (
     <pre className="text-xs bg-slate-100 dark:bg-stone-800 p-2 rounded overflow-x-auto max-h-32 overflow-y-auto font-mono text-slate-700 dark:text-stone-300">
@@ -122,6 +124,7 @@ function ToolRow({
   technicalDetails: boolean;
   nestedBash?: ToolItem[];
 }) {
+  const { t } = useLocale();
   const [open, setOpen] = useState(false);
   const color = AGENT_COLORS[call.agentName || ''] || TOOL_BORDER;
   const summary = humanizeToolSummary(call, { technicalDetails });
@@ -142,15 +145,15 @@ function ToolRow({
       {open && (
         <div className="px-3 pb-3 pt-1 bg-slate-50 dark:bg-stone-900 border-t border-slate-100 dark:border-stone-700">
           {call.input && Object.keys(call.input).length > 0 && (
-            <div className="mb-3"><div className="text-xs font-medium text-slate-500 mb-1 flex items-center gap-1"><Code className="w-3 h-3" />Input</div><ToolInput call={call} /></div>
+            <div className="mb-3"><div className="text-xs font-medium text-slate-500 mb-1 flex items-center gap-1"><Code className="w-3 h-3" />{t("Input")}</div><ToolInput call={call} /></div>
           )}
           {call.output && (
-            <div className="mb-3"><div className="text-xs font-medium text-slate-500 mb-1 flex items-center gap-1"><Code className="w-3 h-3" />Output</div>
+            <div className="mb-3"><div className="text-xs font-medium text-slate-500 mb-1 flex items-center gap-1"><Code className="w-3 h-3" />{t("Output")}</div>
               <pre className="text-xs bg-slate-100 dark:bg-stone-800 p-2 rounded overflow-x-auto max-h-96 overflow-y-auto font-mono text-slate-700 dark:text-stone-300 whitespace-pre-wrap">{call.output}</pre>
             </div>
           )}
           {call.error && (
-            <div className="mb-3"><div className="text-xs font-medium text-rose-600 mb-1">Error</div>
+            <div className="mb-3"><div className="text-xs font-medium text-rose-600 mb-1">{t("Error")}</div>
               <pre className="text-xs bg-rose-50 dark:bg-rose-900/20 p-2 rounded text-rose-700 dark:text-rose-300 whitespace-pre-wrap">{call.error}</pre>
             </div>
           )}
@@ -168,6 +171,7 @@ function ToolRow({
 }
 
 function ThinkingBlock({ thoughts }: { thoughts: ThoughtItem[] }) {
+  const { t } = useLocale();
   const [open, setOpen] = useState(false);
   if (thoughts.length === 0) return null;
   const { latest } = splitLatestThought(thoughts);
@@ -193,7 +197,7 @@ function ThinkingBlock({ thoughts }: { thoughts: ThoughtItem[] }) {
         {open ? (
           <div className="flex-1 min-w-0 space-y-1.5">
             <p className="text-[11px] text-slate-400">
-              Thinking · {thoughts.length} step{thoughts.length === 1 ? '' : 's'}
+              {t("Thinking ·")}{' '}{thoughts.length} step{thoughts.length === 1 ? '' : 's'}
             </p>
             {thoughts.map((t, i) => (
               <p
@@ -211,11 +215,11 @@ function ThinkingBlock({ thoughts }: { thoughts: ThoughtItem[] }) {
         ) : (
           <div className="flex-1 min-w-0">
             <p className="text-[11px] text-slate-400 mb-0.5">
-              Thinking · latest
+              {t("Thinking · latest")}
               {earlierCount > 0 ? (
                 <span className="text-slate-400">
                   {' '}
-                  · {earlierCount} earlier ▸
+                  · {earlierCount}{' '}{t("earlier ▸")}
                 </span>
               ) : null}
             </p>
@@ -292,6 +296,7 @@ function TurnBlock({
   technicalDetails: boolean;
   backgroundWaiting?: BackgroundWaitingState | null;
 }) {
+  const { t } = useLocale();
   const collapse = shouldCollapseTurnTree(turn, index, turns, { technicalDetails });
   const [treeOpen, setTreeOpen] = useState(!collapse);
   useEffect(() => { setTreeOpen(!collapse); }, [collapse]);
@@ -310,8 +315,8 @@ function TurnBlock({
         </div>
         <div
           className="w-7 h-7 rounded-full bg-slate-200 dark:bg-stone-700 flex items-center justify-center flex-shrink-0"
-          aria-label="You"
-          title="You"
+          aria-label={t("You")}
+          title={t("You")}
         >
           <User className="w-4 h-4 text-slate-600 dark:text-stone-300" />
         </div>
@@ -333,7 +338,7 @@ function TurnBlock({
               className="text-xs text-slate-500 dark:text-stone-400 hover:text-slate-700 dark:hover:text-stone-300 transition-colors"
               onClick={() => setTreeOpen(true)}
             >
-              Agent activity ({stepCount} step{stepCount === 1 ? '' : 's'}) ▸
+              {t("Agent activity (")}{stepCount} step{stepCount === 1 ? '' : 's'}) ▸
             </button>
           ) : (
             <>
@@ -343,7 +348,7 @@ function TurnBlock({
                   className="text-xs text-slate-500 dark:text-stone-400 hover:text-slate-700 dark:hover:text-stone-300 transition-colors mb-1"
                   onClick={() => setTreeOpen(false)}
                 >
-                  Hide agent activity ▾
+                  {t("Hide agent activity ▾")}
                 </button>
               )}
               <AgentTrace items={traceItems} technicalDetails={technicalDetails} />
@@ -363,7 +368,7 @@ function TurnBlock({
           {turn.status === 'running' && !turn.result && !backgroundWaiting && (
             <div className="flex items-center gap-2 text-sm text-slate-400">
               <span className="live-dot w-2.5 h-2.5 rounded-full" aria-hidden="true" />
-              Working…
+              {t("Working…")}
             </div>
           )}
           {turn.result && (

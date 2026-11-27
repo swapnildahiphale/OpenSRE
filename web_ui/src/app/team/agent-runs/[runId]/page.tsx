@@ -17,6 +17,7 @@ import {
 import { Skeleton, TeamPageShell } from '@/components/ui-flow';
 import { ArrowLeft } from 'lucide-react';
 import { formatTriggerMeta } from '@/lib/triggerMeta';
+import { useLocale } from '@/lib/i18n/LocaleProvider';
 
 const NO_RESUME = "This conversation can't be continued (no saved session). Start a new investigation.";
 const INTERRUPTED_HALT =
@@ -24,6 +25,7 @@ const INTERRUPTED_HALT =
 const STORAGE_KEY = 'opensre.trace.technicalDetails';
 
 export default function AgentRunDetailPage() {
+  const { t } = useLocale();
   const { runId } = useParams<{ runId: string }>();
   const router = useRouter();
   const {
@@ -131,13 +133,13 @@ export default function AgentRunDetailPage() {
       ? 'running'
       : (stream.runStatus === 'timeout' ? 'timeout' : status);
   const haltMessage = displayStatus === 'interrupted'
-    ? INTERRUPTED_HALT
+    ? t(INTERRUPTED_HALT)
     : (stream.error || errorMessage);
   const showHaltBanner = !isLiveTurn && !!haltMessage && (
     displayStatus === 'timeout' || displayStatus === 'failed' || displayStatus === 'interrupted'
   );
 
-  const turnLabel = `${turns.length} turn${turns.length === 1 ? '' : 's'}`;
+  const turnLabel = t(turns.length === 1 ? '{count} turn' : '{count} turns', { count: turns.length });
   const canSendFollowUp = !isLiveTurn && (continuable || isOrphaned) && !!threadId;
 
   return (
@@ -166,7 +168,7 @@ export default function AgentRunDetailPage() {
             busy={isLiveTurn}
             disabled={!isLiveTurn && !continuable && !isOrphaned}
             disabledReason={
-              !continuable && !isOrphaned && !threadId ? NO_RESUME : undefined
+              !continuable && !isOrphaned && !threadId ? t(NO_RESUME) : undefined
             }
           />
         </div>
@@ -179,7 +181,7 @@ export default function AgentRunDetailPage() {
           className="inline-flex items-center gap-2 text-sm text-slate-500 hover:text-slate-700 mb-5 transition-colors"
         >
           <ArrowLeft className="w-4 h-4" />
-          Back to investigations
+          {t("Back to investigations")}
         </button>
 
         <header className="mb-6 min-w-0">
@@ -219,7 +221,7 @@ export default function AgentRunDetailPage() {
             checked={technicalDetails}
             onChange={(e) => onToggle(e.target.checked)}
           />
-          Debug Mode
+          {t("Debug Mode")}
         </label>
 
         {/* Full column width — align agent chat with run title edges */}

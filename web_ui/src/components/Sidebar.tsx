@@ -1,5 +1,7 @@
 'use client';
 
+import { useLocale } from '@/lib/i18n/LocaleProvider';
+
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
@@ -34,7 +36,7 @@ const teamNavigation = [
   { name: 'Memory', href: '/team/memory', icon: Brain },
   { name: 'Proposed Changes', href: '/team/pending-changes', icon: GitPullRequest },
   { name: 'Settings', href: '/settings', icon: ShieldCheck },
-];
+] as const;
 
 // Navigation for admin users
 const adminNavigation = [
@@ -43,12 +45,12 @@ const adminNavigation = [
   { name: 'Org Configurations', href: '/admin/config', icon: Cog },
   { name: 'Token Management', href: '/admin/token-management', icon: Key },
   { name: 'Settings', href: '/settings', icon: ShieldCheck },
-];
+] as const;
 
 // Navigation when not logged in
 const guestNavigation = [
   { name: 'Sign In', href: '/settings', icon: ShieldCheck },
-];
+] as const;
 
 function isNavActive(pathname: string, href: string): boolean {
   if (href === '/team') {
@@ -58,6 +60,7 @@ function isNavActive(pathname: string, href: string): boolean {
 }
 
 export function Sidebar() {
+  const { t } = useLocale();
   const pathname = usePathname();
   const [isOpen, setIsOpen] = useState(false);
   const { identity } = useIdentity();
@@ -95,7 +98,7 @@ export function Sidebar() {
               const isActive = isNavActive(pathname, item.href);
               return (
                 <Link
-                  key={item.name}
+                  key={item.href}
                   href={item.href}
                   className={clsx(
                     "flex items-center px-3 py-2.5 text-sm font-medium rounded-lg transition-colors group",
@@ -105,7 +108,7 @@ export function Sidebar() {
                   )}
                 >
                   <item.icon className={clsx("w-5 h-5 mr-3 transition-colors", isActive ? "text-white" : "text-stone-500 group-hover:text-stone-400")} />
-                  {item.name}
+                  {t(item.name)}
                 </Link>
               );
             })}

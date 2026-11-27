@@ -89,6 +89,18 @@ To connect to config service:
 - local config service: set `CONFIG_SERVICE_URL=http://localhost:8080`
 - tunneled internal ALB: set `CONFIG_SERVICE_URL=http://localhost:8081`
 
+## Console language
+
+Choose **English** or **简体中文** on the sign-in page or in **Settings → General**.
+English is the default. The preference is saved in the current browser and
+applies to both the team and admin consoles without changing team configuration.
+
+Use `useLocale().t('English source message')` for new interface strings and
+add the matching translation to `src/lib/i18n/zh-CN.json`. Use named
+placeholders such as `{count}` instead of concatenating translated fragments.
+Keep route names, config keys, API values, logs, and user- or agent-generated
+content in their original form. Unmigrated UI text remains in English.
+
 ## Knowledge Base Tree Explorer
 
 The Tree Explorer (`/team/knowledge`) provides:

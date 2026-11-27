@@ -16,6 +16,7 @@ import {
   Building2,
   Lock
 } from 'lucide-react';
+import { useLocale } from '@/lib/i18n/LocaleProvider';
 
 interface SSOConfig {
   org_id: string;
@@ -65,6 +66,7 @@ const PROVIDER_PRESETS: Record<string, { name: string; icon: any; color: string;
 };
 
 export default function SSOSettingsPage() {
+  const { t } = useLocale();
   const { identity, loading: identityLoading } = useIdentity();
   const [config, setConfig] = useState<SSOConfig | null>(null);
   const [loading, setLoading] = useState(true);
@@ -202,7 +204,7 @@ export default function SSOSettingsPage() {
     return (
       <div className="p-8">
         <div className="bg-clay-light/10 dark:bg-clay/20 border border-red-200 dark:border-red-800 rounded-xl p-6 text-center">
-          <p className="text-clay dark:text-clay-light">Admin access required</p>
+          <p className="text-clay dark:text-clay-light">{t("Admin access required")}</p>
         </div>
       </div>
     );
@@ -213,10 +215,10 @@ export default function SSOSettingsPage() {
       <div className="mb-8">
         <h1 className="text-2xl font-semibold text-stone-900 dark:text-white flex items-center gap-3">
           <Shield className="w-7 h-7 text-stone-500" />
-          Single Sign-On
+          {t("Single Sign-On")}
         </h1>
         <p className="text-sm text-stone-500 mt-2">
-          Configure SSO to allow your organization to sign in with your identity provider.
+          {t("Configure SSO to allow your organization to sign in with your identity provider.")}
         </p>
       </div>
 
@@ -224,9 +226,9 @@ export default function SSOSettingsPage() {
       <div className="bg-white dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded-xl p-6 mb-6">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-lg font-semibold text-stone-900 dark:text-white">Enable SSO</h2>
+            <h2 className="text-lg font-semibold text-stone-900 dark:text-white">{t("Enable SSO")}</h2>
             <p className="text-sm text-stone-500 mt-1">
-              When enabled, users can sign in with your identity provider.
+              {t("When enabled, users can sign in with your identity provider.")}
             </p>
           </div>
           <button
@@ -246,7 +248,7 @@ export default function SSOSettingsPage() {
 
       {/* Provider Selection */}
       <div className="bg-white dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded-xl p-6 mb-6">
-        <h2 className="text-lg font-semibold text-stone-900 dark:text-white mb-4">Identity Provider</h2>
+        <h2 className="text-lg font-semibold text-stone-900 dark:text-white mb-4">{t("Identity Provider")}</h2>
         
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
           {Object.entries(PROVIDER_PRESETS).map(([key, preset]) => {
@@ -274,13 +276,13 @@ export default function SSOSettingsPage() {
 
       {/* Configuration Form */}
       <div className="bg-white dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded-xl p-6 mb-6 space-y-4">
-        <h2 className="text-lg font-semibold text-stone-900 dark:text-white mb-4">Configuration</h2>
+        <h2 className="text-lg font-semibold text-stone-900 dark:text-white mb-4">{t("Configuration")}</h2>
 
         {/* Azure-specific: Tenant ID */}
         {providerType === 'azure' && (
           <div>
             <label className="block text-sm font-medium text-stone-700 dark:text-stone-300 mb-1">
-              Tenant ID <span className="text-clay">*</span>
+              {t("Tenant ID")}{' '}<span className="text-clay">*</span>
             </label>
             <input
               type="text"
@@ -290,7 +292,7 @@ export default function SSOSettingsPage() {
               className="w-full px-3 py-2 rounded-lg border border-stone-200 dark:border-stone-600 bg-white dark:bg-stone-700 text-stone-900 dark:text-white"
             />
             <p className="text-xs text-stone-500 mt-1">
-              Find this in Azure Portal → Entra ID → Overview
+              {t("Find this in Azure Portal → Entra ID → Overview")}
             </p>
           </div>
         )}
@@ -299,7 +301,7 @@ export default function SSOSettingsPage() {
         {(providerType === 'oidc' || providerType === 'okta') && (
           <div>
             <label className="block text-sm font-medium text-stone-700 dark:text-stone-300 mb-1">
-              Issuer URL <span className="text-clay">*</span>
+              {t("Issuer URL")}{' '}<span className="text-clay">*</span>
             </label>
             <input
               type="url"
@@ -309,7 +311,7 @@ export default function SSOSettingsPage() {
               className="w-full px-3 py-2 rounded-lg border border-stone-200 dark:border-stone-600 bg-white dark:bg-stone-700 text-stone-900 dark:text-white"
             />
             <p className="text-xs text-stone-500 mt-1">
-              The OIDC issuer URL (must have /.well-known/openid-configuration)
+              {t("The OIDC issuer URL (must have /.well-known/openid-configuration)")}
             </p>
           </div>
         )}
@@ -317,13 +319,13 @@ export default function SSOSettingsPage() {
         {/* Client ID */}
         <div>
           <label className="block text-sm font-medium text-stone-700 dark:text-stone-300 mb-1">
-            Client ID <span className="text-clay">*</span>
+            {t("Client ID")}{' '}<span className="text-clay">*</span>
           </label>
           <input
             type="text"
             value={clientId}
             onChange={(e) => setClientId(e.target.value)}
-            placeholder="Your OAuth client ID"
+            placeholder={t("Your OAuth client ID")}
             className="w-full px-3 py-2 rounded-lg border border-stone-200 dark:border-stone-600 bg-white dark:bg-stone-700 text-stone-900 dark:text-white"
           />
         </div>
@@ -331,7 +333,7 @@ export default function SSOSettingsPage() {
         {/* Client secret (env-only) */}
         <div>
           <label className="block text-sm font-medium text-stone-700 dark:text-stone-300 mb-1">
-            Client Secret
+            {t("Client Secret")}
           </label>
           <p className="text-sm text-stone-600 dark:text-stone-300">
             {config?.has_client_secret
@@ -343,7 +345,7 @@ export default function SSOSettingsPage() {
         {/* Admin Group */}
         <div>
           <label className="block text-sm font-medium text-stone-700 dark:text-stone-300 mb-1">
-            Admin Group (optional)
+            {t("Admin Group (optional)")}
           </label>
           <input
             type="text"
@@ -353,14 +355,14 @@ export default function SSOSettingsPage() {
             className="w-full px-3 py-2 rounded-lg border border-stone-200 dark:border-stone-600 bg-white dark:bg-stone-700 text-stone-900 dark:text-white"
           />
           <p className="text-xs text-stone-500 mt-1">
-            Users in this group will get admin role
+            {t("Users in this group will get admin role")}
           </p>
         </div>
 
         {/* Allowed Domains */}
         <div>
           <label className="block text-sm font-medium text-stone-700 dark:text-stone-300 mb-1">
-            Allowed Email Domains (optional)
+            {t("Allowed Email Domains (optional)")}
           </label>
           <input
             type="text"
@@ -370,7 +372,7 @@ export default function SSOSettingsPage() {
             className="w-full px-3 py-2 rounded-lg border border-stone-200 dark:border-stone-600 bg-white dark:bg-stone-700 text-stone-900 dark:text-white"
           />
           <p className="text-xs text-stone-500 mt-1">
-            Comma-separated list of allowed email domains
+            {t("Comma-separated list of allowed email domains")}
           </p>
         </div>
       </div>
@@ -420,7 +422,7 @@ export default function SSOSettingsPage() {
           <Info className="w-5 h-5 text-stone-500 mt-0.5 flex-shrink-0" />
           <div>
             <p className="text-sm text-stone-800 dark:text-stone-200 font-medium">
-              After enabling SSO
+              {t("After enabling SSO")}
             </p>
             <p className="text-sm text-stone-600 dark:text-stone-300 mt-1">
               Your organization members will see a "Sign in with {PROVIDER_PRESETS[providerType]?.name}" button on the login page.

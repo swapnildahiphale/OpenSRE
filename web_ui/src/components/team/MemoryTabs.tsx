@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { clsx } from 'clsx';
+import { useLocale } from '@/lib/i18n/LocaleProvider';
 
 const TABS = [
   {
@@ -29,10 +30,11 @@ const TABS = [
 ] as const;
 
 export function MemoryTabs() {
+  const { t } = useLocale();
   const pathname = usePathname();
 
   return (
-    <nav aria-label="Memory sections" className="border-b border-slate-200/80 -mt-2">
+    <nav aria-label={t("Memory sections")} className="border-b border-slate-200/80 -mt-2">
       <div className="flex gap-1 overflow-x-auto scrollbar-none">
         {TABS.map((tab) => {
           const active = tab.isActive(pathname);
@@ -47,7 +49,7 @@ export function MemoryTabs() {
                   : 'border-transparent text-slate-500 hover:text-slate-700',
               )}
             >
-              {tab.label}
+              {t(tab.label)}
             </Link>
           );
         })}

@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Send, Square } from 'lucide-react';
 import { clsx } from 'clsx';
+import { useLocale } from '@/lib/i18n/LocaleProvider';
 
 interface Props {
   onSend: (message: string) => void;
@@ -25,9 +26,10 @@ export default function ConversationComposer({
   queuedMessages = [],
   disabled,
   disabledReason,
-  placeholder: idlePlaceholder = 'Ask a follow-up…',
+  placeholder: idlePlaceholder,
   embedded = false,
 }: Props) {
+  const { t } = useLocale();
   const [value, setValue] = useState('');
   const [queueError, setQueueError] = useState<string | null>(null);
 
@@ -53,7 +55,7 @@ export default function ConversationComposer({
         await Promise.resolve(onQueueMessage(text));
         setValue('');
       } catch (err) {
-        setQueueError((err as Error).message || 'Failed to queue message');
+        setQueueError((err as Error).message || t('Failed to queue message'));
       }
       return;
     }
@@ -62,7 +64,7 @@ export default function ConversationComposer({
     setValue('');
   };
 
-  const placeholder = busy ? 'Queue a message…' : idlePlaceholder;
+  const placeholder = busy ? t('Queue a message…') : idlePlaceholder ?? t('Ask a follow-up…');
 
   return (
     <div className={clsx(!embedded && 'mt-6')}>
@@ -79,7 +81,7 @@ export default function ConversationComposer({
             >
               <span className="text-slate-700 dark:text-stone-300">{msg}</span>
               <span className="shrink-0 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">
-                Queued
+                {t("Queued")}
               </span>
             </li>
           ))}
@@ -108,7 +110,7 @@ export default function ConversationComposer({
             data-testid="conversation-composer-stop"
             onClick={onStop}
             className="h-11 w-11 shrink-0 rounded-xl bg-rose-100/50 text-rose-700 flex items-center justify-center hover:bg-rose-100/80 transition-colors"
-            aria-label="Stop investigation"
+            aria-label={t("Stop investigation")}
           >
             <Square className="w-4 h-4 fill-current" />
           </button>
@@ -118,7 +120,7 @@ export default function ConversationComposer({
           onClick={() => void submit()}
           disabled={!value.trim()}
           className="h-11 w-11 shrink-0 rounded-xl bg-emerald-100/50 text-emerald-700 flex items-center justify-center hover:bg-emerald-100/80 transition-colors disabled:opacity-40"
-          aria-label={busy ? 'Queue message' : 'Send follow-up'}
+          aria-label={t(busy ? 'Queue message' : 'Send follow-up')}
         >
           <Send className="w-5 h-5" />
         </button>

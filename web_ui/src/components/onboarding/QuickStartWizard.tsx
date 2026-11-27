@@ -23,6 +23,7 @@ import {
   PartyPopper,
   Rocket,
 } from 'lucide-react';
+import { useLocale } from '@/lib/i18n/LocaleProvider';
 
 interface QuickStartWizardProps {
   onClose: () => void;
@@ -36,6 +37,7 @@ interface QuickStartWizardProps {
 const TOTAL_STEPS = 6;
 
 export function QuickStartWizard({ onClose, onRunAgent, onSkip, initialStep = 1, localStorageOnly = false }: QuickStartWizardProps) {
+  const { t } = useLocale();
   const [currentStep, setCurrentStep] = useState(initialStep);
   const { setQuickStartStep, clearQuickStartStep, markStep4IntegrationsVisited, markStep4AgentConfigVisited } = useOnboarding({ localStorageOnly });
 
@@ -94,7 +96,7 @@ export function QuickStartWizard({ onClose, onRunAgent, onSkip, initialStep = 1,
           <button
             onClick={handleClose}
             className="absolute top-4 right-4 text-stone-400 hover:text-stone-600 dark:hover:text-stone-300 transition-colors"
-            aria-label="Close"
+            aria-label={t("Close")}
           >
             <X className="w-5 h-5" />
           </button>
@@ -139,14 +141,14 @@ export function QuickStartWizard({ onClose, onRunAgent, onSkip, initialStep = 1,
                 className="flex items-center gap-1 text-sm text-stone-500 dark:text-stone-400 hover:text-stone-700 dark:hover:text-stone-200 transition-colors"
               >
                 <ArrowLeft className="w-4 h-4" />
-                Back
+                {t("Back")}
               </button>
             ) : (
               <button
                 onClick={handleSkip}
                 className="text-sm text-stone-500 dark:text-stone-400 hover:text-stone-700 dark:hover:text-stone-200 transition-colors"
               >
-                Skip tutorial
+                {t("Skip tutorial")}
               </button>
             )}
           </div>
@@ -157,7 +159,7 @@ export function QuickStartWizard({ onClose, onRunAgent, onSkip, initialStep = 1,
                 onClick={handleNext}
                 className="flex items-center gap-2 px-5 py-2.5 bg-forest hover:bg-forest-dark text-white rounded-lg font-medium transition-colors shadow-sm"
               >
-                Next
+                {t("Next")}
                 <ArrowRight className="w-4 h-4" />
               </button>
             ) : (
@@ -166,7 +168,7 @@ export function QuickStartWizard({ onClose, onRunAgent, onSkip, initialStep = 1,
                 className="flex items-center gap-2 px-5 py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors shadow-sm"
               >
                 <Check className="w-4 h-4" />
-                Done
+                {t("Done")}
               </button>
             )}
           </div>
@@ -178,39 +180,39 @@ export function QuickStartWizard({ onClose, onRunAgent, onSkip, initialStep = 1,
 
 // Step 1: Welcome
 function StepWelcome() {
+  const { t } = useLocale();
   return (
     <div className="space-y-6">
       <div>
         <h2 className="text-xl font-semibold text-stone-900 dark:text-white mb-2">
-          Welcome to OpenSRE
+          {t("Welcome to OpenSRE")}
         </h2>
         <p className="text-stone-600 dark:text-stone-400">
-          Your AI SRE that automatically investigates production incidents 24/7.
+          {t("Your AI SRE that automatically investigates production incidents 24/7.")}
         </p>
       </div>
 
       <div className="bg-forest-light/10 dark:bg-forest/20 rounded-xl p-4 border border-forest-light/30 dark:border-forest/30">
         <p className="text-sm text-forest-dark dark:text-forest-light">
-          When an incident fires, OpenSRE starts investigating immediately - analyzing logs,
-          metrics, traces, and code changes to find the root cause before your team even opens their laptops.
+          {t("When an incident fires, OpenSRE starts investigating immediately - analyzing logs, metrics, traces, and code changes to find the root cause before your team even opens their laptops.")}
         </p>
       </div>
 
       <div className="grid grid-cols-3 gap-4">
         <FeatureCard
           icon={<Zap className="w-5 h-5" />}
-          title="Instant Response"
-          description="Investigation starts in seconds"
+          title={t("Instant Response")}
+          description={t("Investigation starts in seconds")}
         />
         <FeatureCard
           icon={<Layers className="w-5 h-5" />}
-          title="Multi-Agent"
-          description="Specialized AI for each system"
+          title={t("Multi-Agent")}
+          description={t("Specialized AI for each system")}
         />
         <FeatureCard
           icon={<MessageSquare className="w-5 h-5" />}
-          title="Slack Native"
-          description="Results where you work"
+          title={t("Slack Native")}
+          description={t("Results where you work")}
         />
       </div>
     </div>
@@ -219,14 +221,15 @@ function StepWelcome() {
 
 // Step 2: How It Works
 function StepHowItWorks() {
+  const { t } = useLocale();
   return (
     <div className="space-y-6">
       <div>
         <h2 className="text-xl font-semibold text-stone-900 dark:text-white mb-2">
-          How Investigation Works
+          {t("How Investigation Works")}
         </h2>
         <p className="text-stone-600 dark:text-stone-400">
-          OpenSRE uses a team of specialized AI agents that work together.
+          {t("OpenSRE uses a team of specialized AI agents that work together.")}
         </p>
       </div>
 
@@ -236,21 +239,21 @@ function StepHowItWorks() {
           {/* Planner */}
           <div className="flex items-center gap-2 px-4 py-2 bg-forest-light/15 dark:bg-forest/20 text-forest dark:text-forest-light rounded-lg font-medium text-sm">
             <Bot className="w-4 h-4" />
-            Planner Agent
+            {t("Planner Agent")}
           </div>
 
           <div className="w-px h-4 bg-stone-300 dark:bg-stone-600" />
-          <div className="text-xs text-stone-400">delegates to</div>
+          <div className="text-xs text-stone-400">{t("delegates to")}</div>
           <div className="w-px h-4 bg-stone-300 dark:bg-stone-600" />
 
           {/* Investigation Agent */}
           <div className="flex items-center gap-2 px-4 py-2 bg-forest-light/10 dark:bg-forest/20 text-forest-dark dark:text-forest-light rounded-lg font-medium text-sm">
             <Bot className="w-4 h-4" />
-            Investigation Agent
+            {t("Investigation Agent")}
           </div>
 
           <div className="w-px h-4 bg-stone-300 dark:bg-stone-600" />
-          <div className="text-xs text-stone-400">coordinates</div>
+          <div className="text-xs text-stone-400">{t("coordinates")}</div>
           <div className="flex items-center gap-1 mt-2">
             <div className="w-8 h-px bg-stone-300 dark:bg-stone-600" />
             <div className="w-8 h-px bg-stone-300 dark:bg-stone-600" />
@@ -261,8 +264,8 @@ function StepHowItWorks() {
           <div className="flex flex-wrap justify-center gap-2 mt-3">
             <SubAgentChip label="K8s" />
             <SubAgentChip label="AWS" />
-            <SubAgentChip label="Metrics" />
-            <SubAgentChip label="Logs" />
+            <SubAgentChip label={t("Metrics")} />
+            <SubAgentChip label={t("Logs")} />
             <SubAgentChip label="GitHub" />
           </div>
         </div>
@@ -270,13 +273,13 @@ function StepHowItWorks() {
 
       <div className="text-sm text-stone-600 dark:text-stone-400 space-y-2">
         <p>
-          <strong className="text-stone-900 dark:text-white">1.</strong> The Planner receives your incident and determines the investigation strategy
+          <strong className="text-stone-900 dark:text-white">1.</strong>{' '}{t("The Planner receives your incident and determines the investigation strategy")}
         </p>
         <p>
-          <strong className="text-stone-900 dark:text-white">2.</strong> Specialized agents query Kubernetes, AWS, Grafana, logs, and code changes
+          <strong className="text-stone-900 dark:text-white">2.</strong>{' '}{t("Specialized agents query Kubernetes, AWS, Grafana, logs, and code changes")}
         </p>
         <p>
-          <strong className="text-stone-900 dark:text-white">3.</strong> Findings are synthesized into root cause analysis with recommendations
+          <strong className="text-stone-900 dark:text-white">3.</strong>{' '}{t("Findings are synthesized into root cause analysis with recommendations")}
         </p>
       </div>
     </div>
@@ -285,14 +288,15 @@ function StepHowItWorks() {
 
 // Step 3: Connect Systems
 function StepConnectSystems({ onNavigateAway }: { onNavigateAway: () => void }) {
+  const { t } = useLocale();
   return (
     <div className="space-y-6">
       <div>
         <h2 className="text-xl font-semibold text-stone-900 dark:text-white mb-2">
-          Connect Your Systems
+          {t("Connect Your Systems")}
         </h2>
         <p className="text-stone-600 dark:text-stone-400">
-          Most investigations are triggered automatically via webhooks - no human action needed.
+          {t("Most investigations are triggered automatically via webhooks - no human action needed.")}
         </p>
       </div>
 
@@ -307,19 +311,18 @@ function StepConnectSystems({ onNavigateAway }: { onNavigateAway: () => void }) 
         <IntegrationItem
           icon={<Bell className="w-5 h-5" />}
           name="PagerDuty / Incident.io"
-          description="Auto-triggered when incidents are created"
+          description={t("Auto-triggered when incidents are created")}
         />
         <IntegrationItem
           icon={<Github className="w-5 h-5" />}
           name="GitHub"
-          description="Comment @opensre on PRs or issues"
+          description={t("Comment @opensre on PRs or issues")}
         />
       </div>
 
       <div className="bg-forest-light/10 dark:bg-forest/20 rounded-xl p-4 border border-forest-light/30 dark:border-forest/30">
         <p className="text-sm text-forest-dark dark:text-forest-light">
-          <strong>Tip:</strong> Start with Slack integration - it&apos;s the most common way teams use OpenSRE.
-          Once connected, just @mention the bot in any channel.
+          <strong>{t("Tip:")}</strong>{' '}{t("Start with Slack integration - it's the most common way teams use OpenSRE. Once connected, just @mention the bot in any channel.")}
         </p>
       </div>
 
@@ -330,7 +333,7 @@ function StepConnectSystems({ onNavigateAway }: { onNavigateAway: () => void }) 
       >
         <div className="flex items-center gap-3">
           <Settings className="w-5 h-5 text-stone-500" />
-          <span className="font-medium text-stone-900 dark:text-white">Set Up Integrations</span>
+          <span className="font-medium text-stone-900 dark:text-white">{t("Set Up Integrations")}</span>
         </div>
         <ChevronRight className="w-5 h-5 text-stone-400 group-hover:text-stone-600 dark:group-hover:text-stone-300 transition-colors" />
       </Link>
@@ -340,38 +343,39 @@ function StepConnectSystems({ onNavigateAway }: { onNavigateAway: () => void }) 
 
 // Step 4: Configure Agents
 function StepConfigureAgents({ onIntegrationsClick, onAgentConfigClick }: { onIntegrationsClick: () => void; onAgentConfigClick: () => void }) {
+  const { t } = useLocale();
   return (
     <div className="space-y-6">
       <div>
         <h2 className="text-xl font-semibold text-stone-900 dark:text-white mb-2">
-          Configure Your Agents
+          {t("Configure Your Agents")}
         </h2>
         <p className="text-stone-600 dark:text-stone-400">
-          Customize how agents investigate to match your infrastructure.
+          {t("Customize how agents investigate to match your infrastructure.")}
         </p>
       </div>
 
       <div className="space-y-4">
         <ConfigSection
           icon={<Wrench className="w-5 h-5" />}
-          title="Integrations & Tools"
-          description="Connect Grafana, Datadog, AWS, Kubernetes to unlock investigation capabilities. More integrations = better investigations."
+          title={t("Integrations & Tools")}
+          description={t("Connect Grafana, Datadog, AWS, Kubernetes to unlock investigation capabilities. More integrations = better investigations.")}
         />
         <ConfigSection
           icon={<MessageSquare className="w-5 h-5" />}
-          title="Agent Prompts"
-          description='Add team context to system prompts: "We use EKS on AWS, primary services are checkout-service and payment-service..."'
+          title={t("Agent Prompts")}
+          description={t("Add team context to system prompts: \"We use EKS on AWS, primary services are checkout-service and payment-service...\"")}
         />
         <ConfigSection
           icon={<Bot className="w-5 h-5" />}
-          title="Enable/Disable Agents"
-          description="Turn off agents you don't need (e.g., disable AWS agent if you're on GCP). Add MCP servers for custom tools."
+          title={t("Enable/Disable Agents")}
+          description={t("Turn off agents you don't need (e.g., disable AWS agent if you're on GCP). Add MCP servers for custom tools.")}
         />
       </div>
 
       <div className="bg-forest-light/10 dark:bg-forest/20 rounded-xl p-4 border border-forest-light/30 dark:border-forest/30">
         <p className="text-sm text-forest-dark dark:text-forest-light">
-          <strong>Tip:</strong> Visit both pages to complete this step. The setup guide will track your progress.
+          <strong>{t("Tip:")}</strong>{' '}{t("Visit both pages to complete this step. The setup guide will track your progress.")}
         </p>
       </div>
 
@@ -382,7 +386,7 @@ function StepConfigureAgents({ onIntegrationsClick, onAgentConfigClick }: { onIn
           className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-stone-100 dark:bg-stone-700 hover:bg-stone-200 dark:hover:bg-stone-700 rounded-lg transition-colors text-sm font-medium text-stone-700 dark:text-stone-300"
         >
           <Wrench className="w-4 h-4" />
-          Integrations
+          {t("Integrations")}
         </Link>
         <Link
           href="/team/agents"
@@ -390,7 +394,7 @@ function StepConfigureAgents({ onIntegrationsClick, onAgentConfigClick }: { onIn
           className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-stone-100 dark:bg-stone-700 hover:bg-stone-200 dark:hover:bg-stone-700 rounded-lg transition-colors text-sm font-medium text-stone-700 dark:text-stone-300"
         >
           <Bot className="w-4 h-4" />
-          Agent Config
+          {t("Agent Config")}
         </Link>
       </div>
     </div>
@@ -399,19 +403,20 @@ function StepConfigureAgents({ onIntegrationsClick, onAgentConfigClick }: { onIn
 
 // Step 5: Try It Now
 function StepTryItNow({ onNavigateAway }: { onNavigateAway: () => void }) {
+  const { t } = useLocale();
   return (
     <div className="space-y-6">
       <div>
         <h2 className="text-xl font-semibold text-stone-900 dark:text-white mb-2">
-          Try It Now
+          {t("Try It Now")}
         </h2>
         <p className="text-stone-600 dark:text-stone-400">
-          Test the agent before deploying to Slack. Describe an incident and watch it investigate.
+          {t("Test the agent before deploying to Slack. Describe an incident and watch it investigate.")}
         </p>
       </div>
 
       <div className="space-y-3">
-        <p className="text-sm font-medium text-stone-700 dark:text-stone-300">Example prompts:</p>
+        <p className="text-sm font-medium text-stone-700 dark:text-stone-300">{t("Example prompts:")}</p>
         <div className="space-y-2">
           <ExamplePrompt text="My checkout API is returning 500 errors since 10am" />
           <ExamplePrompt text="Memory usage spiking on payment-service pods" />
@@ -421,8 +426,7 @@ function StepTryItNow({ onNavigateAway }: { onNavigateAway: () => void }) {
 
       <div className="bg-amber-50 dark:bg-amber-900/20 rounded-xl p-4 border border-amber-100 dark:border-amber-900/40">
         <p className="text-sm text-amber-800 dark:text-amber-200">
-          <strong>Note:</strong> Investigation quality depends on your configured integrations.
-          Without Grafana/K8s/AWS connected, the agent can reason but can&apos;t query real systems.
+          <strong>{t("Note:")}</strong>{' '}{t("Investigation quality depends on your configured integrations. Without Grafana/K8s/AWS connected, the agent can reason but can't query real systems.")}
         </p>
       </div>
 
@@ -432,7 +436,7 @@ function StepTryItNow({ onNavigateAway }: { onNavigateAway: () => void }) {
         className="flex items-center justify-center gap-2 w-full px-4 py-3 bg-forest hover:bg-forest-dark text-white rounded-lg font-medium transition-colors shadow-sm"
       >
         <Sparkles className="w-5 h-5" />
-        Try It Now
+        {t("Try It Now")}
       </Link>
     </div>
   );
@@ -517,6 +521,7 @@ function ExamplePrompt({ text }: { text: string }) {
 
 // Step 6: Complete / Congratulations
 function StepComplete() {
+  const { t } = useLocale();
   return (
     <div className="space-y-6 text-center py-4">
       <div className="flex justify-center">
@@ -527,30 +532,30 @@ function StepComplete() {
 
       <div>
         <h2 className="text-2xl font-bold text-stone-900 dark:text-white mb-2">
-          All Done!
+          {t("All Done!")}
         </h2>
         <p className="text-stone-600 dark:text-stone-400">
-          Congratulations! You&apos;re all set up and ready to go.
+          {t("Congratulations! You're all set up and ready to go.")}
         </p>
       </div>
 
       <div className="bg-stone-50 dark:bg-stone-700 rounded-xl p-5 text-left">
         <h3 className="font-medium text-stone-900 dark:text-white mb-3 flex items-center gap-2">
           <Rocket className="w-5 h-5 text-forest" />
-          What&apos;s Next?
+          {t("What's Next?")}
         </h3>
         <ul className="space-y-2 text-sm text-stone-600 dark:text-stone-400">
           <li className="flex items-start gap-2">
             <Check className="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0" />
-            <span>Trigger an investigation via Slack or webhook</span>
+            <span>{t("Trigger an investigation via Slack or webhook")}</span>
           </li>
           <li className="flex items-start gap-2">
             <Check className="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0" />
-            <span>Watch agents analyze and correlate data automatically</span>
+            <span>{t("Watch agents analyze and correlate data automatically")}</span>
           </li>
           <li className="flex items-start gap-2">
             <Check className="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0" />
-            <span>Review findings and root cause analysis</span>
+            <span>{t("Review findings and root cause analysis")}</span>
           </li>
         </ul>
       </div>

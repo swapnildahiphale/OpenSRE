@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { AccountMenu } from '@/components/AccountMenu';
+import { useLocale } from '@/lib/i18n/LocaleProvider';
 
 const teamNavigation = [
   { name: 'Dashboard', href: '/team', icon: LayoutDashboard },
@@ -27,7 +28,7 @@ const teamNavigation = [
   { name: 'Memory', href: '/team/memory', icon: Brain },
   { name: 'Proposed Changes', href: '/team/pending-changes', icon: GitPullRequest },
   { name: 'Settings', href: '/settings', icon: ShieldCheck },
-];
+] as const;
 
 function isNavActive(pathname: string, href: string): boolean {
   if (href === '/team') {
@@ -42,6 +43,7 @@ type Props = {
 };
 
 export function TeamSidebar({ collapsed, onToggle }: Props) {
+  const { t } = useLocale();
   const pathname = usePathname();
   const width = collapsed ? 64 : 230;
 
@@ -53,7 +55,7 @@ export function TeamSidebar({ collapsed, onToggle }: Props) {
       <div className="mb-6 flex items-center justify-between px-3">
         {!collapsed && (
           <span className="text-[11px] uppercase tracking-[0.22em] text-slate-400">
-            workspace
+            {t("workspace")}
           </span>
         )}
         <button
@@ -63,7 +65,7 @@ export function TeamSidebar({ collapsed, onToggle }: Props) {
             'rounded-md p-1 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700',
             collapsed && 'mx-auto',
           )}
-          aria-label="Toggle sidebar"
+          aria-label={t("Toggle sidebar")}
         >
           <ChevronLeft
             className={clsx(
@@ -79,9 +81,9 @@ export function TeamSidebar({ collapsed, onToggle }: Props) {
           const isActive = isNavActive(pathname, item.href);
           return (
             <Link
-              key={item.name}
+              key={item.href}
               href={item.href}
-              title={collapsed ? item.name : undefined}
+              title={collapsed ? t(item.name) : undefined}
               className={clsx(
                 'relative flex items-center gap-3 rounded-xl px-3 py-2 text-left transition-colors',
                 isActive
@@ -99,7 +101,7 @@ export function TeamSidebar({ collapsed, onToggle }: Props) {
               />
               <item.icon className="h-[18px] w-[18px] shrink-0" />
               {!collapsed && (
-                <span className="truncate text-sm font-medium">{item.name}</span>
+                <span className="truncate text-sm font-medium">{t(item.name)}</span>
               )}
             </Link>
           );

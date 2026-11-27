@@ -24,6 +24,7 @@ import { TreeSelector, type EffectiveTree, type TreeStats } from '@/components/k
 import { CreateTreeModal } from '@/components/knowledge/CreateTreeModal';
 import { UploadDocumentModal } from '@/components/knowledge/UploadDocumentModal';
 import { PageHeader, Button, Skeleton, listRowHoverClass, TeamPageShell } from '@/components/ui-flow';
+import { useLocale } from '@/lib/i18n/LocaleProvider';
 
 // Lazy load the TreeExplorer since it's heavy
 const TreeExplorer = lazy(() =>
@@ -67,6 +68,7 @@ function KnowledgeTabs({
   documentsCount: number;
   proposedCount: number;
 }) {
+  const { t } = useLocale();
   const tabClass = (tab: TabType) =>
     `px-4 py-2 text-sm font-medium rounded-lg transition-all flex items-center gap-2 ${
       activeTab === tab
@@ -78,11 +80,11 @@ function KnowledgeTabs({
     <div
       className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 rounded-xl p-1 w-fit"
       role="tablist"
-      aria-label="Knowledge sections"
+      aria-label={t("Knowledge sections")}
     >
       <button type="button" role="tab" aria-selected={activeTab === 'explorer'} onClick={() => onTabChange('explorer')} className={tabClass('explorer')}>
         <Network className="w-4 h-4 shrink-0" />
-        Explorer
+        {t("Explorer")}
       </button>
       <button type="button" role="tab" aria-selected={activeTab === 'documents'} onClick={() => onTabChange('documents')} className={tabClass('documents')}>
         <FileText className="w-4 h-4 shrink-0" />
@@ -90,7 +92,7 @@ function KnowledgeTabs({
       </button>
       <button type="button" role="tab" aria-selected={activeTab === 'proposed'} onClick={() => onTabChange('proposed')} className={tabClass('proposed')}>
         <Sparkles className="w-4 h-4 shrink-0" />
-        Proposed
+        {t("Proposed")}
         {proposedCount > 0 && (
           <span className="w-5 h-5 rounded-full bg-emerald-100/60 text-emerald-700 text-xs flex items-center justify-center font-medium">
             {proposedCount}
@@ -102,6 +104,7 @@ function KnowledgeTabs({
 }
 
 export default function TeamKnowledgePage() {
+  const { t } = useLocale();
   const { identity } = useIdentity();
   const [documents, setDocuments] = useState<KnowledgeDocument[]>([]);
   const [proposedChanges, setProposedChanges] = useState<ProposedKBChange[]>([]);
@@ -402,7 +405,7 @@ export default function TeamKnowledgePage() {
       selectedTree ? (
         <Button variant="primary" onClick={() => setShowUploadModal(true)}>
           <Upload className="w-4 h-4" />
-          Upload
+          {t("Upload")}
         </Button>
       ) : null
     ) : (
@@ -424,7 +427,7 @@ export default function TeamKnowledgePage() {
         </Button>
         <Button variant="primary" onClick={() => setShowAddModal(true)}>
           <Plus className="w-4 h-4" />
-          Add Entry
+          {t("Add Entry")}
         </Button>
       </div>
     );
@@ -436,9 +439,9 @@ export default function TeamKnowledgePage() {
       header={
         <>
           <PageHeader
-            eyebrow="Team console"
-            title="Knowledge"
-            subtitle="Team docs and RAPTOR knowledge trees for semantic search and Q&A"
+            eyebrow={t("Team console")}
+            title={t("Knowledge")}
+            subtitle={t("Team docs and RAPTOR knowledge trees for semantic search and Q&A")}
             actions={headerActions}
           />
           <KnowledgeTabs
@@ -488,7 +491,7 @@ export default function TeamKnowledgePage() {
                   <div className="h-full flex items-center justify-center bg-slate-50 dark:bg-slate-800">
                     <div className="text-center space-y-3 w-48 mx-auto">
                       <Skeleton className="h-8 w-8 rounded-full mx-auto" />
-                      <p className="text-slate-500">Loading Tree Explorer...</p>
+                      <p className="text-slate-500">{t("Loading Tree Explorer...")}</p>
                     </div>
                   </div>
                 }
@@ -499,7 +502,7 @@ export default function TeamKnowledgePage() {
               <div className="h-full flex items-center justify-center bg-slate-50 dark:bg-slate-800">
                 <div className="text-center">
                   <Layers className="w-12 h-12 text-slate-300 dark:text-slate-600 mx-auto mb-3" />
-                  <p className="text-slate-500">Select a tree to explore</p>
+                  <p className="text-slate-500">{t("Select a tree to explore")}</p>
                 </div>
               </div>
             )}
@@ -540,7 +543,7 @@ export default function TeamKnowledgePage() {
                       type="text"
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
-                      placeholder="Search knowledge base..."
+                      placeholder={t("Search knowledge base...")}
                       className="w-full pl-10 pr-4 py-2 rounded-full border border-slate-200/70 bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500"
                     />
                   </div>
@@ -548,7 +551,7 @@ export default function TeamKnowledgePage() {
                   {filteredDocs.length === 0 ? (
                     <div className="rounded-[1.5rem] border border-slate-200/70 bg-white dark:bg-slate-800 p-12 text-center">
                       <BookOpen className="w-12 h-12 mx-auto text-slate-300 dark:text-slate-600 mb-4" />
-                      <p className="text-slate-500">No knowledge documents found.</p>
+                      <p className="text-slate-500">{t("No knowledge documents found.")}</p>
                       <p className="text-sm text-slate-400 mt-2">
                         Try the{' '}
                         <button
@@ -556,7 +559,7 @@ export default function TeamKnowledgePage() {
                           onClick={() => setActiveTab('explorer')}
                           className="text-slate-600 dark:text-slate-400 hover:underline"
                         >
-                          Tree Explorer
+                          {t("Tree Explorer")}
                         </button>{' '}
                         to search the RAPTOR knowledge base.
                       </p>
@@ -604,7 +607,7 @@ export default function TeamKnowledgePage() {
                                 type="button"
                                 onClick={() => setViewingDoc(doc)}
                                 className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
-                                title="View"
+                                title={t("View")}
                               >
                                 <Eye className="w-4 h-4" />
                               </button>
@@ -612,7 +615,7 @@ export default function TeamKnowledgePage() {
                                 type="button"
                                 onClick={() => handleDelete(doc.id)}
                                 className="p-2 text-slate-400 hover:text-rose-600"
-                                title="Delete"
+                                title={t("Delete")}
                               >
                                 <Trash2 className="w-4 h-4" />
                               </button>
@@ -630,9 +633,9 @@ export default function TeamKnowledgePage() {
                   {proposedChanges.length === 0 ? (
                     <div className="rounded-[1.5rem] border border-slate-200/70 bg-white dark:bg-slate-800 p-12 text-center">
                       <Sparkles className="w-12 h-12 mx-auto text-slate-300 dark:text-slate-600 mb-4" />
-                      <p className="text-slate-500">No pending AI-proposed changes.</p>
+                      <p className="text-slate-500">{t("No pending AI-proposed changes.")}</p>
                       <p className="text-xs text-slate-400 mt-2">
-                        The AI Pipeline will propose knowledge updates based on incident patterns.
+                        {t("The AI Pipeline will propose knowledge updates based on incident patterns.")}
                       </p>
                     </div>
                   ) : (
@@ -649,7 +652,7 @@ export default function TeamKnowledgePage() {
                             <div>
                               <div className="flex items-center gap-2 mb-1">
                                 <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400">
-                                  + Add
+                                  {t("+ Add")}
                                 </span>
                                 <h3 className="text-[14.5px] text-slate-900 dark:text-white">
                                   {change.document.title}
@@ -659,11 +662,11 @@ export default function TeamKnowledgePage() {
                                 {change.document.summary}
                               </p>
                               <p className="text-xs text-slate-500">
-                                <span className="font-medium">Reason:</span> {change.reason}
+                                <span className="font-medium">{t("Reason:")}</span> {change.reason}
                               </p>
                               {change.learnedFrom && (
                                 <p className="text-xs text-slate-500 mt-1">
-                                  Learned from: {change.learnedFrom}
+                                  {t("Learned from:")}{' '}{change.learnedFrom}
                                 </p>
                               )}
                             </div>
@@ -674,10 +677,10 @@ export default function TeamKnowledgePage() {
                               onClick={() => handleRejectChange(change.id)}
                               className="text-rose-600 border-rose-200 hover:bg-rose-50"
                             >
-                              Reject
+                              {t("Reject")}
                             </Button>
                             <Button variant="primary" onClick={() => handleApproveChange(change.id)}>
-                              Approve
+                              {t("Approve")}
                             </Button>
                           </div>
                         </div>
@@ -718,9 +721,9 @@ export default function TeamKnowledgePage() {
                   {viewingDoc.content || viewingDoc.summary}
                 </div>
                 <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-600 text-xs text-slate-500">
-                  <p>Created: {new Date(viewingDoc.createdAt).toLocaleString()}</p>
-                  <p>By: {viewingDoc.createdBy}</p>
-                  {viewingDoc.source && <p>Source: {viewingDoc.source}</p>}
+                  <p>{t("Created:")}{' '}{new Date(viewingDoc.createdAt).toLocaleString()}</p>
+                  <p>{t("By:")}{' '}{viewingDoc.createdBy}</p>
+                  {viewingDoc.source && <p>{t("Source:")}{' '}{viewingDoc.source}</p>}
                 </div>
               </div>
             </div>
@@ -739,6 +742,7 @@ function AddKnowledgeModal({
   onClose: () => void;
   onSave: (data: { title: string; content: string }) => void;
 }) {
+  const { t } = useLocale();
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
 
@@ -746,12 +750,12 @@ function AddKnowledgeModal({
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
       <div className="bg-white dark:bg-slate-800 rounded-2xl w-full max-w-lg p-6">
         <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">
-          Add Knowledge Entry
+          {t("Add Knowledge Entry")}
         </h2>
         <div className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-              Title
+              {t("Title")}
             </label>
             <input
               type="text"
@@ -763,13 +767,13 @@ function AddKnowledgeModal({
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-              Content
+              {t("Content")}
             </label>
             <textarea
               value={content}
               onChange={(e) => setContent(e.target.value)}
               rows={6}
-              placeholder="Enter the knowledge content..."
+              placeholder={t("Enter the knowledge content...")}
               className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700"
             />
           </div>
@@ -779,14 +783,14 @@ function AddKnowledgeModal({
             onClick={onClose}
             className="px-4 py-2 text-sm text-slate-600 dark:text-slate-400"
           >
-            Cancel
+            {t("Cancel")}
           </button>
           <button
             onClick={() => onSave({ title, content })}
             disabled={!title.trim() || !content.trim()}
             className="px-4 py-2 bg-emerald-100/50 text-emerald-700 rounded-full hover:bg-emerald-100/80 disabled:opacity-50"
           >
-            Add Entry
+            {t("Add Entry")}
           </button>
         </div>
       </div>

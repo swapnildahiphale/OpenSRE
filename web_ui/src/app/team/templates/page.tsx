@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { apiFetch } from '@/lib/apiClient';
 import { PageHeader, Button, Skeleton } from '@/components/ui-flow';
+import { useLocale } from '@/lib/i18n/LocaleProvider';
 
 interface Template {
   id: string;
@@ -71,6 +72,7 @@ const CATEGORY_ICONS: Record<string, string> = {
 };
 
 export default function TemplatesPage() {
+  const { t } = useLocale();
   const { identity } = useIdentity();
   const [templates, setTemplates] = useState<Template[]>([]);
   const [loading, setLoading] = useState(true);
@@ -179,8 +181,8 @@ export default function TemplatesPage() {
   return (
     <div className="p-8 max-w-6xl mx-auto">
       <PageHeader
-        eyebrow="Team console"
-        title="Templates"
+        eyebrow={t("Team console")}
+        title={t("Templates")}
         subtitle="Pre-configured agent systems optimized for specific use cases"
       />
 
@@ -314,7 +316,7 @@ export default function TemplatesPage() {
                 ))}
                 {template.required_mcps.length > 3 && (
                   <span className="text-xs px-2 py-1 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 rounded">
-                    +{template.required_mcps.length - 3} more
+                    +{template.required_mcps.length - 3}{' '}{t("more")}
                   </span>
                 )}
               </div>
@@ -357,7 +359,7 @@ export default function TemplatesPage() {
               {/* Description */}
               <div>
                 <h3 className="text-sm font-semibold text-slate-900 dark:text-white mb-2">
-                  Description
+                  {t("Description")}
                 </h3>
                 <p className="text-slate-600 dark:text-slate-400">
                   {selectedTemplate.description}
@@ -440,7 +442,7 @@ export default function TemplatesPage() {
             {/* Footer */}
             <div className="p-6 border-t border-slate-200 dark:border-slate-600 flex justify-end gap-3">
               <Button variant="secondary" onClick={() => setShowPreview(false)}>
-                Cancel
+                {t("Cancel")}
               </Button>
               <Button
                 variant="primary"

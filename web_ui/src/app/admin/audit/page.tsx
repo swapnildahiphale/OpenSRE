@@ -22,6 +22,7 @@ import {
   User,
   Hash
 } from 'lucide-react';
+import { useLocale } from '@/lib/i18n/LocaleProvider';
 
 // Types
 interface AuditEvent {
@@ -71,6 +72,7 @@ const eventTypeIcons: Record<string, { icon: any; color: string }> = {
 };
 
 export default function AuditPage() {
+  const { t } = useLocale();
   const { identity, loading: identityLoading } = useIdentity();
   const [events, setEvents] = useState<AuditEvent[]>([]);
   const [total, setTotal] = useState(0);
@@ -219,7 +221,7 @@ export default function AuditPage() {
   if (!isAdmin) {
     return (
       <div className="p-8 text-center">
-        <p className="text-stone-500">Admin access required</p>
+        <p className="text-stone-500">{t("Admin access required")}</p>
       </div>
     );
   }
@@ -231,10 +233,10 @@ export default function AuditPage() {
         <div>
           <h1 className="text-2xl font-semibold text-stone-900 dark:text-white flex items-center gap-3">
             <Activity className="w-7 h-7 text-stone-500" />
-            Unified Audit Log
+            {t("Unified Audit Log")}
           </h1>
           <p className="text-sm text-stone-500 mt-1">
-            View all activity across tokens, configuration, and agent runs
+            {t("View all activity across tokens, configuration, and agent runs")}
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -244,14 +246,14 @@ export default function AuditPage() {
             className="flex items-center gap-2 px-4 py-2 text-sm bg-stone-100 dark:bg-stone-700 rounded-lg hover:bg-stone-200 dark:hover:bg-stone-700 transition-colors"
           >
             <RefreshCcw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-            Refresh
+            {t("Refresh")}
           </button>
           <button
             onClick={exportCSV}
             className="flex items-center gap-2 px-4 py-2 text-sm bg-stone-700 text-white rounded-lg hover:bg-stone-600 transition-colors"
           >
             <Download className="w-4 h-4" />
-            Export CSV
+            {t("Export CSV")}
           </button>
         </div>
       </div>
@@ -262,7 +264,7 @@ export default function AuditPage() {
           {/* Source filters */}
           <div className="flex items-center gap-2">
             <Filter className="w-4 h-4 text-stone-400" />
-            <span className="text-sm text-stone-500 mr-2">Sources:</span>
+            <span className="text-sm text-stone-500 mr-2">{t("Sources:")}</span>
             {Object.entries(sourceColors).map(([source, style]) => (
               <button
                 key={source}
@@ -285,7 +287,7 @@ export default function AuditPage() {
             onChange={(e) => setSelectedTeam(e.target.value)}
             className="px-3 py-1.5 text-sm rounded-lg border border-stone-200 dark:border-stone-600 bg-white dark:bg-stone-700 text-stone-700 dark:text-stone-300"
           >
-            <option value="">All Teams</option>
+            <option value="">{t("All Teams")}</option>
             {teams.map(t => (
               <option key={t.node_id} value={t.node_id}>{t.name}</option>
             ))}
@@ -297,11 +299,11 @@ export default function AuditPage() {
             onChange={(e) => setTimeRange(e.target.value)}
             className="px-3 py-1.5 text-sm rounded-lg border border-stone-200 dark:border-stone-600 bg-white dark:bg-stone-700 text-stone-700 dark:text-stone-300"
           >
-            <option value="1h">Last hour</option>
-            <option value="24h">Last 24 hours</option>
-            <option value="7d">Last 7 days</option>
-            <option value="30d">Last 30 days</option>
-            <option value="all">All time</option>
+            <option value="1h">{t("Last hour")}</option>
+            <option value="24h">{t("Last 24 hours")}</option>
+            <option value="7d">{t("Last 7 days")}</option>
+            <option value="30d">{t("Last 30 days")}</option>
+            <option value="all">{t("All time")}</option>
           </select>
 
           {/* Search */}
@@ -309,7 +311,7 @@ export default function AuditPage() {
             <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-stone-400" />
             <input
               type="text"
-              placeholder="Search events..."
+              placeholder={t("Search events...")}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full pl-9 pr-4 py-1.5 text-sm rounded-lg border border-stone-200 dark:border-stone-600 bg-white dark:bg-stone-700 text-stone-700 dark:text-stone-300 placeholder-stone-400"
@@ -328,13 +330,13 @@ export default function AuditPage() {
         {loading ? (
           <div className="p-8 text-center">
             <RefreshCcw className="w-6 h-6 animate-spin mx-auto text-stone-400" />
-            <p className="text-stone-500 mt-2">Loading events...</p>
+            <p className="text-stone-500 mt-2">{t("Loading events...")}</p>
           </div>
         ) : events.length === 0 ? (
           <div className="p-8 text-center">
             <Activity className="w-8 h-8 mx-auto text-stone-300 mb-2" />
-            <p className="text-stone-500">No events found</p>
-            <p className="text-xs text-stone-400 mt-1">Try adjusting your filters</p>
+            <p className="text-stone-500">{t("No events found")}</p>
+            <p className="text-xs text-stone-400 mt-1">{t("Try adjusting your filters")}</p>
           </div>
         ) : (
           <div className="divide-y divide-stone-100 dark:divide-stone-700">
@@ -409,13 +411,13 @@ export default function AuditPage() {
                   {isExpanded && (
                     <div className="px-4 pb-4 ml-9">
                       <div className="bg-stone-50 dark:bg-stone-700 rounded-lg p-4">
-                        <h4 className="text-xs font-medium text-stone-500 uppercase tracking-wide mb-2">Event Details</h4>
+                        <h4 className="text-xs font-medium text-stone-500 uppercase tracking-wide mb-2">{t("Event Details")}</h4>
                         <pre className="text-xs text-stone-700 dark:text-stone-300 overflow-x-auto whitespace-pre-wrap">
                           {JSON.stringify(event.details, null, 2)}
                         </pre>
                         {event.correlation_id && (
                           <div className="mt-3 pt-3 border-t border-stone-200 dark:border-stone-600">
-                            <span className="text-xs text-stone-500">Correlation ID: </span>
+                            <span className="text-xs text-stone-500">{t("Correlation ID:")}{' '}</span>
                             <code className="text-xs font-mono text-stone-700 dark:text-stone-300">{event.correlation_id}</code>
                           </div>
                         )}
@@ -436,17 +438,17 @@ export default function AuditPage() {
               disabled={offset === 0}
               className="px-4 py-2 text-sm rounded-lg bg-white dark:bg-stone-700 border border-stone-200 dark:border-stone-600 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-stone-100 dark:hover:bg-stone-700"
             >
-              Previous
+              {t("Previous")}
             </button>
             <span className="text-sm text-stone-500">
-              Page {Math.floor(offset / limit) + 1} of {Math.ceil(total / limit)}
+              {t("Page")}{' '}{Math.floor(offset / limit) + 1} of {Math.ceil(total / limit)}
             </span>
             <button
               onClick={() => setOffset(offset + limit)}
               disabled={offset + limit >= total}
               className="px-4 py-2 text-sm rounded-lg bg-white dark:bg-stone-700 border border-stone-200 dark:border-stone-600 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-stone-100 dark:hover:bg-stone-700"
             >
-              Next
+              {t("Next")}
             </button>
           </div>
         )}

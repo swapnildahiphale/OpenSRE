@@ -17,6 +17,7 @@ import { useAgentStream } from '@/lib/useAgentStream';
 import { timelineToTurns } from '@/lib/agentTimeline';
 import ConversationTranscript from './ConversationTranscript';
 import ConversationComposer from './ConversationComposer';
+import { useLocale } from '@/lib/i18n/LocaleProvider';
 
 type Props = {
   open: boolean;
@@ -27,6 +28,7 @@ type Props = {
 };
 
 export function NewInvestigationDrawer({ open, onClose, onComplete }: Props) {
+  const { t } = useLocale();
   const router = useRouter();
   const { timeline, runId, isStreaming, backgroundWaiting, sendMessage, queueMessage, queuedMessages, stop, reset } = useAgentStream({
     // useAgentStream passes the final output text; callers here only need a
@@ -53,8 +55,8 @@ export function NewInvestigationDrawer({ open, onClose, onComplete }: Props) {
               <Sparkles className="h-5 w-5 text-emerald-600" />
             </div>
             <div>
-              <h2 className="font-semibold text-slate-900">New Investigation</h2>
-              <p className="text-xs text-slate-500">AI-powered incident investigation</p>
+              <h2 className="font-semibold text-slate-900">{t("New Investigation")}</h2>
+              <p className="text-xs text-slate-500">{t("AI-powered incident investigation")}</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -67,7 +69,7 @@ export function NewInvestigationDrawer({ open, onClose, onComplete }: Props) {
                 }}
                 className="rounded-full bg-emerald-100/50 px-3 py-1 text-xs font-medium text-emerald-700 hover:bg-emerald-100/80"
               >
-                View saved run
+                {t("View saved run")}
               </button>
             )}
             <button
@@ -82,9 +84,9 @@ export function NewInvestigationDrawer({ open, onClose, onComplete }: Props) {
           {timeline.length === 0 && !isStreaming ? (
             <div className="py-12 text-center">
               <Bot className="mx-auto mb-4 h-12 w-12 text-slate-300" />
-              <p className="mb-2 text-slate-600">Start an investigation</p>
+              <p className="mb-2 text-slate-600">{t("Start an investigation")}</p>
               <p className="text-sm text-slate-400">
-                Describe the issue and the AI will analyze your systems.
+                {t("Describe the issue and the AI will analyze your systems.")}
               </p>
             </div>
           ) : (
@@ -98,7 +100,7 @@ export function NewInvestigationDrawer({ open, onClose, onComplete }: Props) {
             queuedMessages={queuedMessages}
             onStop={isStreaming ? stop : undefined}
             busy={isStreaming}
-            placeholder="Describe the issue to investigate..."
+            placeholder={t("Describe the issue to investigate...")}
           />
         </div>
       </div>

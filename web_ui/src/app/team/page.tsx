@@ -25,6 +25,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useInvestigationLauncher } from '@/components/shell/InvestigationLauncherContext';
 import { PageHeader, Panel, StatusDot, listRowHoverClass, TeamPageShell } from '@/components/ui-flow';
 import type { ComponentProps } from 'react';
+import { useLocale } from '@/lib/i18n/LocaleProvider';
 
 interface TeamStats {
   totalRuns: number;
@@ -117,6 +118,7 @@ function issueTypeClass(issueType?: string | null): string {
 }
 
 export default function TeamDashboardPage() {
+  const { locale, t } = useLocale();
   const router = useRouter();
   const { identity } = useIdentity();
   const [stats, setStats] = useState<TeamStats | null>(null);
@@ -235,22 +237,22 @@ export default function TeamDashboardPage() {
       <TeamPageShell className="space-y-10">
         <div className="flex flex-wrap items-end justify-between gap-8">
           <PageHeader
-            eyebrow="Dashboard"
-            title="Today"
-            subtitle="Monitor your AI agents and team activity"
+            eyebrow={t("Dashboard")}
+            title={t("Today")}
+            subtitle={t("Monitor your AI agents and team activity")}
           />
           <div className="flex flex-col items-end gap-3 text-sm shrink-0">
             {liveInvestigationCount > 0 && (
               <span className="inline-flex items-center gap-2 text-slate-500">
                 <span className="live-dot w-2 h-2 rounded-full" aria-hidden />
                 <span className="font-mono text-[13px] tabular-nums">
-                  {liveInvestigationCount} live investigation
+                  {liveInvestigationCount}{' '}{t("live investigation")}
                   {liveInvestigationCount !== 1 ? 's' : ''}
                 </span>
               </span>
             )}
             <div className="text-xs text-slate-400 text-right font-mono">
-              Team: <span className="text-slate-600">{teamLabel}</span>
+              {t("Team:")}{' '}<span className="text-slate-600">{teamLabel}</span>
             </div>
           </div>
         </div>
@@ -272,11 +274,11 @@ export default function TeamDashboardPage() {
               <div className="relative flex-1 flex flex-col">
                 <div className="flex items-center justify-between">
                   <span className="text-[11px] uppercase tracking-[0.22em] text-slate-500">
-                    In flight
+                    {t("In flight")}
                   </span>
                   {liveInvestigationCount > 0 && (
                     <span className="inline-flex items-center h-7 px-3 rounded-full text-xs font-medium bg-emerald-100/70 text-emerald-800 border border-emerald-200/80">
-                      Active
+                      {t("Active")}
                     </span>
                   )}
                 </div>
@@ -286,7 +288,7 @@ export default function TeamDashboardPage() {
                   </span>
                   {(stats?.runsThisWeek ?? 0) > 0 && (
                     <span className="text-emerald-600 font-mono text-sm font-medium">
-                      / {stats?.runsThisWeek} runs this week
+                      / {stats?.runsThisWeek}{' '}{t("runs this week")}
                     </span>
                   )}
                 </div>
@@ -304,15 +306,15 @@ export default function TeamDashboardPage() {
                 <div className="mt-auto pt-5 flex gap-6 text-xs font-mono text-slate-500">
                   <span>
                     <span className="text-emerald-600 font-medium">{runStatusCounts.running}</span>{' '}
-                    running
+                    {t("running")}
                   </span>
                   <span>
                     <span className="text-amber-600 font-medium">{runStatusCounts.timeout}</span>{' '}
-                    timeout
+                    {t("timeout")}
                   </span>
                   <span>
                     <span className="text-slate-500 font-medium">{runStatusCounts.failed}</span>{' '}
-                    failed
+                    {t("failed")}
                   </span>
                 </div>
               </div>
@@ -321,7 +323,7 @@ export default function TeamDashboardPage() {
           <div className="col-span-12 md:col-span-7 grid grid-cols-3 gap-x-10 px-2">
             <div className="border-t border-slate-200 pt-6">
               <div className="text-[11px] uppercase tracking-[0.22em] text-slate-500">
-                Total investigations
+                {t("Total investigations")}
               </div>
               <div className="mt-4 text-4xl font-medium tracking-tight font-mono tabular-nums text-slate-900">
                 {stats?.totalInvestigations ?? stats?.totalRuns ?? 0}
@@ -329,7 +331,7 @@ export default function TeamDashboardPage() {
             </div>
             <div className="border-t border-slate-200 pt-6">
               <div className="text-[11px] uppercase tracking-[0.22em] text-slate-500">
-                Run success
+                {t("Run success")}
               </div>
               <div className="mt-4 text-4xl font-medium tracking-tight font-mono tabular-nums text-slate-900">
                 {stats?.successRate ?? 0}%
@@ -337,7 +339,7 @@ export default function TeamDashboardPage() {
             </div>
             <div className="border-t border-slate-200 pt-6">
               <div className="text-[11px] uppercase tracking-[0.22em] text-slate-500">
-                Avg run MTTD
+                {t("Avg run MTTD")}
               </div>
               <div className="mt-4 text-4xl font-medium tracking-tight font-mono tabular-nums text-slate-900">
                 {formatMttd(stats?.avgMttdSeconds)}
@@ -350,20 +352,20 @@ export default function TeamDashboardPage() {
           <section className="lg:col-span-2">
             <Panel className="flex flex-col max-h-[540px]">
               <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between shrink-0">
-                <h2 className="text-lg font-medium tracking-tight text-slate-900">Recent Activity</h2>
+                <h2 className="text-lg font-medium tracking-tight text-slate-900">{t("Recent Activity")}</h2>
                 <button
                   type="button"
                   onClick={handleRefresh}
                   className="text-xs text-slate-500 hover:text-slate-700 inline-flex items-center gap-1 transition-colors"
                 >
                   <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} />
-                  Refresh
+                  {t("Refresh")}
                 </button>
               </div>
               <ul className="divide-y divide-slate-100 overflow-y-auto flex-1">
                 {recentThreads.length === 0 && (
                   <li className="px-5 py-8 text-center text-sm text-slate-500">
-                    No recent investigations
+                    {t("No recent investigations")}
                   </li>
                 )}
                 {recentThreads.map(thread => {
@@ -380,7 +382,7 @@ export default function TeamDashboardPage() {
                       >
                         <div className="flex items-start gap-3">
                           <span className="mt-1.5">
-                            <StatusDot tone={runStatusTone(status)} label={status} />
+                            <StatusDot tone={runStatusTone(status)} label={t(status)} />
                           </span>
                           <div className="min-w-0 flex-1">
                             <div className="flex flex-wrap items-center gap-2 mb-1.5 text-xs text-slate-500">
@@ -389,9 +391,9 @@ export default function TeamDashboardPage() {
                                   {ep.issue_type}
                                 </span>
                               )}
-                              {thread.turnCount > 1 && <span>{thread.turnCount} turns</span>}
+                              {thread.turnCount > 1 && <span>{thread.turnCount}{' '}{t("turns")}</span>}
                               <span className="font-mono tabular-nums">
-                                {formatRelativeTime(thread.latestRun.startedAt)}
+                                {formatRelativeTime(thread.latestRun.startedAt, locale)}
                               </span>
                             </div>
                             <p className="text-[14.5px] text-slate-900 leading-snug line-clamp-2">
@@ -409,7 +411,7 @@ export default function TeamDashboardPage() {
                   href="/team/agent-runs"
                   className="text-sm text-emerald-700 font-medium hover:underline"
                 >
-                  All investigations →
+                  {t("All investigations →")}
                 </Link>
               </div>
             </Panel>
@@ -418,7 +420,7 @@ export default function TeamDashboardPage() {
           <div className="flex flex-col gap-4">
             <Panel>
               <div className="px-4 py-3.5 border-b border-slate-100 flex items-center justify-between">
-                <h2 className="text-lg font-medium tracking-tight text-slate-900">Pending Items</h2>
+                <h2 className="text-lg font-medium tracking-tight text-slate-900">{t("Pending Items")}</h2>
                 {totalPending > 0 && (
                   <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-600 font-mono tabular-nums">
                     {totalPending}
@@ -433,7 +435,7 @@ export default function TeamDashboardPage() {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <GitPullRequest className="w-4 h-4 text-slate-400" />
-                      <span className="text-sm font-medium text-slate-900">Config Changes</span>
+                      <span className="text-sm font-medium text-slate-900">{t("Config Changes")}</span>
                     </div>
                     {pending.configChanges > 0 && (
                       <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-600 font-mono">
@@ -441,7 +443,7 @@ export default function TeamDashboardPage() {
                       </span>
                     )}
                   </div>
-                  <p className="text-xs text-slate-500 mt-1.5">Awaiting approval</p>
+                  <p className="text-xs text-slate-500 mt-1.5">{t("Awaiting approval")}</p>
                 </Link>
 
                 <Link
@@ -451,7 +453,7 @@ export default function TeamDashboardPage() {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <BookOpen className="w-4 h-4 text-slate-400" />
-                      <span className="text-sm font-medium text-slate-900">Knowledge Changes</span>
+                      <span className="text-sm font-medium text-slate-900">{t("Knowledge Changes")}</span>
                     </div>
                     {pending.knowledgeChanges > 0 && (
                       <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100/60 text-emerald-700 font-mono">
@@ -459,14 +461,14 @@ export default function TeamDashboardPage() {
                       </span>
                     )}
                   </div>
-                  <p className="text-xs text-slate-500 mt-1.5">Proposed changes</p>
+                  <p className="text-xs text-slate-500 mt-1.5">{t("Proposed changes")}</p>
                 </Link>
               </div>
             </Panel>
 
             <Panel>
               <div className="px-4 py-3.5 border-b border-slate-100">
-                <h2 className="text-lg font-medium tracking-tight text-slate-900">Quick Actions</h2>
+                <h2 className="text-lg font-medium tracking-tight text-slate-900">{t("Quick Actions")}</h2>
               </div>
               <div className="p-4 space-y-2">
                 <Link
@@ -478,8 +480,8 @@ export default function TeamDashboardPage() {
                       <Upload className="w-4 h-4" />
                     </div>
                     <div>
-                      <div className="text-sm font-medium text-slate-900">Upload Knowledge</div>
-                      <div className="text-xs text-slate-500">Add documentation</div>
+                      <div className="text-sm font-medium text-slate-900">{t("Upload Knowledge")}</div>
+                      <div className="text-xs text-slate-500">{t("Add documentation")}</div>
                     </div>
                   </div>
                 </Link>
@@ -493,8 +495,8 @@ export default function TeamDashboardPage() {
                       <Wrench className="w-4 h-4" />
                     </div>
                     <div>
-                      <div className="text-sm font-medium text-slate-900">Configure Agents</div>
-                      <div className="text-xs text-slate-500">Edit agent topology</div>
+                      <div className="text-sm font-medium text-slate-900">{t("Configure Agents")}</div>
+                      <div className="text-xs text-slate-500">{t("Edit agent topology")}</div>
                     </div>
                   </div>
                 </Link>
@@ -508,8 +510,8 @@ export default function TeamDashboardPage() {
                       <Brain className="w-4 h-4" />
                     </div>
                     <div>
-                      <div className="text-sm font-medium text-slate-900">Memory</div>
-                      <div className="text-xs text-slate-500">Past investigations</div>
+                      <div className="text-sm font-medium text-slate-900">{t("Memory")}</div>
+                      <div className="text-xs text-slate-500">{t("Past investigations")}</div>
                     </div>
                   </div>
                 </Link>

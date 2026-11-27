@@ -18,6 +18,7 @@ import {
   Plug,
 } from 'lucide-react';
 import { PageHeader, Button, Chip, Skeleton, listRowHoverClass, TeamPageShell } from '@/components/ui-flow';
+import { useLocale } from '@/lib/i18n/LocaleProvider';
 
 interface Evidence {
   source_type: string;  // 'slack_thread', 'confluence_doc', 'agent_trace', etc.
@@ -114,6 +115,7 @@ const getSourceTypeLabel = (sourceType: string) => {
 };
 
 export default function TeamPendingChangesPage() {
+  const { t } = useLocale();
   const { identity } = useIdentity();
   const [changes, setChanges] = useState<PendingChange[]>([]);
   const [loading, setLoading] = useState(true);
@@ -230,14 +232,14 @@ export default function TeamPendingChangesPage() {
 
   const pageHeader = (
     <PageHeader
-      eyebrow="Team console"
-      title="Proposed Changes"
-      subtitle="Review and approve AI-proposed changes to your team's configuration."
+      eyebrow={t("Team console")}
+      title={t("Proposed Changes")}
+      subtitle={t("Review and approve AI-proposed changes to your team's configuration.")}
       actions={
         pendingCount > 0 ? (
           <Chip active className="pointer-events-none cursor-default">
             <Clock className="w-3.5 h-3.5" />
-            {pendingCount} pending
+            {pendingCount}{' '}{t("pending")}
           </Chip>
         ) : undefined
       }
@@ -368,11 +370,11 @@ export default function TeamPendingChangesPage() {
                   {/* Diff View */}
                   {change.diff && (
                     <div className="mb-4">
-                      <h4 className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Changes</h4>
+                      <h4 className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">{t("Changes")}</h4>
                       <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-lg overflow-hidden">
                         {change.diff.before && (
                           <div className="p-3 border-b border-slate-200 dark:border-slate-600 bg-rose-50 dark:bg-rose-900/10">
-                            <div className="text-xs text-rose-600 mb-1">- Before</div>
+                            <div className="text-xs text-rose-600 mb-1">{t("- Before")}</div>
                             <pre className="text-xs text-slate-700 dark:text-slate-300 whitespace-pre-wrap">
                               {typeof change.diff.before === 'string'
                                 ? change.diff.before
@@ -382,7 +384,7 @@ export default function TeamPendingChangesPage() {
                         )}
                         {change.diff.after && (
                           <div className="p-3 bg-green-50 dark:bg-green-900/10">
-                            <div className="text-xs text-green-600 mb-1">+ After</div>
+                            <div className="text-xs text-green-600 mb-1">{t("+ After")}</div>
                             <pre className="text-xs text-slate-700 dark:text-slate-300 whitespace-pre-wrap">
                               {typeof change.diff.after === 'string'
                                 ? change.diff.after
@@ -427,7 +429,7 @@ export default function TeamPendingChangesPage() {
                                 rel="noopener noreferrer"
                                 className="text-xs text-emerald-600 dark:text-emerald-400 hover:underline mt-2 inline-block"
                               >
-                                View source →
+                                {t("View source →")}
                               </a>
                             )}
                           </div>
@@ -440,15 +442,15 @@ export default function TeamPendingChangesPage() {
                   {change.reviewedBy && (
                     <div className="mb-4 p-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-lg">
                       <p className="text-sm text-slate-600 dark:text-slate-400">
-                        <span className="font-medium">Reviewed by:</span> {change.reviewedBy}
+                        <span className="font-medium">{t("Reviewed by:")}</span> {change.reviewedBy}
                       </p>
                       <p className="text-sm text-slate-600 dark:text-slate-400">
-                        <span className="font-medium">Date:</span>{' '}
+                        <span className="font-medium">{t("Date:")}</span>{' '}
                         {new Date(change.reviewedAt!).toLocaleString()}
                       </p>
                       {change.reviewComment && (
                         <p className="text-sm text-slate-600 dark:text-slate-400 mt-2">
-                          <span className="font-medium">Comment:</span> {change.reviewComment}
+                          <span className="font-medium">{t("Comment:")}</span> {change.reviewComment}
                         </p>
                       )}
                     </div>

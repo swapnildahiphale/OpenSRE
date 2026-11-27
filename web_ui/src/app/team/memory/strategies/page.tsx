@@ -5,6 +5,7 @@ import { ChevronDown, Pencil, RotateCw, Trash2, X } from 'lucide-react';
 import { clsx } from 'clsx';
 import MarkdownFallback from '@/components/MarkdownFallback';
 import { Button, Chip, EmptyState, Skeleton, listRowHoverClass } from '@/components/ui-flow';
+import { useLocale } from '@/lib/i18n/LocaleProvider';
 
 interface Strategy {
   strategy_id: string;
@@ -35,6 +36,7 @@ function FilterSectionLabel({ children }: { children: React.ReactNode }) {
 }
 
 export default function StrategiesPage() {
+  const { locale, t } = useLocale();
   const [allStrategies, setAllStrategies] = useState<Strategy[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -237,8 +239,8 @@ export default function StrategiesPage() {
   if (allStrategies.length === 0) {
     return (
       <EmptyState
-        title="No strategies yet"
-        description="Strategies are auto-generated after multiple similar investigations. Run more episodes with the same issue type and component to unlock playbooks."
+        title={t("No strategies yet")}
+        description={t("Strategies are auto-generated after multiple similar investigations. Run more episodes with the same issue type and component to unlock playbooks.")}
       />
     );
   }
@@ -248,14 +250,14 @@ export default function StrategiesPage() {
       <aside className="col-span-12 lg:col-span-3">
         <div className="sticky top-[80px] space-y-8">
           <div>
-            <FilterSectionLabel>Patterns</FilterSectionLabel>
+            <FilterSectionLabel>{t("Patterns")}</FilterSectionLabel>
             <div className="flex flex-wrap gap-1.5">
               <Chip
                 active={issueType === 'all'}
                 onClick={() => setIssueType('all')}
                 className="h-auto px-2.5 py-1 normal-case"
               >
-                all
+                {t("all")}
               </Chip>
               {patternFreqs.map(({ value, count }) => (
                 <Chip
@@ -272,7 +274,7 @@ export default function StrategiesPage() {
           </div>
 
           <div>
-            <FilterSectionLabel>Component</FilterSectionLabel>
+            <FilterSectionLabel>{t("Component")}</FilterSectionLabel>
             <input
               type="text"
               value={componentKey}
@@ -289,7 +291,7 @@ export default function StrategiesPage() {
                 onClick={clearAllFilters}
                 className="text-[12px] text-slate-500 hover:text-slate-800 transition-colors"
               >
-                clear all
+                {t("clear all")}
               </button>
             </div>
           )}
@@ -306,8 +308,8 @@ export default function StrategiesPage() {
             onClick={fetchStrategies}
             disabled={refreshing}
             className="p-2 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-slate-100 transition disabled:opacity-50"
-            aria-label="Refresh strategies"
-            title="Refresh"
+            aria-label={t("Refresh strategies")}
+            title={t("Refresh")}
           >
             <RotateCw className={clsx('w-[18px] h-[18px]', refreshing && 'animate-spin')} />
           </button>
@@ -315,11 +317,11 @@ export default function StrategiesPage() {
 
         {filteredStrategies.length === 0 ? (
           <EmptyState
-            title="No strategies match your filters"
+            title={t("No strategies match your filters")}
             action={
               hasActiveFilters ? (
                 <Button variant="secondary" onClick={clearAllFilters}>
-                  Clear filters
+                  {t("Clear filters")}
                 </Button>
               ) : undefined
             }
@@ -385,7 +387,7 @@ export default function StrategiesPage() {
                             type="button"
                             onClick={(e) => startEditing(e, strategy)}
                             className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 shrink-0"
-                            aria-label="Edit strategy"
+                            aria-label={t("Edit strategy")}
                           >
                             <Pencil className="w-4 h-4" />
                           </button>
@@ -395,7 +397,7 @@ export default function StrategiesPage() {
                             onClick={(e) => handleDelete(e, strategy)}
                             disabled={deleting}
                             className="p-1.5 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-rose-50 shrink-0 disabled:opacity-50"
-                            aria-label="Delete strategy"
+                            aria-label={t("Delete strategy")}
                           >
                             <Trash2 className={clsx('w-4 h-4', deleting && 'animate-pulse')} />
                           </button>
@@ -409,7 +411,7 @@ export default function StrategiesPage() {
                                   htmlFor={`strategy-edit-${strategy.strategy_id}`}
                                   className="block text-xs font-medium text-slate-500"
                                 >
-                                  Edit playbook (Markdown)
+                                  {t("Edit playbook (Markdown)")}
                                 </label>
                                 <textarea
                                   id={`strategy-edit-${strategy.strategy_id}`}
@@ -435,7 +437,7 @@ export default function StrategiesPage() {
                                     disabled={saving}
                                   >
                                     <X className="w-4 h-4" />
-                                    Cancel
+                                    {t("Cancel")}
                                   </Button>
                                 </div>
                               </div>
@@ -446,10 +448,10 @@ export default function StrategiesPage() {
                                 </div>
                                 <div className="mt-4 pt-3 border-t border-slate-100 text-xs text-slate-400 space-y-1">
                                   {strategy.generated_at ? (
-                                    <p>Generated {new Date(strategy.generated_at).toLocaleString()}</p>
+                                    <p>{t("Generated")}{' '}{new Date(strategy.generated_at).toLocaleString(locale)}</p>
                                   ) : null}
                                   {strategy.updated_at ? (
-                                    <p>Last edited {new Date(strategy.updated_at).toLocaleString()}</p>
+                                    <p>{t("Last edited")}{' '}{new Date(strategy.updated_at).toLocaleString(locale)}</p>
                                   ) : null}
                                 </div>
                               </>

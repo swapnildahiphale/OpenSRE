@@ -8,6 +8,7 @@ import { clsx } from 'clsx';
 import { ChevronDown, Clock, RotateCw, Search } from 'lucide-react';
 import { formatRelativeTime } from '@/lib/formatRelativeTime';
 import { Button, Chip, EmptyState, Panel, Skeleton, listRowHoverClass } from '@/components/ui-flow';
+import { useLocale } from '@/lib/i18n/LocaleProvider';
 
 interface Component {
   type: string;
@@ -109,6 +110,7 @@ function formatDuration(seconds: number | null): string | null {
 }
 
 export default function EpisodesPage() {
+  const { locale, t } = useLocale();
   const searchParams = useSearchParams();
   const targetEpisodeId = searchParams.get('episode');
   const initialIssueType = searchParams.get('issue_type');
@@ -285,11 +287,11 @@ export default function EpisodesPage() {
   if (episodes.length === 0) {
     return (
       <EmptyState
-        title="No episodes yet"
-        description="Episodes are created automatically after investigations."
+        title={t("No episodes yet")}
+        description={t("Episodes are created automatically after investigations.")}
         action={
           <Link href="/team/agent-runs">
-            <Button variant="primary">Start investigation</Button>
+            <Button variant="primary">{t("Start investigation")}</Button>
           </Link>
         }
       />
@@ -301,22 +303,22 @@ export default function EpisodesPage() {
       <aside className="col-span-12 lg:col-span-3">
         <div className="sticky top-[80px] space-y-8">
           <div>
-            <FilterSectionLabel>Status</FilterSectionLabel>
+            <FilterSectionLabel>{t("Status")}</FilterSectionLabel>
             <ul className="space-y-1.5">
               <StatusFilterItem
-                label="All"
+                label={t("All")}
                 count={stats.total}
                 active={statusFilter === 'all'}
                 onClick={() => setStatusFilter('all')}
               />
               <StatusFilterItem
-                label="Resolved"
+                label={t("Resolved")}
                 count={stats.resolved}
                 active={statusFilter === 'resolved'}
                 onClick={() => setStatusFilter('resolved')}
               />
               <StatusFilterItem
-                label="Open"
+                label={t("Open")}
                 count={stats.open}
                 active={statusFilter === 'unresolved'}
                 onClick={() => setStatusFilter('unresolved')}
@@ -326,14 +328,14 @@ export default function EpisodesPage() {
 
           {issueTypeFreqs.length > 0 && (
             <div>
-              <FilterSectionLabel>Patterns</FilterSectionLabel>
+              <FilterSectionLabel>{t("Patterns")}</FilterSectionLabel>
               <div className="flex flex-wrap gap-1.5">
                 <Chip
                   active={issueTypeFilter === 'all'}
                   onClick={() => setIssueTypeFilter('all')}
                   className="h-auto px-2.5 py-1 normal-case"
                 >
-                  all
+                  {t("all")}
                 </Chip>
                 {visiblePatterns.map(({ value, count }) => (
                   <Chip
@@ -351,8 +353,8 @@ export default function EpisodesPage() {
                     type="button"
                     onClick={expandPatterns}
                     className="px-2.5 py-1 rounded-full text-xs font-medium border border-slate-200/70 bg-slate-50 text-slate-500 hover:bg-slate-100 hover:border-slate-300 hover:text-slate-600 transition"
-                    aria-label="Show more patterns"
-                    title="Show more patterns"
+                    aria-label={t("Show more patterns")}
+                    title={t("Show more patterns")}
                   >
                     …
                   </button>
@@ -362,15 +364,15 @@ export default function EpisodesPage() {
           )}
 
           <div>
-            <FilterSectionLabel>Sort</FilterSectionLabel>
+            <FilterSectionLabel>{t("Sort")}</FilterSectionLabel>
             <ul className="space-y-1.5">
               <StatusFilterItem
-                label="Newest first"
+                label={t("Newest first")}
                 active={sortBy === 'newest'}
                 onClick={() => setSortBy('newest')}
               />
               <StatusFilterItem
-                label="Most effective"
+                label={t("Most effective")}
                 active={sortBy === 'effectiveness'}
                 onClick={() => setSortBy('effectiveness')}
               />
@@ -384,7 +386,7 @@ export default function EpisodesPage() {
                 onClick={clearAllFilters}
                 className="text-[12px] text-slate-500 hover:text-slate-800 transition-colors"
               >
-                clear all
+                {t("clear all")}
               </button>
             </div>
           )}
@@ -396,7 +398,7 @@ export default function EpisodesPage() {
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
           <input
             type="text"
-            placeholder="Search episodes…"
+            placeholder={t("Search episodes…")}
             value={searchText}
             onChange={(e) => setSearchText(e.target.value)}
             className="w-full h-11 pl-10 pr-4 rounded-xl border border-slate-200/70 bg-white text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-300"
@@ -405,11 +407,11 @@ export default function EpisodesPage() {
 
         {filteredEpisodes.length === 0 && !hasTargetEpisode ? (
           <EmptyState
-            title="No episodes match your filters"
+            title={t("No episodes match your filters")}
             action={
               hasActiveFilters ? (
                 <Button variant="secondary" onClick={clearAllFilters}>
-                  Clear filters
+                  {t("Clear filters")}
                 </Button>
               ) : undefined
             }
@@ -445,7 +447,7 @@ export default function EpisodesPage() {
                           </span>
                           {ep.extraction_status === 'failed' && (
                             <span className="inline-flex items-center h-5 px-2 rounded-full text-[10px] font-medium tracking-wide bg-slate-100 text-slate-600">
-                              couldn’t summarize
+                              {t("couldn’t summarize")}
                             </span>
                           )}
                           {ep.severity && (
@@ -481,7 +483,7 @@ export default function EpisodesPage() {
                             ))}
                             {!expanded && ep.services.length > 3 && (
                               <span className="text-xs text-slate-400">
-                                +{ep.services.length - 3} more
+                                +{ep.services.length - 3}{' '}{t("more")}
                               </span>
                             )}
                           </div>
@@ -490,7 +492,7 @@ export default function EpisodesPage() {
                         <div className="flex items-center gap-3 text-xs text-slate-400 flex-wrap">
                           {ep.created_at && (
                             <span className="font-mono tabular-nums">
-                              {formatRelativeTime(ep.created_at)}
+                              {formatRelativeTime(ep.created_at, locale)}
                             </span>
                           )}
                           {duration && (
@@ -517,7 +519,7 @@ export default function EpisodesPage() {
                       )}
                       {ep.root_cause && (
                         <p className="text-sm text-slate-500 mb-3">
-                          <span className="font-medium text-slate-700">Root cause:</span>{' '}
+                          <span className="font-medium text-slate-700">{t("Root cause:")}</span>{' '}
                           {ep.root_cause}
                         </p>
                       )}
@@ -541,7 +543,7 @@ export default function EpisodesPage() {
                       )}
                       {ep.extraction_status === 'failed' && (
                         <div className="flex items-center justify-between gap-3 mb-4">
-                          <p className="text-sm text-slate-500">Couldn’t summarize this investigation.</p>
+                          <p className="text-sm text-slate-500">{t("Couldn’t summarize this investigation.")}</p>
                           <button
                             type="button"
                             disabled={retryingId === ep.episode_id}
@@ -552,13 +554,13 @@ export default function EpisodesPage() {
                             className="inline-flex items-center gap-1.5 text-sm text-emerald-700 hover:underline disabled:opacity-50"
                           >
                             <RotateCw className="w-3.5 h-3.5" />
-                            Retry
+                            {t("Retry")}
                           </button>
                         </div>
                       )}
                       {ep.effectiveness_score != null && (
                         <p className="text-xs text-slate-500 mb-4">
-                          Effectiveness{' '}
+                          {t("Effectiveness")}{' '}
                           <span className="font-mono text-slate-700">
                             {ep.effectiveness_score.toFixed(2)}
                           </span>
@@ -569,7 +571,7 @@ export default function EpisodesPage() {
                           href={`/team/agent-runs/${ep.agent_run_id}`}
                           className="text-sm text-emerald-700 font-medium hover:underline"
                         >
-                          Open investigation →
+                          {t("Open investigation →")}
                         </Link>
                       )}
                     </div>

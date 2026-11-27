@@ -15,6 +15,7 @@ import {
   ChevronDown,
   ChevronUp
 } from 'lucide-react';
+import { useLocale } from '@/lib/i18n/LocaleProvider';
 
 interface PendingChange {
   id: string;
@@ -34,6 +35,7 @@ interface PendingChange {
 }
 
 export default function PendingChangesPage() {
+  const { t } = useLocale();
   const { identity, loading: identityLoading } = useIdentity();
   const [changes, setChanges] = useState<PendingChange[]>([]);
   const [loading, setLoading] = useState(false);
@@ -145,7 +147,7 @@ export default function PendingChangesPage() {
     return (
       <div className="p-8">
         <div className="bg-clay-light/10 dark:bg-clay/20 border border-red-200 dark:border-red-800 rounded-xl p-6 text-center">
-          <p className="text-clay dark:text-clay-light">Admin access required</p>
+          <p className="text-clay dark:text-clay-light">{t("Admin access required")}</p>
         </div>
       </div>
     );
@@ -166,7 +168,7 @@ export default function PendingChangesPage() {
           className="flex items-center gap-2 px-3 py-2 text-sm bg-stone-100 dark:bg-stone-700 rounded-lg hover:bg-stone-200 dark:hover:bg-stone-700"
         >
           <RefreshCcw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-          Refresh
+          {t("Refresh")}
         </button>
       </div>
 
